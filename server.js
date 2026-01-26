@@ -132,7 +132,7 @@ app.post("/api/otp/send", async (req, res) => {
 });
 
 // OTP LOGIN (PUBLIC)
-app.post("/api/otp/login", (req, res) => {
+app.post("/api/otp/login", async (req, res) => {
   const { email, code } = req.body || {};
 
   if (!email || !code) {
