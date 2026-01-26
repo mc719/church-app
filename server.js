@@ -28,6 +28,16 @@ const pool = new Pool({
 });
 
 // ===============================
+// 4.5) ONE-TIME CODE (OTP) STORE
+// ===============================
+const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const otpStore = new Map(); // email -> { code, expiresAt, user }
+
+function isExpired(ts) {
+  return !ts || Date.now() > ts;
+}
+
+// ===============================
 // 5) AUTH MIDDLEWARE (PASTE HERE)
 // ===============================
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-secret";
@@ -48,6 +58,14 @@ function requireAuth(req, res, next) {
   }
 }
 
+function requireAdmin(req, res, next) {
+  const role = req.user?.role;
+  if (role !== "superuser" && role !== "admin") {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+  next();
+}
+
 // ===============================
 // 6) ROUTES
 // ===============================
@@ -55,6 +73,83 @@ function requireAuth(req, res, next) {
 // Test route
 app.get("/api/test", (req, res) => {
   res.json({ message: "Server is working 🎉" });
+});
+
+// OTP SEND (PUBLIC) - by email
+app.post("/api/otp/send", async (req, res) => {
+  try {
+    const { email } = req.body || {};
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const result = await pool.query(
+      "SELECT id, username, role, status, email FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Unrecognized email" });
+    }
+
+    const user = result.rows[0];
+
+    if (!user.status) {
+      return res.status(403).json({ error: "Account disabled" });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + OTP_TTL_MS;
+    otpStore.set(email, { code, expiresAt, user });
+
+    // In a real app, send via email/SMS here.
+    console.log(`OTP for ${email}: ${code}`);
+
+    const response = { message: "One-time code sent" };
+    if (process.env.NODE_ENV !== "production") {
+      response.devCode = code;
+    }
+
+    res.json(response);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to send code" });
+  }
+});
+
+// OTP LOGIN (PUBLIC)
+app.post("/api/otp/login", (req, res) => {
+  const { email, code } = req.body || {};
+
+  if (!email || !code) {
+    return res.status(400).json({ error: "Email and code are required" });
+  }
+
+  const record = otpStore.get(email);
+  if (!record || isExpired(record.expiresAt)) {
+    otpStore.delete(email);
+    return res.status(400).json({ error: "Code expired or not found" });
+  }
+
+  if (record.code !== code) {
+    return res.status(400).json({ error: "Invalid code" });
+  }
+
+  const user = record.user;
+  otpStore.delete(email);
+
+  const token = jwt.sign(
+    { userId: user.id, role: user.role, username: user.username },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+
+  res.json({
+    token,
+    username: user.username,
+    role: user.role
+  });
 });
 
 // LOGIN ROUTE (PUBLIC)
@@ -114,6 +209,108 @@ app.post("/api/cells", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to add cell" });
+  }
+});
+
+// USERS (PROTECTED, ADMIN ONLY)
+app.get("/api/users", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id::text as id,
+              username,
+              email,
+              role,
+              status,
+              restricted_menus as "restrictedMenus"
+       FROM users
+       ORDER BY id`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load users" });
+  }
+});
+
+app.post("/api/users", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { username, password, email, role, status, restrictedMenus } = req.body;
+
+    if (!username || !password || !email || !role) {
+      return res.status(400).json({ error: "Username, email, password, and role are required" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO users (username, email, password_hash, role, status, restricted_menus)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING id::text as id, username, email, role, status, restricted_menus as "restrictedMenus"`,
+      [username, email, passwordHash, role, status ?? true, restrictedMenus || []]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to add user" });
+  }
+});
+
+app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { username, password, email, role, status, restrictedMenus } = req.body;
+
+    let passwordHash = null;
+    if (password) {
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET username = COALESCE($1, username),
+           email = COALESCE($2, email),
+           password_hash = COALESCE($3, password_hash),
+           role = COALESCE($4, role),
+           status = COALESCE($5, status),
+           restricted_menus = COALESCE($6, restricted_menus)
+       WHERE id = $7
+       RETURNING id::text as id, username, email, role, status, restricted_menus as "restrictedMenus"`,
+      [
+        username ?? null,
+        email ?? null,
+        passwordHash,
+        role ?? null,
+        status ?? null,
+        restrictedMenus ?? null,
+        req.params.id
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM users WHERE id = $1 RETURNING id::text as id",
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete user" });
   }
 });
 
@@ -375,7 +572,7 @@ app.delete("/api/reports/:id", requireAuth, async (req, res) => {
 
 // Serve HTML LAST
 app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(__dirname, "public/index2.html"));
+  res.sendFile(path.join(__dirname, "public/index.html"));
 });
 
 // ===============================

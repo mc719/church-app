@@ -1673,8 +1673,12 @@
             <div class="modal-body">
                 <div id="forgotStep1">
                     <p style="text-align: center; margin-bottom: 24px; line-height: 1.6;">
-                        A one-time login code will be sent to cereadingmedia@gmail.com
+                        Enter the email linked to your account to receive a one-time login code.
                     </p>
+                    <div class="form-group">
+                        <label for="forgotEmail">Email *</label>
+                        <input type="email" id="forgotEmail" class="form-control" placeholder="you@example.com" required>
+                    </div>
                     <div class="form-actions">
                         <button type="button" class="btn" onclick="showLoginModal()">
                             <i class="fas fa-sign-in-alt"></i> Login
@@ -1685,7 +1689,7 @@
                 
                 <div id="forgotStep2" style="display: none;">
                     <p style="text-align: center; margin-bottom: 24px; line-height: 1.6;">
-                        Enter the 6-digit code sent to cereadingmedia@gmail.com
+                        Enter the 6-digit code sent to your email.
                     </p>
                     <div class="code-inputs">
                         <input type="text" maxlength="1" class="code-input" oninput="moveToNext(this, 1)">
@@ -2035,8 +2039,12 @@
                         <input type="text" id="editUserUsername" class="form-control" required>
                     </div>
                     <div class="form-group">
+                        <label for="editUserEmail">Email *</label>
+                        <input type="email" id="editUserEmail" class="form-control" required>
+                    </div>
+                    <div class="form-group">
                         <label for="editUserPassword">Password *</label>
-                        <input type="password" id="editUserPassword" class="form-control" required>
+                        <input type="password" id="editUserPassword" class="form-control" placeholder="Leave blank to keep current password">
                     </div>
                     <div class="form-group">
                         <label for="editUserRole">Role *</label>
@@ -2126,6 +2134,10 @@
                     <div class="form-group">
                         <label for="userUsername">Username *</label>
                         <input type="text" id="userUsername" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userEmail">Email *</label>
+                        <input type="email" id="userEmail" class="form-control" required>
                     </div>
                     <div class="form-group">
                         <label for="userPassword">Password *</label>
@@ -2496,6 +2508,7 @@
                     <thead>
                         <tr>
                             <th>Username</th>
+                            <th>Email</th>
                             <th>Password</th>
                             <th>Role</th>
                             <th>Restricted Menus</th>
@@ -2639,6 +2652,7 @@
             cells: [],
             reports: [],
             members: [],
+            users: [],
             currentUser: null,
             settings: {
                 theme: 'light',
@@ -2646,8 +2660,7 @@
                 logoTitle: 'Christ Embassy',
                 logoSubtitle: 'Church Cell Data'
             },
-            currentYear: new Date().getFullYear(),
-            resetCode: null,
+            currentYear: new Date().getFullYear()
         };
 
         // Idle timeout variables
@@ -2725,6 +2738,16 @@
                 // Load reports
                 const reportsData = await apiRequest(API_ENDPOINTS.REPORTS);
                 churchData.reports = reportsData;
+
+                // Load users (admin only)
+                try {
+                    const usersData = await apiRequest(API_ENDPOINTS.USERS);
+                    churchData.users = usersData;
+                } catch (error) {
+                    if (error.message !== 'Not authorized') {
+                        console.warn('Failed to load users:', error.message);
+                    }
+                }
                 
                 // Update UI
                 updateAllUI();
@@ -2797,6 +2820,7 @@
             updateRecentReports();
             updateSidebarMenus();
             updateAllMembersTable();
+            updateAccessManagementTable();
             updateSessionsTable();
         }
 
@@ -3403,6 +3427,151 @@
             document.getElementById('membersCount').textContent = visibleRows.length;
         }
 
+        function getMenuOptions() {
+            const options = [];
+            document.querySelectorAll('.nav-item').forEach(item => {
+                const id = item.getAttribute('data-page');
+                const label = item.textContent.trim();
+                if (id) {
+                    options.push({ id, label });
+                }
+            });
+            return options;
+        }
+
+        function populateRestrictedMenusOptions(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+
+            const menus = getMenuOptions();
+            menus.forEach(menu => {
+                const option = document.createElement('label');
+                option.className = 'multiselect-option';
+                option.innerHTML = `
+                    <input type="checkbox" value="${menu.id}">
+                    <span>${menu.label}</span>
+                `;
+                container.appendChild(option);
+            });
+        }
+
+        function getRestrictedMenusSelection(containerId) {
+            const selected = [];
+            document.querySelectorAll(`#${containerId} input:checked`).forEach(input => {
+                selected.push(input.value);
+            });
+            return selected;
+        }
+
+        function setRestrictedMenusSelection(containerId, values) {
+            const valueSet = new Set(values || []);
+            document.querySelectorAll(`#${containerId} input`).forEach(input => {
+                input.checked = valueSet.has(input.value);
+            });
+        }
+
+        function updateAccessManagementTable() {
+            const tbody = document.getElementById('accessManagementBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            churchData.users.forEach(user => {
+                const restrictedMenus = (user.restrictedMenus || []).join(', ');
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.username}</td>
+                    <td>${user.email || ''}</td>
+                    <td>******</td>
+                    <td>${user.role}</td>
+                    <td>${restrictedMenus || '-'}</td>
+                    <td>${user.status ? 'Active' : 'Inactive'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn edit-btn" onclick="editUser('${user.id}')">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="action-btn delete-btn" onclick="deleteUser('${user.id}', '${user.username}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function editUser(userId) {
+            const user = churchData.users.find(u => u.id === userId);
+            if (!user) return;
+
+            document.getElementById('editUserId').value = user.id;
+            document.getElementById('editUserUsername').value = user.username;
+            document.getElementById('editUserEmail').value = user.email || '';
+            document.getElementById('editUserPassword').value = '';
+            document.getElementById('editUserRole').value = user.role;
+            document.getElementById('editUserStatusToggle').checked = !!user.status;
+            document.getElementById('editUserStatusText').textContent = user.status ? 'Active' : 'Inactive';
+
+            populateRestrictedMenusOptions('editRestrictedMenusOptions');
+            setRestrictedMenusSelection('editRestrictedMenusOptions', user.restrictedMenus || []);
+
+            showModal('editUserModal');
+        }
+
+        async function saveEditedUser() {
+            try {
+                const userId = document.getElementById('editUserId').value;
+                const password = document.getElementById('editUserPassword').value;
+
+                const payload = {
+                    username: document.getElementById('editUserUsername').value.trim(),
+                    email: document.getElementById('editUserEmail').value.trim(),
+                    role: document.getElementById('editUserRole').value,
+                    status: document.getElementById('editUserStatusToggle').checked,
+                    restrictedMenus: getRestrictedMenusSelection('editRestrictedMenusOptions')
+                };
+
+                if (password) {
+                    payload.password = password;
+                }
+
+                const updated = await apiRequest(`${API_ENDPOINTS.USERS}/${userId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+
+                const index = churchData.users.findIndex(u => u.id === userId);
+                if (index !== -1) {
+                    churchData.users[index] = updated;
+                }
+
+                updateAccessManagementTable();
+                closeModal('editUserModal');
+                alert('User updated successfully!');
+            } catch (error) {
+                alert('Failed to update user: ' + error.message);
+            }
+        }
+
+        async function deleteUser(userId, username) {
+            if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
+                return;
+            }
+
+            try {
+                await apiRequest(`${API_ENDPOINTS.USERS}/${userId}`, {
+                    method: 'DELETE'
+                });
+
+                churchData.users = churchData.users.filter(u => u.id !== userId);
+                updateAccessManagementTable();
+            } catch (error) {
+                alert('Failed to delete user: ' + error.message);
+            }
+        }
+
         // Edit member
         function editMember(cellId, memberId) {
             const member = churchData.members.find(m => m.id === memberId && m.cellId === cellId);
@@ -3596,22 +3765,45 @@
             showModal('forgotPasswordModal');
         }
 
-        // Send reset code
-        function sendResetCode() {
-            churchData.resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+        // Send reset code (server validated)
+        async function sendResetCode() {
+            const email = document.getElementById('forgotEmail').value.trim();
+            if (!email) {
+                alert('Please enter your email first.');
+                return;
+            }
             
-            alert(`One-time login code sent to cereadingmedia@gmail.com\nYour code is: ${churchData.resetCode}\n\n(In a real application, this would be sent via email)`);
-            
-            document.getElementById('forgotStep1').style.display = 'none';
-            document.getElementById('forgotStep2').style.display = 'block';
-            
-            const codeInputs = document.querySelectorAll('.code-input');
-            codeInputs.forEach(input => {
-                input.value = '';
-                input.classList.remove('filled');
-            });
-            
-            codeInputs[0].focus();
+            try {
+                const response = await fetch('/api/otp/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to send code');
+                }
+                
+                if (data.devCode) {
+                    alert(`One-time login code (dev): ${data.devCode}`);
+                } else {
+                    alert('One-time login code sent. Check your email.');
+                }
+                
+                document.getElementById('forgotStep1').style.display = 'none';
+                document.getElementById('forgotStep2').style.display = 'block';
+                
+                const codeInputs = document.querySelectorAll('.code-input');
+                codeInputs.forEach(input => {
+                    input.value = '';
+                    input.classList.remove('filled');
+                });
+                
+                codeInputs[0].focus();
+            } catch (error) {
+                alert('Failed to send code: ' + error.message);
+            }
         }
 
         // Move to next code input
@@ -3629,20 +3821,56 @@
             }
         }
 
-        // Verify reset code
-        function verifyResetCode() {
+        // Verify reset code (server validated)
+        async function verifyResetCode() {
             const codeInputs = document.querySelectorAll('.code-input');
             let enteredCode = '';
             codeInputs.forEach(input => {
                 enteredCode += input.value;
             });
             
-            if (enteredCode === churchData.resetCode) {
-                alert('Code verified! Please login with your credentials.');
+            const email = document.getElementById('forgotEmail').value.trim();
+            if (!email) {
+                alert('Please enter your email first.');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/otp/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code: enteredCode })
+                });
+                
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Invalid code');
+                }
+                
+                // Store token and user info
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('role', data.role);
+                localStorage.setItem('username', data.username);
+                
+                churchData.currentUser = {
+                    username: data.username,
+                    role: data.role,
+                    token: data.token
+                };
+                
                 closeModal('forgotPasswordModal');
-                showLoginModal();
-            } else {
-                alert('Invalid code. Please try again.');
+                document.body.classList.remove('login-active');
+                resetIdleTimer();
+                await loadAllData();
+                applyUserPermissions();
+                
+                if (data.role === 'superuser' || data.role === 'admin') {
+                    navigateToPage('dashboard');
+                } else {
+                    navigateToPage('members');
+                }
+            } catch (error) {
+                alert(error.message || 'Invalid code. Please try again.');
                 codeInputs.forEach(input => {
                     input.value = '';
                     input.classList.remove('filled');
@@ -3919,6 +4147,47 @@
                 saveEditedMember();
             });
 
+            // Add new user button
+            document.getElementById('addNewUserBtn')?.addEventListener('click', function() {
+                populateRestrictedMenusOptions('restrictedMenusOptions');
+                showModal('newUserModal');
+            });
+
+            // New user form
+            document.getElementById('newUserForm')?.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                const payload = {
+                    username: document.getElementById('userUsername').value.trim(),
+                    email: document.getElementById('userEmail').value.trim(),
+                    password: document.getElementById('userPassword').value,
+                    role: document.getElementById('userRole').value,
+                    status: document.getElementById('userStatusToggle').checked,
+                    restrictedMenus: getRestrictedMenusSelection('restrictedMenusOptions')
+                };
+
+                try {
+                    const created = await apiRequest(API_ENDPOINTS.USERS, {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+
+                    churchData.users.push(created);
+                    updateAccessManagementTable();
+                    closeModal('newUserModal');
+                    this.reset();
+                    alert('User added successfully!');
+                } catch (error) {
+                    alert('Failed to add user: ' + error.message);
+                }
+            });
+
+            // Edit user form
+            document.getElementById('editUserForm')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveEditedUser();
+            });
+
             // Confirm delete button
             document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
                 if (currentDeleteCallback) {
@@ -3946,6 +4215,7 @@
                 churchData.cells = [];
                 churchData.members = [];
                 churchData.reports = [];
+                churchData.users = [];
                 
                 // Close all modals
                 document.querySelectorAll('.modal-overlay.active').forEach(modal => {
