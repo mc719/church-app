@@ -594,7 +594,7 @@ app.post("/api/reports", requireAuth, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO reports (cell_id, date, venue, meeting_type, description, attendees, report_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$2)
+       VALUES ($1,$2,$3,$4,$5,$6,($2::timestamptz)::date)
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  date,
