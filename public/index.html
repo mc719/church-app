@@ -2084,6 +2084,48 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Page Modal -->
+    <div id="editPageModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Edit Menu</h3>
+                <button class="close-modal" onclick="closeModal('editPageModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editPageForm">
+                    <input type="hidden" id="editPageId">
+                    <div class="form-group">
+                        <label for="editPageName">Menu Name *</label>
+                        <input type="text" id="editPageName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPageIcon">Icon (Font Awesome) *</label>
+                        <input type="text" id="editPageIcon" class="form-control" list="faIconOptions" placeholder="fas fa-home" required>
+                        <datalist id="faIconOptions">
+                            <option value="fas fa-home"></option>
+                            <option value="fas fa-users"></option>
+                            <option value="fas fa-user-shield"></option>
+                            <option value="fas fa-file-alt"></option>
+                            <option value="fas fa-history"></option>
+                            <option value="fas fa-cog"></option>
+                            <option value="fas fa-church"></option>
+                            <option value="fas fa-layer-group"></option>
+                            <option value="fas fa-chart-line"></option>
+                            <option value="fas fa-clipboard-list"></option>
+                        </datalist>
+                        <small id="editPageIconPreview" style="display: inline-block; margin-top: 8px;">
+                            <i class="fas fa-home"></i>
+                        </small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn" onclick="closeModal('editPageModal')">Cancel</button>
+                        <button type="submit" class="btn btn-success">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
     <!-- Add New Menu Modal -->
     <div id="newMenuModal" class="modal-overlay">
@@ -2221,7 +2263,11 @@
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </div>
-            
+            <div class="nav-item" data-page="members" id="membersNav">
+                <i class="fas fa-users"></i>
+                <span>Members</span>
+            </div>
+
             <div class="nav-divider" id="cellGroupsDivider"></div>
             
             <div class="nav-section-title" id="cellGroupsTitle">Cell Groups</div>
@@ -2235,10 +2281,6 @@
             
             <div class="nav-section-title" id="adminTitle">Administrator</div>
             
-            <div class="nav-item" data-page="members" id="membersNav">
-                <i class="fas fa-users"></i>
-                <span>Members</span>
-            </div>
             <div class="nav-item" data-page="page-management" id="pageManagementNav">
                 <i class="fas fa-file-alt"></i>
                 <span>Page Management</span>
@@ -2649,6 +2691,7 @@
             members: [],
             users: [],
             sessions: [],
+            pageMeta: {},
             currentUser: null,
             settings: {
                 theme: 'light',
@@ -3050,6 +3093,8 @@
                 cellGroupsContainer.appendChild(navItem);
             });
 
+            applyPageMetaToSidebar();
+
             // Apply user permissions
             applyUserPermissions();
             applyPageVisibility();
@@ -3447,6 +3492,51 @@
             return options;
         }
 
+        function getPageMeta() {
+            if (Object.keys(churchData.pageMeta || {}).length) {
+                return churchData.pageMeta;
+            }
+            try {
+                const raw = localStorage.getItem('pageMeta');
+                if (raw) {
+                    churchData.pageMeta = JSON.parse(raw);
+                    return churchData.pageMeta;
+                }
+            } catch {
+                // ignore
+            }
+            const meta = {};
+            document.querySelectorAll('.nav-item').forEach(item => {
+                if (item.closest('#cellGroupsContainer')) return;
+                const id = item.getAttribute('data-page');
+                if (!id) return;
+                const icon = item.querySelector('i')?.className || 'fas fa-file-alt';
+                const label = item.querySelector('span')?.textContent?.trim() || id;
+                meta[id] = { label, icon };
+            });
+            churchData.pageMeta = meta;
+            localStorage.setItem('pageMeta', JSON.stringify(meta));
+            return meta;
+        }
+
+        function setPageMeta(meta) {
+            churchData.pageMeta = meta;
+            localStorage.setItem('pageMeta', JSON.stringify(meta));
+        }
+
+        function applyPageMetaToSidebar() {
+            const meta = getPageMeta();
+            document.querySelectorAll('.nav-item').forEach(item => {
+                if (item.closest('#cellGroupsContainer')) return;
+                const id = item.getAttribute('data-page');
+                if (!id || !meta[id]) return;
+                item.innerHTML = `
+                    <i class="${meta[id].icon}"></i>
+                    <span>${meta[id].label}</span>
+                `;
+            });
+        }
+
         function getPageVisibility() {
             try {
                 const raw = localStorage.getItem('pageVisibility');
@@ -3543,7 +3633,14 @@
             if (!tbody) return;
 
             const visibility = getPageVisibility();
-            const pages = getMenuOptions();
+            const meta = getPageMeta();
+            const pages = [];
+            document.querySelectorAll('.nav-item').forEach(item => {
+                if (item.closest('#cellGroupsContainer')) return;
+                const id = item.getAttribute('data-page');
+                if (!id || !meta[id]) return;
+                pages.push({ id, label: meta[id].label, icon: meta[id].icon });
+            });
             tbody.innerHTML = '';
 
             pages.forEach(page => {
@@ -3552,7 +3649,7 @@
                 row.innerHTML = `
                     <td>${page.label}</td>
                     <td>${page.id}</td>
-                    <td>-</td>
+                    <td><i class="${page.icon}"></i></td>
                     <td>system</td>
                     <td>
                         <label class="toggle-switch">
@@ -3560,7 +3657,16 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </td>
-                    <td>-</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn edit-btn" onclick="editPageMenu('${page.id}')">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="action-btn delete-btn" onclick="confirmDeletePageMenu('${page.id}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </td>
                 `;
                 tbody.appendChild(row);
             });
@@ -3572,6 +3678,48 @@
                     applyPageVisibility();
                 });
             });
+        }
+
+        function editPageMenu(pageId) {
+            const meta = getPageMeta();
+            if (!meta[pageId]) return;
+
+            document.getElementById('editPageId').value = pageId;
+            document.getElementById('editPageName').value = meta[pageId].label;
+            document.getElementById('editPageIcon').value = meta[pageId].icon;
+            document.getElementById('editPageIconPreview').innerHTML = `<i class="${meta[pageId].icon}"></i>`;
+            showModal('editPageModal');
+        }
+
+        function confirmDeletePageMenu(pageId) {
+            if (pageId === 'dashboard') {
+                alert('Dashboard cannot be deleted.');
+                return;
+            }
+            document.getElementById('deleteConfirmText').textContent =
+                `Are you sure you want to delete menu "${pageId}"? This action cannot be undone.`;
+            currentDeleteCallback = () => deletePageMenu(pageId);
+            showModal('deleteConfirmModal');
+        }
+
+        function deletePageMenu(pageId) {
+            const meta = getPageMeta();
+            delete meta[pageId];
+            setPageMeta(meta);
+            setPageVisibility(pageId, false);
+
+            const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+            if (navItem) {
+                navItem.remove();
+            }
+            const page = document.getElementById(pageId);
+            if (page) {
+                page.remove();
+            }
+
+            updatePageManagementTable();
+            applyPageVisibility();
+            closeModal('deleteConfirmModal');
         }
 
         function editUser(userId) {
@@ -4264,6 +4412,32 @@
             document.getElementById('editUserForm')?.addEventListener('submit', function(e) {
                 e.preventDefault();
                 saveEditedUser();
+            });
+
+            document.getElementById('editPageIcon')?.addEventListener('input', function() {
+                const preview = document.getElementById('editPageIconPreview');
+                if (preview) {
+                    preview.innerHTML = `<i class="${this.value}"></i>`;
+                }
+            });
+
+            document.getElementById('editPageForm')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const pageId = document.getElementById('editPageId').value;
+                const label = document.getElementById('editPageName').value.trim();
+                const icon = document.getElementById('editPageIcon').value.trim();
+
+                if (!pageId || !label || !icon) {
+                    alert('Menu name and icon are required.');
+                    return;
+                }
+
+                const meta = getPageMeta();
+                meta[pageId] = { label, icon };
+                setPageMeta(meta);
+                applyPageMetaToSidebar();
+                updatePageManagementTable();
+                closeModal('editPageModal');
             });
 
             // Confirm delete button
