@@ -374,7 +374,7 @@ app.delete("/api/reports/:id", requireAuth, async (req, res) => {
 });
 
 // Serve HTML LAST
-app.get("/*", (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "public/index2.html"));
 });
 
