@@ -1801,7 +1801,55 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Edit Cell Modal -->
+    <div id="editCellModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Edit Cell</h3>
+                <button class="close-modal" onclick="closeModal('editCellModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editCellForm">
+                    <input type="hidden" id="editCellId">
+                    <div class="form-group">
+                        <label for="editCellName">Cell Name *</label>
+                        <input type="text" id="editCellName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCellVenue">Venue *</label>
+                        <input type="text" id="editCellVenue" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCellDay">Day of Meeting *</label>
+                        <select id="editCellDay" class="form-control" required>
+                            <option value="">Select Day</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCellTime">Time *</label>
+                        <input type="time" id="editCellTime" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCellDescription">Description</label>
+                        <textarea id="editCellDescription" class="form-control" rows="4"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn" onclick="closeModal('editCellModal')">Cancel</button>
+                        <button type="submit" class="btn btn-success">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Report Modal -->
     <div id="addReportModal" class="modal-overlay">
         <div class="modal">
@@ -2335,6 +2383,7 @@
                             <th>Meeting Venue</th>
                             <th>Members</th>
                             <th>Status</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="cellsTableBody">
@@ -2959,7 +3008,7 @@
             if (churchData.cells.length === 0) {
                 cellsTableBody.innerHTML = `
                     <tr>
-                        <td colspan="4" style="text-align: center; padding: 40px; color: var(--gray-color);">
+                        <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-color);">
                             No cells found. Click "Add New Cell" to create your first cell.
                         </td>
                     </tr>
@@ -2994,13 +3043,110 @@
                     <td>${cell.day} at ${cell.time}</td>
                     <td>${memberCount}</td>
                     <td><span class="${statusClass}">${statusText}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn edit-btn" onclick="editCell('${cell.id}')">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="action-btn delete-btn" onclick="confirmDeleteCell('${cell.id}', '${cell.name}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </td>
                 `;
-                cellsTableBody.appendChild(row);
-            });
-        }
+          cellsTableBody.appendChild(row);
+      });
+  }
 
-        // Update recent reports
-        function updateRecentReports() {
+  function editCell(cellId) {
+      const cell = churchData.cells.find(c => c.id === cellId);
+      if (!cell) return;
+
+      document.getElementById('editCellId').value = cell.id;
+      document.getElementById('editCellName').value = cell.name || '';
+      document.getElementById('editCellVenue').value = cell.venue || '';
+      document.getElementById('editCellDay').value = cell.day || '';
+      document.getElementById('editCellTime').value = cell.time || '';
+      document.getElementById('editCellDescription').value = cell.description || '';
+      showModal('editCellModal');
+  }
+
+  async function saveEditedCell() {
+      try {
+          const cellId = document.getElementById('editCellId').value;
+          const payload = {
+              name: document.getElementById('editCellName').value.trim(),
+              venue: document.getElementById('editCellVenue').value.trim(),
+              day: document.getElementById('editCellDay').value,
+              time: document.getElementById('editCellTime').value,
+              description: document.getElementById('editCellDescription').value.trim()
+          };
+
+          const updated = await apiRequest(`${API_ENDPOINTS.CELLS}/${cellId}`, {
+              method: 'PUT',
+              body: JSON.stringify(payload)
+          });
+
+          const index = churchData.cells.findIndex(c => c.id === cellId);
+          if (index !== -1) {
+              churchData.cells[index] = updated;
+          }
+
+          const titleEl = document.getElementById(`cellPageTitle-${cellId}`);
+          if (titleEl) {
+              titleEl.textContent = updated.name;
+          }
+          document.querySelectorAll(`.editable-field[data-cell-id="${cellId}"]`).forEach(el => {
+              const field = el.getAttribute('data-field');
+              if (field && updated[field] !== undefined) {
+                  el.textContent = updated[field] || '';
+              }
+          });
+
+          updateAllUI();
+          closeModal('editCellModal');
+          alert('Cell updated successfully!');
+      } catch (error) {
+          alert('Failed to update cell: ' + error.message);
+      }
+  }
+
+  function confirmDeleteCell(cellId, cellName) {
+      document.getElementById('deleteConfirmText').textContent =
+          `Are you sure you want to delete cell "${cellName}"? This action cannot be undone.`;
+      currentDeleteCallback = () => deleteCell(cellId);
+      showModal('deleteConfirmModal');
+  }
+
+  async function deleteCell(cellId) {
+      try {
+          await apiRequest(`${API_ENDPOINTS.CELLS}/${cellId}`, {
+              method: 'DELETE'
+          });
+
+          churchData.cells = churchData.cells.filter(c => c.id !== cellId);
+          churchData.members = churchData.members.filter(m => m.cellId !== cellId);
+          churchData.reports = churchData.reports.filter(r => r.cellId !== cellId);
+
+          const navItem = document.querySelector(`.nav-item[data-page="cell-${cellId}"]`);
+          if (navItem) {
+              navItem.remove();
+          }
+          const page = document.getElementById(`cell-${cellId}`);
+          if (page) {
+              page.remove();
+          }
+
+          updateAllUI();
+          closeModal('deleteConfirmModal');
+          alert('Cell deleted successfully!');
+      } catch (error) {
+          alert('Failed to delete cell: ' + error.message);
+      }
+  }
+
+  // Update recent reports
+  function updateRecentReports() {
             const oneWeekAgo = new Date();
             oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
@@ -4371,6 +4517,12 @@
             document.getElementById('editMemberForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 saveEditedMember();
+            });
+
+            // Edit cell form
+            document.getElementById('editCellForm')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveEditedCell();
             });
 
             // Add new user button
