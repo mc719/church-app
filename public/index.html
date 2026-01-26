@@ -3198,7 +3198,7 @@
                     </div>
                     <div class="report-content">
                         <strong>Meeting Type:</strong> ${getMeetingTypeText(report.meetingType)}<br>
-                        <strong>Attendees:</strong> ${report.attendees ? report.attendees.length : 0}<br><br>
+                        <strong>Attendees:</strong> ${Array.isArray(report.attendees) ? report.attendees.length : 0}<br><br>
                         ${report.description || 'No additional information'}
                     </div>
                 `;
@@ -3524,8 +3524,8 @@
                                     </div>
                                     <div class="report-content">
                                         <strong>Meeting Type:</strong> ${getMeetingTypeText(report.meetingType)}<br>
-                                        <strong>Attendees:</strong> ${report.attendees ? report.attendees.length : 0}<br>
-                                        <strong>Present Members:</strong> ${report.attendees ? report.attendees.map(a => a.name).join(', ') : 'None'}<br><br>
+                                        <strong>Attendees:</strong> ${Array.isArray(report.attendees) ? report.attendees.length : 0}<br>
+                                        <strong>Present Members:</strong> ${Array.isArray(report.attendees) && report.attendees.length ? report.attendees.map(a => a.name).join(', ') : 'None'}<br><br>
                                         ${report.description || 'No additional information'}
                                     </div>
                                 </div>
