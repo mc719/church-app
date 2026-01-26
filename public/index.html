@@ -372,12 +372,14 @@
             color: var(--primary-color);
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         
         .dark-theme .stat-icon {
             background: linear-gradient(135deg, #4dabf7, #339af0);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         
@@ -2221,6 +2223,10 @@
             
             <div class="nav-section-title" id="adminTitle">Administrator</div>
             
+            <div class="nav-item" data-page="members" id="membersNav">
+                <i class="fas fa-users"></i>
+                <span>Members</span>
+            </div>
             <div class="nav-item" data-page="page-management" id="pageManagementNav">
                 <i class="fas fa-file-alt"></i>
                 <span>Page Management</span>
@@ -2289,6 +2295,45 @@
             
             <div class="reports-grid" id="recentReports">
                 <!-- Recent reports will be loaded dynamically -->
+            </div>
+        </div>
+        
+        <!-- Members Page -->
+        <div id="members" class="page-content">
+            <div class="page-header">
+                <h1>All Members</h1>
+                <div class="page-actions">
+                    <div class="search-box">
+                        <input type="text" id="searchMembers" placeholder="Search members..." oninput="searchMembers()">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table id="allMembersTable">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Name</th>
+                            <th>Gender</th>
+                            <th>Mobile</th>
+                            <th>Email</th>
+                            <th>Cell Name</th>
+                            <th>Cell Role</th>
+                            <th>Cell Venue</th>
+                            <th>Cell Day</th>
+                            <th>Cell Time</th>
+                            <th>Joined Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allMembersBody">
+                        <!-- All members from all cells will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; color: var(--gray-color);">
+                Showing <span id="membersCount">0</span> members
             </div>
         </div>
         
@@ -2578,39 +2623,28 @@
     </div>
 
     <script>
-        // Data storage keys
-        const STORAGE_KEYS = {
-            CELLS: 'church_cells',
-            REPORTS: 'church_reports',
-            MEMBERS: 'church_members',
-            USERS: 'church_users',
-            MENUS: 'church_menus',
-            SESSIONS: 'church_sessions',
-            SETTINGS: 'church_settings',
-            NEXT_IDS: 'church_next_ids'
+        // API endpoints
+        const API_BASE = '/api';
+        const API_ENDPOINTS = {
+            LOGIN: `${API_BASE}/login`,
+            CELLS: `${API_BASE}/cells`,
+            MEMBERS: `${API_BASE}/members`,
+            REPORTS: `${API_BASE}/reports`,
+            USERS: `${API_BASE}/users`,
+            SESSIONS: `${API_BASE}/sessions`
         };
 
-        // Initialize with empty data structure
+        // Data storage for frontend cache
         const churchData = {
             cells: [],
             reports: [],
-            members: {},
-            users: [],
-            menus: [],
-            sessions: [],
+            members: [],
             currentUser: null,
             settings: {
                 theme: 'light',
                 logo: null,
                 logoTitle: 'Christ Embassy',
                 logoSubtitle: 'Church Cell Data'
-            },
-            nextIds: {
-                cell: 1,
-                report: 1,
-                member: 1,
-                user: 1,
-                menu: 6
             },
             currentYear: new Date().getFullYear(),
             resetCode: null,
@@ -2624,156 +2658,92 @@
         const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
         const IDLE_MODAL_TIMEOUT = 30 * 1000; // 30 seconds
 
-        // Load data from localStorage
-        function loadDataFromStorage() {
+        // DOM elements
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const sidebar = document.getElementById('sidebar');
+        const statsContainer = document.getElementById('statsContainer');
+        const cellsTableBody = document.getElementById('cellsTableBody');
+        const recentReports = document.getElementById('recentReports');
+        const themeOptions = document.querySelectorAll('.theme-option');
+        const cellGroupsContainer = document.getElementById('cellGroupsContainer');
+        const dynamicCellPages = document.getElementById('dynamicCellPages');
+        let currentDeleteCallback = null;
+
+        // Get authorization headers
+        function getAuthHeaders() {
+            const token = localStorage.getItem('token');
+            return {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            };
+        }
+
+        // API request helper
+        async function apiRequest(endpoint, options = {}) {
+            try {
+                const response = await fetch(endpoint, {
+                    ...options,
+                    headers: {
+                        ...getAuthHeaders(),
+                        ...options.headers
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Token expired or invalid
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('role');
+                        localStorage.removeItem('username');
+                        document.body.classList.add('login-active');
+                        document.getElementById('loginModal').classList.add('active');
+                        throw new Error('Session expired. Please login again.');
+                    }
+                    
+                    const error = await response.json();
+                    throw new Error(error.error || 'Request failed');
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('API request failed:', error);
+                throw error;
+            }
+        }
+
+        // Load all data from backend
+        async function loadAllData() {
             try {
                 // Load cells
-                const savedCells = localStorage.getItem(STORAGE_KEYS.CELLS);
-                if (savedCells) {
-                    churchData.cells = JSON.parse(savedCells);
-                }
-
-                // Load reports
-                const savedReports = localStorage.getItem(STORAGE_KEYS.REPORTS);
-                if (savedReports) {
-                    churchData.reports = JSON.parse(savedReports);
-                }
-
+                const cellsData = await apiRequest(API_ENDPOINTS.CELLS);
+                churchData.cells = cellsData;
+                
                 // Load members
-                const savedMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS);
-                if (savedMembers) {
-                    churchData.members = JSON.parse(savedMembers);
-                }
-
-                // Load users
-                const savedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
-                if (savedUsers) {
-                    churchData.users = JSON.parse(savedUsers);
-                } else {
-                    // Initialize with a default superuser if no users exist
-                    churchData.users = [{
-                        id: 1,
-                        username: 'superuser',
-                        password: 'superuser123',
-                        role: 'superuser',
-                        restrictedMenus: [],
-                        status: 'active'
-                    }];
-                }
-
-                // Load menus
-                const savedMenus = localStorage.getItem(STORAGE_KEYS.MENUS);
-                if (savedMenus) {
-                    churchData.menus = JSON.parse(savedMenus);
-                } else {
-                    // Initialize default menus if not saved
-                    churchData.menus = [
-                        { id: 'dashboard', name: 'Dashboard', icon: 'fas fa-home', section: 'admin', active: true, isDefault: true },
-                        { id: 'page-management', name: 'Page Management', icon: 'fas fa-file-alt', section: 'admin', active: true, isDefault: true },
-                        { id: 'access-management', name: 'Access Management', icon: 'fas fa-user-shield', section: 'admin', active: true, isDefault: true },
-                        { id: 'sessions', name: 'Sessions', icon: 'fas fa-history', section: 'admin', active: true, isDefault: true },
-                        { id: 'settings', name: 'Settings', icon: 'fas fa-cog', section: 'admin', active: true, isDefault: true },
-                        { id: 'cells-template', name: 'Cells Template', icon: 'fas fa-users', section: 'cell', active: false, isDefault: true }
-                    ];
-                }
-
-                // Load sessions
-                const savedSessions = localStorage.getItem(STORAGE_KEYS.SESSIONS);
-                if (savedSessions) {
-                    churchData.sessions = JSON.parse(savedSessions);
-                }
-
-                // Load settings
-                const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-                if (savedSettings) {
-                    churchData.settings = JSON.parse(savedSettings);
-                }
-
-                // Load next IDs
-                const savedNextIds = localStorage.getItem(STORAGE_KEYS.NEXT_IDS);
-                if (savedNextIds) {
-                    churchData.nextIds = JSON.parse(savedNextIds);
-                }
+                const membersData = await apiRequest(API_ENDPOINTS.MEMBERS);
+                churchData.members = membersData;
+                
+                // Load reports
+                const reportsData = await apiRequest(API_ENDPOINTS.REPORTS);
+                churchData.reports = reportsData;
+                
+                // Update UI
+                updateAllUI();
+                
+                // Create cell pages for all cells
+                churchData.cells.forEach(cell => {
+                    createCellPage(cell);
+                });
+                
+                return true;
             } catch (error) {
-                console.error('Error loading data from storage:', error);
-                // Initialize with default data
-                initializeDefaultData();
+                console.error('Failed to load data:', error);
+                alert('Failed to load data from server');
+                return false;
             }
-        }
-
-        // Save data to localStorage
-        function saveDataToStorage() {
-            try {
-                localStorage.setItem(STORAGE_KEYS.CELLS, JSON.stringify(churchData.cells));
-                localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(churchData.reports));
-                localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(churchData.members));
-                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(churchData.users));
-                localStorage.setItem(STORAGE_KEYS.MENUS, JSON.stringify(churchData.menus));
-                localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(churchData.sessions));
-                localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(churchData.settings));
-                localStorage.setItem(STORAGE_KEYS.NEXT_IDS, JSON.stringify(churchData.nextIds));
-            } catch (error) {
-                console.error('Error saving data to storage:', error);
-            }
-        }
-
-        // Initialize default data
-        function initializeDefaultData() {
-            // Create cells template
-            createCellsTemplate();
-            
-            // Initialize default menus
-            churchData.menus = [
-                { id: 'dashboard', name: 'Dashboard', icon: 'fas fa-home', section: 'admin', active: true, isDefault: true },
-                { id: 'page-management', name: 'Page Management', icon: 'fas fa-file-alt', section: 'admin', active: true, isDefault: true },
-                { id: 'access-management', name: 'Access Management', icon: 'fas fa-user-shield', section: 'admin', active: true, isDefault: true },
-                { id: 'sessions', name: 'Sessions', icon: 'fas fa-history', section: 'admin', active: true, isDefault: true },
-                { id: 'settings', name: 'Settings', icon: 'fas fa-cog', section: 'admin', active: true, isDefault: true },
-                { id: 'cells-template', name: 'Cells Template', icon: 'fas fa-users', section: 'cell', active: false, isDefault: true }
-            ];
-            
-            // Initialize with a default superuser if no users exist
-            if (churchData.users.length === 0) {
-                churchData.users = [{
-                    id: 1,
-                    username: 'superuser',
-                    password: 'superuser123',
-                    role: 'superuser',
-                    restrictedMenus: [],
-                    status: 'active'
-                }];
-            }
-        }
-
-        // Create cells template
-        function createCellsTemplate() {
-            const templateId = 'cells-template';
-            
-            const templateCell = {
-                id: templateId,
-                name: 'Cells Template',
-                venue: 'Sample Venue',
-                day: 'Friday',
-                time: '7:00 PM',
-                description: 'This is a template for new cells. Create a new cell to get started.',
-                members: 0,
-                status: 'blue',
-                createdAt: new Date(),
-                isTemplate: true
-            };
-            
-            // Add template cell to cells array
-            churchData.cells.push(templateCell);
-            
-            // Initialize empty members array for template
-            churchData.members[templateId] = [];
         }
 
         // Initialize application
         function initializeApplication() {
-            // Load data from localStorage
-            loadDataFromStorage();
-            
             // Set current year in footer
             document.getElementById('currentYear').textContent = churchData.currentYear;
             
@@ -2788,27 +2758,37 @@
             // Update login modal logo
             updateLoginLogo();
             
-            // Create cell pages for all existing cells
-            churchData.cells.forEach(cell => {
-                if (cell.id !== 'cells-template') {
-                    createCellPage(cell);
-                }
-            });
+            // Check if user is already logged in
+            const token = localStorage.getItem('token');
+            const role = localStorage.getItem('role');
+            const username = localStorage.getItem('username');
             
-            // Update UI
-            updateAllUI();
+            if (token && role && username) {
+                churchData.currentUser = {
+                    username: username,
+                    role: role,
+                    token: token
+                };
+                
+                document.body.classList.remove('login-active');
+                document.getElementById('loginModal').classList.remove('active');
+                
+                // Load data and update UI
+                loadAllData().then(() => {
+                    updateAllUI();
+                    applyUserPermissions();
+                    
+                    if (role === 'superuser' || role === 'admin') {
+                        navigateToPage('dashboard');
+                    } else {
+                        navigateToPage('members');
+                    }
+                });
+                
+                // Reset idle timer
+                resetIdleTimer();
+            }
         }
-
-        // DOM elements
-        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const statsContainer = document.getElementById('statsContainer');
-        const cellsTableBody = document.getElementById('cellsTableBody');
-        const recentReports = document.getElementById('recentReports');
-        const themeOptions = document.querySelectorAll('.theme-option');
-        const cellGroupsContainer = document.getElementById('cellGroupsContainer');
-        const dynamicCellPages = document.getElementById('dynamicCellPages');
-        let currentDeleteCallback = null;
 
         // Update all UI components
         function updateAllUI() {
@@ -2816,58 +2796,27 @@
             updateCellsTable();
             updateRecentReports();
             updateSidebarMenus();
-            updatePageManagementTable();
-            updateAccessManagementTable();
+            updateAllMembersTable();
             updateSessionsTable();
-        }
-
-        // Calculate weekly report percentage for a cell
-        function calculateWeeklyReportPercentage(cellId) {
-            const now = new Date();
-            const startOfYear = new Date(now.getFullYear(), 0, 1);
-            const weeksPassed = Math.ceil((now - startOfYear) / (7 * 24 * 60 * 60 * 1000));
-            
-            // Get all reports for this cell in current year
-            const yearlyReports = churchData.reports.filter(report => {
-                if (report.cellId !== cellId) return false;
-                const reportDate = new Date(report.date);
-                return reportDate.getFullYear() === now.getFullYear();
-            });
-            
-            // Group reports by week
-            const reportsByWeek = new Set();
-            yearlyReports.forEach(report => {
-                const reportDate = new Date(report.date);
-                const weekNumber = Math.ceil((reportDate - startOfYear) / (7 * 24 * 60 * 60 * 1000));
-                reportsByWeek.add(weekNumber);
-            });
-            
-            return weeksPassed > 0 ? (reportsByWeek.size / weeksPassed) * 100 : 0;
         }
 
         // Update statistics
         function updateStats() {
-            // Filter out template cells
-            const actualCells = churchData.cells.filter(cell => !cell.isTemplate);
-            const totalCells = actualCells.length;
+            const totalCells = churchData.cells.length;
+            const totalMembers = churchData.members.length;
             
-            // Calculate active and inactive cells
-            let activeCells = 0;
-            let inactiveCells = 0;
+            // Calculate active cells (cells with reports in last 30 days)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             
-            actualCells.forEach(cell => {
-                const reportPercentage = calculateWeeklyReportPercentage(cell.id);
-                if (reportPercentage >= 95) {
-                    activeCells++;
-                } else if (reportPercentage <= 50) {
-                    inactiveCells++;
-                }
-            });
+            const activeCells = churchData.cells.filter(cell => {
+                const cellReports = churchData.reports.filter(report => 
+                    report.cellId === cell.id && new Date(report.date) > thirtyDaysAgo
+                );
+                return cellReports.length > 0;
+            }).length;
             
-            // Calculate total members
-            const totalMembers = actualCells.reduce((sum, cell) => {
-                return sum + (cell.members || 0);
-            }, 0);
+            const inactiveCells = totalCells - activeCells;
 
             statsContainer.innerHTML = `
                 <a href="javascript:void(0)" class="stat-link" onclick="viewAllCells()">
@@ -2911,12 +2860,12 @@
 
         // View active cells
         function viewActiveCells() {
-            alert('Active cells are those with 95% or more weekly reports submitted this year.');
+            alert('Active cells are those with reports in the last 30 days.');
         }
 
         // View inactive cells
         function viewInactiveCells() {
-            alert('Inactive cells are those with 50% or less weekly reports submitted this year.');
+            alert('Inactive cells are those with no reports in the last 30 days.');
         }
 
         // View all cells
@@ -2926,23 +2875,14 @@
 
         // View all members
         function viewAllMembers() {
-            let totalMembers = 0;
-            churchData.cells.forEach(cell => {
-                if (!cell.isTemplate) {
-                    totalMembers += (cell.members || 0);
-                }
-            });
-            alert(`Total members across all cells: ${totalMembers}`);
+            navigateToPage('members');
         }
 
-        // Update cells table with editable cells
+        // Update cells table
         function updateCellsTable() {
             cellsTableBody.innerHTML = '';
             
-            // Filter out template cells
-            const actualCells = churchData.cells.filter(cell => !cell.isTemplate);
-            
-            if (actualCells.length === 0) {
+            if (churchData.cells.length === 0) {
                 cellsTableBody.innerHTML = `
                     <tr>
                         <td colspan="4" style="text-align: center; padding: 40px; color: var(--gray-color);">
@@ -2953,56 +2893,36 @@
                 return;
             }
             
-            actualCells.forEach(cell => {
-                const status = calculateCellStatus(cell.id);
-                const statusClass = `status-${status}`;
-                let statusText = '';
+            churchData.cells.forEach(cell => {
+                // Count members in this cell
+                const memberCount = churchData.members.filter(member => member.cellId === cell.id).length;
                 
-                switch(status) {
-                    case 'red': statusText = 'Needs Attention'; break;
-                    case 'amber': statusText = 'Progressing'; break;
-                    case 'green': statusText = 'Excellent'; break;
-                    case 'blue': statusText = 'No Reports'; break;
+                // Determine status based on recent reports
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                const recentReports = churchData.reports.filter(report => 
+                    report.cellId === cell.id && new Date(report.date) > thirtyDaysAgo
+                );
+                
+                let status = 'blue';
+                let statusText = 'No Recent Reports';
+                
+                if (recentReports.length > 0) {
+                    status = 'green';
+                    statusText = 'Active';
                 }
+                
+                const statusClass = `status-${status}`;
                 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${cell.name}</td>                    
+                    <td>${cell.name}</td>
                     <td>${cell.day} at ${cell.time}</td>
-                    <td>${cell.members || 0}</td>
+                    <td>${memberCount}</td>
                     <td><span class="${statusClass}">${statusText}</span></td>
                 `;
                 cellsTableBody.appendChild(row);
             });
-        }
-
-        // Save cell edit
-        function saveCellEdit(cellId, field, newValue, element) {
-            const cell = churchData.cells.find(c => c.id === cellId);
-            if (cell && newValue && newValue !== cell[field]) {
-                cell[field] = newValue;
-                element.textContent = newValue;
-                
-                // Update cell page if name was changed
-                if (field === 'name') {
-                    const cellPageTitle = document.getElementById(`cellPageTitle-${cellId}`);
-                    if (cellPageTitle) {
-                        cellPageTitle.textContent = newValue;
-                    }
-                    
-                    // Update menu name
-                    const menu = churchData.menus.find(m => m.id === cellId);
-                    if (menu) {
-                        menu.name = newValue;
-                        updateSidebarMenus();
-                    }
-                }
-                
-                updateAllUI();
-                saveDataToStorage();
-            } else {
-                element.textContent = cell[field];
-            }
         }
 
         // Update recent reports
@@ -3078,82 +2998,59 @@
             return types[type] || type;
         }
 
-        // Update sidebar menus with proper dividers
+        // Update sidebar menus
         function updateSidebarMenus() {
             cellGroupsContainer.innerHTML = '';
-
-            // Add cell groups from data (filter out template and inactive menus)
-            const cellMenus = churchData.menus.filter(menu => menu.section === 'cell' && menu.active && menu.id !== 'cells-template');
-            const adminMenus = churchData.menus.filter(menu => menu.section === 'admin' && menu.active);
-
-            // Update cell groups section
-            const cellGroupsTitle = document.getElementById('cellGroupsTitle');
-            const cellGroupsDivider = document.getElementById('cellGroupsDivider');
             
-            if (cellMenus.length === 0) {
-                cellGroupsTitle.classList.add('hidden');
-                cellGroupsDivider.style.display = 'none';
-            } else {
-                cellGroupsTitle.classList.remove('hidden');
-                cellGroupsDivider.style.display = 'block';
+            // Add cell groups
+            churchData.cells.forEach(cell => {
+                const navItem = document.createElement('div');
+                navItem.className = 'nav-item';
+                navItem.setAttribute('data-page', `cell-${cell.id}`);
+                navItem.innerHTML = `
+                    <i class="fas fa-users"></i>
+                    <span>${cell.name}</span>
+                `;
                 
-                cellMenus.forEach(menu => {
-                    const navItem = document.createElement('div');
-                    navItem.className = 'nav-item';
-                    navItem.setAttribute('data-page', menu.id);
-                    navItem.innerHTML = `
-                        <i class="${menu.icon}"></i>
-                        <span>${menu.name}</span>
-                    `;
-                    
-                    navItem.onclick = function() {
-                        navigateToPage(menu.id);
-                    };
-                    
-                    cellGroupsContainer.appendChild(navItem);
-                });
-            }
-
-            // Update admin section
-            const adminTitle = document.getElementById('adminTitle');
-            const adminDivider = document.getElementById('adminDivider');
-            
-            if (adminMenus.length === 0) {
-                adminTitle.classList.add('hidden');
-                adminDivider.style.display = 'none';
-            } else {
-                adminTitle.classList.remove('hidden');
-                adminDivider.style.display = 'block';
-            }
+                navItem.onclick = function() {
+                    navigateToPage(`cell-${cell.id}`);
+                };
+                
+                cellGroupsContainer.appendChild(navItem);
+            });
 
             // Apply user permissions
             applyUserPermissions();
         }
 
-        // Calculate cell status
-        function calculateCellStatus(cellId) {
-            const now = new Date();
-            const currentMonth = now.getMonth();
-            const currentYear = now.getFullYear();
+        // Apply user permissions
+        function applyUserPermissions() {
+            const currentUser = churchData.currentUser;
+            if (!currentUser) return;
             
-            const monthlyReports = churchData.reports.filter(report => {
-                if (report.cellId !== cellId) return false;
-                const reportDate = new Date(report.date);
-                return reportDate.getMonth() === currentMonth && reportDate.getFullYear() === currentYear;
+            const allNavItems = document.querySelectorAll('.nav-item');
+            
+            allNavItems.forEach(navItem => {
+                const pageId = navItem.getAttribute('data-page');
+                
+                // Show/hide based on role
+                if (currentUser.role === 'member') {
+                    // Members can only see dashboard and members page
+                    if (pageId !== 'dashboard' && pageId !== 'members' && !pageId.startsWith('cell-')) {
+                        navItem.style.display = 'none';
+                    } else {
+                        navItem.style.display = 'flex';
+                    }
+                } else {
+                    navItem.style.display = 'flex';
+                }
             });
-            
-            const reportCount = monthlyReports.length;
-            
-            if (reportCount >= 4) return 'green';
-            if (reportCount === 3) return 'amber';
-            if (reportCount <= 2 && reportCount > 0) return 'red';
-            return 'blue';
         }
 
-        // Create cell page with search functionality
+        // Create cell page
         function createCellPage(cell) {
             const cellPage = document.createElement('div');
-            cellPage.id = cell.id;
+            cellPage.id = `cell-${cell.id}`;
             cellPage.className = 'page-content';
             
             cellPage.innerHTML = `
@@ -3189,7 +3086,7 @@
                     <div class="cell-description">
                         <div class="info-label">Description</div>
                         <div class="info-value editable-field" data-field="description" data-cell-id="${cell.id}" style="min-height: 60px; padding: 10px;">
-                            ${cell.description}
+                            ${cell.description || 'No description'}
                         </div>
                     </div>
                 </div>
@@ -3282,10 +3179,8 @@
                 }
             });
             
-            // Clear existing options except first
             yearFilter.innerHTML = '<option value="">All Years</option>';
             
-            // Add years in descending order
             Array.from(years).sort((a, b) => b - a).forEach(year => {
                 const option = document.createElement('option');
                 option.value = year;
@@ -3304,7 +3199,6 @@
             const filteredReports = churchData.reports.filter(report => {
                 if (report.cellId !== cellId) return false;
                 
-                // Search term filter
                 if (searchTerm) {
                     const description = (report.description || '').toLowerCase();
                     const venue = (report.venue || '').toLowerCase();
@@ -3317,19 +3211,16 @@
                     }
                 }
                 
-                // Year filter
                 if (selectedYear) {
                     const reportYear = new Date(report.date).getFullYear();
                     if (reportYear.toString() !== selectedYear) return false;
                 }
                 
-                // Month filter
                 if (selectedMonth !== '') {
                     const reportMonth = new Date(report.date).getMonth();
                     if (reportMonth.toString() !== selectedMonth) return false;
                 }
                 
-                // Meeting type filter
                 if (selectedMeetingType) {
                     if (report.meetingType !== selectedMeetingType) return false;
                 }
@@ -3354,7 +3245,6 @@
                 return;
             }
             
-            // Group by month and year
             const reportsByMonthYear = {};
             reports.forEach(report => {
                 const date = new Date(report.date);
@@ -3370,7 +3260,6 @@
                 reportsByMonthYear[yearMonthKey].reports.push(report);
             });
             
-            // Create HTML for each month
             container.innerHTML = '';
             Object.keys(reportsByMonthYear).sort().reverse().forEach(key => {
                 const monthData = reportsByMonthYear[key];
@@ -3426,12 +3315,12 @@
             });
         }
 
-        // Update cell members table with edit/delete
+        // Update cell members table
         function updateCellMembersTable(cellId) {
             const tbody = document.getElementById(`cellMembersBody-${cellId}`);
             if (!tbody) return;
             
-            const members = churchData.members[cellId] || [];
+            const members = churchData.members.filter(member => member.cellId === cellId);
 
             tbody.innerHTML = '';
             members.forEach(member => {
@@ -3466,18 +3355,57 @@
                 `;
             }
             
-            const cell = churchData.cells.find(c => c.id === cellId);
-            if (cell) {
-                cell.members = members.length;
-                updateStats();
-                updateCellsTable();
-                saveDataToStorage();
-            }
+            updateAllMembersTable();
+        }
+
+        // Update all members table (new function)
+        function updateAllMembersTable() {
+            const tbody = document.getElementById('allMembersBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            churchData.members.forEach(member => {
+                const cell = churchData.cells.find(c => c.id === member.cellId);
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${member.title}</td>
+                    <td>${member.name}</td>
+                    <td>${member.gender}</td>
+                    <td>${member.mobile}</td>
+                    <td>${member.email || ''}</td>
+                    <td>${cell ? cell.name : 'Unknown Cell'}</td>
+                    <td>${member.role}</td>
+                    <td>${cell ? cell.venue : ''}</td>
+                    <td>${cell ? cell.day : ''}</td>
+                    <td>${cell ? cell.time : ''}</td>
+                    <td>${new Date(member.joinedDate).toLocaleDateString()}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('membersCount').textContent = churchData.members.length;
+        }
+
+        // Search members function
+        function searchMembers() {
+            const searchTerm = document.getElementById('searchMembers').value.toLowerCase();
+            const rows = document.querySelectorAll('#allMembersBody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+            
+            // Update count
+            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+            document.getElementById('membersCount').textContent = visibleRows.length;
         }
 
         // Edit member
         function editMember(cellId, memberId) {
-            const member = churchData.members[cellId].find(m => m.id === memberId);
+            const member = churchData.members.find(m => m.id === memberId && m.cellId === cellId);
             if (member) {
                 document.getElementById('editMemberId').value = memberId;
                 document.getElementById('editMemberCellId').value = cellId;
@@ -3492,22 +3420,37 @@
         }
 
         // Save edited member
-        function saveEditedMember() {
-            const memberId = parseInt(document.getElementById('editMemberId').value);
-            const cellId = document.getElementById('editMemberCellId').value;
-            const memberIndex = churchData.members[cellId].findIndex(m => m.id === memberId);
-            
-            if (memberIndex !== -1) {
-                churchData.members[cellId][memberIndex].title = document.getElementById('editMemberTitle').value;
-                churchData.members[cellId][memberIndex].name = document.getElementById('editMemberName').value;
-                churchData.members[cellId][memberIndex].gender = document.getElementById('editMemberGender').value;
-                churchData.members[cellId][memberIndex].mobile = document.getElementById('editMemberMobile').value;
-                churchData.members[cellId][memberIndex].email = document.getElementById('editMemberEmail').value;
-                churchData.members[cellId][memberIndex].role = document.getElementById('editMemberRole').value;
+        async function saveEditedMember() {
+            try {
+                const memberId = parseInt(document.getElementById('editMemberId').value);
+                const cellId = document.getElementById('editMemberCellId').value;
                 
-                updateCellMembersTable(cellId);
+                const payload = {
+                    title: document.getElementById('editMemberTitle').value,
+                    name: document.getElementById('editMemberName').value,
+                    gender: document.getElementById('editMemberGender').value,
+                    mobile: document.getElementById('editMemberMobile').value,
+                    email: document.getElementById('editMemberEmail').value,
+                    role: document.getElementById('editMemberRole').value
+                };
+                
+                await apiRequest(`${API_ENDPOINTS.MEMBERS}/${memberId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+                
+                // Update local data
+                const memberIndex = churchData.members.findIndex(m => m.id === memberId && m.cellId === cellId);
+                if (memberIndex !== -1) {
+                    churchData.members[memberIndex] = { ...churchData.members[memberIndex], ...payload };
+                    updateCellMembersTable(cellId);
+                    updateAllMembersTable();
+                }
+                
                 closeModal('editMemberModal');
-                saveDataToStorage();
+                alert('Member updated successfully!');
+            } catch (error) {
+                alert('Failed to update member: ' + error.message);
             }
         }
 
@@ -3521,181 +3464,25 @@
         }
 
         // Delete member
-        function deleteMember(cellId, memberId) {
-            const memberIndex = churchData.members[cellId].findIndex(m => m.id === memberId);
-            if (memberIndex !== -1) {
-                churchData.members[cellId].splice(memberIndex, 1);
-                updateCellMembersTable(cellId);
+        async function deleteMember(cellId, memberId) {
+            try {
+                await apiRequest(`${API_ENDPOINTS.MEMBERS}/${memberId}`, {
+                    method: 'DELETE'
+                });
+                
+                // Update local data
+                const memberIndex = churchData.members.findIndex(m => m.id === memberId && m.cellId === cellId);
+                if (memberIndex !== -1) {
+                    churchData.members.splice(memberIndex, 1);
+                    updateCellMembersTable(cellId);
+                    updateAllMembersTable();
+                }
+                
                 closeModal('deleteConfirmModal');
-                saveDataToStorage();
+                alert('Member deleted successfully!');
+            } catch (error) {
+                alert('Failed to delete member: ' + error.message);
             }
-        }
-
-        // Update page management table
-        function updatePageManagementTable() {
-            const tbody = document.getElementById('pageManagementBody');
-            tbody.innerHTML = '';
-
-            churchData.menus.forEach(menu => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${menu.name}</td>
-                    <td>${menu.id}</td>
-                    <td><i class="${menu.icon}"></i></td>
-                    <td>${menu.section}</td>
-                    <td>
-                        <label class="toggle-switch">
-                            <input type="checkbox" ${menu.active ? 'checked' : ''} onchange="toggleMenu('${menu.id}', this.checked)">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="action-btn edit-btn" onclick="editMenu('${menu.id}')">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                            <button class="action-btn delete-btn" onclick="deleteMenu('${menu.id}')" ${menu.isDefault ? 'disabled' : ''}>
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // Update access management table
-        function updateAccessManagementTable() {
-            const tbody = document.getElementById('accessManagementBody');
-            tbody.innerHTML = '';
-
-            churchData.users.forEach(user => {
-                const restrictedMenusText = user.restrictedMenus.length > 0 
-                    ? user.restrictedMenus.map(menuId => {
-                        const menu = churchData.menus.find(m => m.id === menuId);
-                        return menu ? menu.name : menuId;
-                    }).join(', ') 
-                    : 'None';
-                
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${user.username}</td>
-                    <td>
-                        <span class="password-text">${user.password}</span>
-                        <button class="password-toggle" onclick="togglePasswordVisibility(this)">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </td>
-                    <td>${user.role.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
-                    <td>${restrictedMenusText}</td>
-                    <td class="${user.status === 'active' ? 'status-active' : 'status-inactive'}">
-                        ${user.status === 'active' ? 'Active' : 'Inactive'}
-                    </td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="action-btn edit-btn" onclick="editUser(${user.id})">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                            <button class="action-btn delete-btn" onclick="deleteUser(${user.id})" ${user.id === 1 ? 'disabled' : ''}>
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // Toggle password visibility
-        function togglePasswordVisibility(button) {
-            const passwordText = button.previousElementSibling;
-            const icon = button.querySelector('i');
-            
-            if (passwordText.textContent === '******') {
-                const user = churchData.users.find(u => 
-                    passwordText.textContent === '******' && 
-                    passwordText.closest('tr').querySelector('td:first-child').textContent === u.username
-                );
-                if (user) {
-                    passwordText.textContent = user.password === '******' ? 'superuser123' : user.password;
-                    icon.className = 'fas fa-eye-slash';
-                }
-            } else {
-                passwordText.textContent = '******';
-                icon.className = 'fas fa-eye';
-            }
-        }
-
-        // Update sessions table
-        function updateSessionsTable() {
-            const tbody = document.getElementById('sessionsBody');
-            tbody.innerHTML = '';
-
-            if (churchData.sessions.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="11" style="text-align: center; padding: 40px; color: var(--gray-color);">
-                            No session data available.
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            churchData.sessions.forEach(session => {
-                const startTime = new Date(session.startTime).toLocaleString();
-                const logoutTime = session.logoutTime ? new Date(session.logoutTime).toLocaleString() : '-';
-                
-                const now = new Date();
-                const activeTime = session.logoutTime 
-                    ? Math.round((new Date(session.logoutTime) - new Date(session.startTime)) / 60000)
-                    : Math.round((now - new Date(session.startTime)) / 60000);
-                
-                const idleTime = session.status === 'active' 
-                    ? Math.round((now - new Date(session.lastActivity)) / 60000)
-                    : 0;
-                
-                const totalTime = activeTime + idleTime;
-
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${session.user}</td>
-                    <td>${startTime}</td>
-                    <td>${logoutTime}</td>
-                    <td>${session.ip}</td>
-                    <td>${session.browser}</td>
-                    <td>${session.os}</td>
-                    <td>${session.timezone}</td>
-                    <td>${activeTime} min</td>
-                    <td>${idleTime} min</td>
-                    <td>${totalTime} min</td>
-                    <td class="${session.status === 'active' ? 'status-active' : 'status-inactive'}">
-                        ${session.status === 'active' ? 'Active' : 'Logged Out'}
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // Apply user permissions
-        function applyUserPermissions() {
-            const currentUser = churchData.currentUser;
-            if (!currentUser) return;
-            
-            const allNavItems = document.querySelectorAll('.nav-item');
-            
-            allNavItems.forEach(navItem => {
-                const pageId = navItem.getAttribute('data-page');
-                const menu = churchData.menus.find(m => m.id === pageId);
-                
-                if (!menu || !menu.active || 
-                    (currentUser.role !== 'superuser' && 
-                     currentUser.restrictedMenus.includes(pageId))) {
-                    navItem.style.display = 'none';
-                } else {
-                    navItem.style.display = 'flex';
-                }
-            });
         }
 
         // Update login logo
@@ -3737,23 +3524,13 @@
                 modal.classList.add('active');
                 document.body.style.overflow = 'hidden';
                 
-                // Initialize modal content if needed
                 if (modalId === 'addReportModal') {
                     const today = new Date().toISOString().split('T')[0];
                     document.getElementById('reportDate').value = today;
                     document.getElementById('reportTime').value = '19:00';
                     
-                    // Populate attendees
                     const cellId = document.getElementById('reportCellId').value;
                     populateAttendees(cellId);
-                }
-                
-                if (modalId === 'newUserModal') {
-                    populateRestrictedMenusOptions('restrictedMenusOptions');
-                }
-                
-                if (modalId === 'editUserModal') {
-                    populateEditRestrictedMenusOptions();
                 }
             }
         }
@@ -3788,50 +3565,12 @@
             }
         }
 
-        // Populate restricted menus options
-        function populateRestrictedMenusOptions(dropdownId) {
-            const dropdown = document.getElementById(dropdownId);
-            if (dropdown) {
-                dropdown.innerHTML = '';
-                churchData.menus.forEach(menu => {
-                    const option = document.createElement('div');
-                    option.className = 'multiselect-option';
-                    option.innerHTML = `
-                        <input type="checkbox" value="${menu.id}">
-                        <span>${menu.name}</span>
-                    `;
-                    dropdown.appendChild(option);
-                });
-            }
-        }
-
-        // Populate edit restricted menus options
-        function populateEditRestrictedMenusOptions() {
-            const dropdown = document.getElementById('editRestrictedMenusOptions');
-            if (dropdown) {
-                dropdown.innerHTML = '';
-                const userId = parseInt(document.getElementById('editUserId').value);
-                const user = churchData.users.find(u => u.id === userId);
-                const restrictedMenus = user ? user.restrictedMenus : [];
-                
-                churchData.menus.forEach(menu => {
-                    const option = document.createElement('div');
-                    option.className = 'multiselect-option';
-                    option.innerHTML = `
-                        <input type="checkbox" value="${menu.id}" ${restrictedMenus.includes(menu.id) ? 'checked' : ''}>
-                        <span>${menu.name}</span>
-                    `;
-                    dropdown.appendChild(option);
-                });
-            }
-        }
-
         // Populate attendees for report
         function populateAttendees(cellId) {
             const container = document.getElementById('attendeesContainer');
             if (!container) return;
             
-            const members = churchData.members[cellId] || [];
+            const members = churchData.members.filter(member => member.cellId === cellId);
             
             container.innerHTML = '';
             members.forEach(member => {
@@ -3859,25 +3598,19 @@
 
         // Send reset code
         function sendResetCode() {
-            // Generate random 6-digit code
             churchData.resetCode = Math.floor(100000 + Math.random() * 900000).toString();
             
-            // In a real app, you would send this via email
-            // For demo purposes, we'll just show it
             alert(`One-time login code sent to cereadingmedia@gmail.com\nYour code is: ${churchData.resetCode}\n\n(In a real application, this would be sent via email)`);
             
-            // Show code input step
             document.getElementById('forgotStep1').style.display = 'none';
             document.getElementById('forgotStep2').style.display = 'block';
             
-            // Clear code inputs
             const codeInputs = document.querySelectorAll('.code-input');
             codeInputs.forEach(input => {
                 input.value = '';
                 input.classList.remove('filled');
             });
             
-            // Focus first input
             codeInputs[0].focus();
         }
 
@@ -3889,7 +3622,6 @@
                 codeInputs[index].focus();
             }
             
-            // Update filled class
             if (input.value.length === 1) {
                 input.classList.add('filled');
             } else {
@@ -3906,16 +3638,11 @@
             });
             
             if (enteredCode === churchData.resetCode) {
-                // Code is correct - auto-login as superuser
-                const superuser = churchData.users.find(u => u.username === 'superuser');
-                if (superuser) {
-                    login(superuser.username, superuser.password === '******' ? 'superuser123' : superuser.password);
-                    closeModal('forgotPasswordModal');
-                    alert('Login successful! You have been logged in as superuser.');
-                }
+                alert('Code verified! Please login with your credentials.');
+                closeModal('forgotPasswordModal');
+                showLoginModal();
             } else {
                 alert('Invalid code. Please try again.');
-                // Clear inputs
                 codeInputs.forEach(input => {
                     input.value = '';
                     input.classList.remove('filled');
@@ -3924,108 +3651,83 @@
             }
         }
 
-        // Login function - MODIFIED to use users from access management
-        function login(username, password) {
-            // Find user by username
-            const user = churchData.users.find(u => u.username === username);
+        // Login function - MODIFIED for database-backed authentication
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            // Check if user exists and is active
-            if (!user) {
-                alert('Invalid username or password.');
-                return false;
-            }
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
             
-            if (user.status !== 'active') {
-                alert('This account is inactive. Please contact an administrator.');
-                return false;
-            }
-            
-            // Check password
-            const actualPassword = user.password === '******' ? 'superuser123' : user.password;
-            if (password !== actualPassword) {
-                alert('Invalid username or password.');
-                return false;
-            }
-            
-            // Login successful
-            churchData.currentUser = {
-                id: user.id,
-                username: user.username,
-                password: '******',
-                role: user.role,
-                restrictedMenus: user.restrictedMenus || [],
-                status: user.status
-            };
-            
-            // Create session
-            const newSession = {
-                user: username,
-                startTime: new Date(),
-                logoutTime: null,
-                ip: '127.0.0.1',
-                browser: navigator.userAgent,
-                os: navigator.platform,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                status: 'active',
-                lastActivity: new Date()
-            };
-            
-            churchData.sessions.push(newSession);
-            
-            // Close login modal
-            closeModal('loginModal');
-            document.body.classList.remove('login-active');
-            
-            // Reset idle timer
-            resetIdleTimer();
-            
-            // Update UI
-            updateAllUI();
-            applyUserPermissions();
-            
-            // Navigate based on role
-            if (user.role === 'superuser' || user.role === 'admin') {
-                navigateToPage('dashboard');
-            } else {
-                // Find first active cell menu
-                const cellMenu = churchData.menus.find(m => m.section === 'cell' && m.active && m.id !== 'cells-template');
-                if (cellMenu) {
-                    navigateToPage(cellMenu.id);
-                } else {
-                    navigateToPage('dashboard');
+            try {
+                const response = await fetch(API_ENDPOINTS.LOGIN, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    alert(data.error || 'Login failed');
+                    return;
                 }
+                
+                // Store token and user info
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('role', data.role);
+                localStorage.setItem('username', data.username);
+                
+                churchData.currentUser = {
+                    username: data.username,
+                    role: data.role,
+                    token: data.token
+                };
+                
+                // Close login modal
+                closeModal('loginModal');
+                document.body.classList.remove('login-active');
+                
+                // Reset idle timer
+                resetIdleTimer();
+                
+                // Load data and update UI
+                await loadAllData();
+                applyUserPermissions();
+                
+                // Navigate based on role
+                if (data.role === 'superuser' || data.role === 'admin') {
+                    navigateToPage('dashboard');
+                } else {
+                    navigateToPage('members');
+                }
+                
+                alert('Login successful!');
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Login failed. Please check your credentials and try again.');
             }
-            
-            // Save data
-            saveDataToStorage();
-            
-            return true;
-        }
+        });
 
         // Navigation function
         function navigateToPage(pageId) {
-            // Hide all pages
             document.querySelectorAll('.page-content').forEach(page => {
                 page.classList.remove('active');
             });
             
-            // Remove active class from all nav items
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
             });
             
-            // Show selected page
             const targetPage = document.getElementById(pageId);
             if (targetPage) {
                 targetPage.classList.add('active');
                 
-                // Add active class to corresponding nav item
                 const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
                 if (navItem) {
                     navItem.classList.add('active');
                 }
                 
-                // Close mobile sidebar
                 if (window.innerWidth <= 1024) {
                     sidebar.classList.remove('open');
                 }
@@ -4036,10 +3738,8 @@
         function setTheme(theme) {
             churchData.settings.theme = theme;
             
-            // Remove all theme classes
             document.body.classList.remove('light-theme', 'dark-theme');
             
-            // Apply selected theme
             if (theme === 'auto') {
                 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                 document.body.classList.add(prefersDark ? 'dark-theme' : 'light-theme');
@@ -4047,7 +3747,6 @@
                 document.body.classList.add(theme + '-theme');
             }
             
-            // Update active state in theme options
             document.querySelectorAll('.theme-option').forEach(option => {
                 option.classList.remove('active');
                 if (option.getAttribute('data-theme') === theme) {
@@ -4055,10 +3754,8 @@
                 }
             });
             
-            // Save to localStorage
             localStorage.setItem('theme', theme);
             churchData.settings.theme = theme;
-            saveDataToStorage();
         }
 
         // Apply theme from localStorage
@@ -4077,16 +3774,12 @@
                     updateLoginLogo();
                     updateCurrentLogoPreview();
                     
-                    // Also update sidebar logo
                     const logoImage = document.getElementById('logoImage');
                     const logoIcon = document.getElementById('logoIcon');
                     
                     logoImage.src = e.target.result;
                     logoImage.style.display = 'block';
                     logoIcon.style.display = 'none';
-                    
-                    // Save to storage
-                    saveDataToStorage();
                     
                     alert('Logo uploaded successfully!');
                 };
@@ -4102,14 +3795,10 @@
             churchData.settings.logoTitle = title;
             churchData.settings.logoSubtitle = subtitle;
             
-            // Update UI
             document.getElementById('logoTitleText').textContent = title;
             document.getElementById('logoSubtitleText').textContent = subtitle;
             document.getElementById('loginTitle').textContent = `Welcome to ${title}`;
             document.getElementById('loginSubtitle').textContent = subtitle;
-            
-            // Save to storage
-            saveDataToStorage();
             
             alert('Logo text saved successfully!');
         }
@@ -4137,7 +3826,6 @@
             document.getElementById('idleCountdown').textContent = idleCountdown;
             showModal('idleModal');
             
-            // Start countdown
             idleModalTimer = setInterval(() => {
                 idleCountdown--;
                 document.getElementById('idleCountdown').textContent = idleCountdown;
@@ -4170,13 +3858,7 @@
                     if (churchData.currentUser.role === 'superuser' || churchData.currentUser.role === 'admin') {
                         navigateToPage('dashboard');
                     } else {
-                        // Find first active cell menu
-                        const cellMenu = churchData.menus.find(m => m.section === 'cell' && m.active && m.id !== 'cells-template');
-                        if (cellMenu) {
-                            navigateToPage(cellMenu.id);
-                        } else {
-                            navigateToPage('dashboard');
-                        }
+                        navigateToPage('members');
                     }
                 }
             });
@@ -4203,22 +3885,13 @@
             // Save logo text
             document.getElementById('saveLogoTextBtn').addEventListener('click', saveLogoText);
 
-            // Modal close when clicking outside - only for non-login modals
+            // Modal close when clicking outside
             document.querySelectorAll('.modal-overlay').forEach(modal => {
                 if (modal.id !== 'loginModal') {
                     modal.addEventListener('click', function(e) {
                         if (e.target === this) {
                             closeModal(this.id);
                         }
-                    });
-                }
-            });
-
-            // Close dropdowns when clicking outside
-            document.addEventListener('click', function(e) {
-                if (!e.target.closest('.multiselect-dropdown')) {
-                    document.querySelectorAll('.multiselect-options').forEach(dropdown => {
-                        dropdown.classList.remove('show');
                     });
                 }
             });
@@ -4240,34 +3913,10 @@
             // Stay logged in button
             document.getElementById('stayLoggedInBtn').addEventListener('click', stayLoggedIn);
 
-            // Login form - MODIFIED to use new login function
-            document.getElementById('loginForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const username = document.getElementById('loginUsername').value;
-                const password = document.getElementById('loginPassword').value;
-                
-                if (login(username, password)) {
-                    this.reset();
-                }
-            });
-
             // Edit member form
             document.getElementById('editMemberForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 saveEditedMember();
-            });
-            
-            // Edit menu form
-            document.getElementById('editMenuForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                saveEditedMenu();
-            });
-            
-            // Edit user form
-            document.getElementById('editUserForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                saveEditedUser();
             });
 
             // Confirm delete button
@@ -4283,29 +3932,20 @@
                 showModal('newCellModal');
             });
 
-            // Add New Menu button
-            document.getElementById('addNewMenuBtn').addEventListener('click', function() {
-                showModal('newMenuModal');
-            });
-
-            // Add New User button
-            document.getElementById('addNewUserBtn').addEventListener('click', function() {
-                showModal('newUserModal');
-            });
-
             // Perform logout
             window.performLogout = function() {
-                // End current session
-                if (churchData.currentUser && churchData.sessions.length > 0) {
-                    const currentSession = churchData.sessions[churchData.sessions.length - 1];
-                    if (currentSession.status === 'active') {
-                        currentSession.logoutTime = new Date();
-                        currentSession.status = 'logged out';
-                    }
-                }
+                // Clear local storage
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                localStorage.removeItem('username');
                 
                 // Reset current user
                 churchData.currentUser = null;
+                
+                // Clear data
+                churchData.cells = [];
+                churchData.members = [];
+                churchData.reports = [];
                 
                 // Close all modals
                 document.querySelectorAll('.modal-overlay.active').forEach(modal => {
@@ -4329,111 +3969,48 @@
                     idleModalTimer = null;
                 }
                 
-                // Save data
-                saveDataToStorage();
+                // Reset UI
+                updateAllUI();
             };
 
-            // New Cell Form
-            document.getElementById('newCellForm').addEventListener('submit', function(e) {
+            // New Cell Form - MODIFIED for backend integration
+            document.getElementById('newCellForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
-                const cellName = document.getElementById('cellName').value;
-                const cellVenue = document.getElementById('cellVenue').value;
-                const cellDay = document.getElementById('cellDay').value;
-                const cellTime = document.getElementById('cellTime').value;
-                const cellDescription = document.getElementById('cellDescription').value;
                 
-                const cellId = 'cell-' + churchData.nextIds.cell;
-                const newCell = {
-                    id: cellId,
-                    name: cellName,
-                    venue: cellVenue,
-                    day: cellDay,
-                    time: cellTime,
-                    description: cellDescription,
-                    members: 0,
-                    status: 'blue',
-                    createdAt: new Date(),
-                    isTemplate: false
+                const payload = {
+                    name: document.getElementById('cellName').value.trim(),
+                    venue: document.getElementById('cellVenue').value.trim(),
+                    day: document.getElementById('cellDay').value,
+                    time: document.getElementById('cellTime').value,
+                    description: document.getElementById('cellDescription').value.trim()
                 };
                 
-                churchData.cells.push(newCell);
-                churchData.members[cellId] = [];
-                churchData.nextIds.cell++;
-                
-                // Add to menus
-                churchData.menus.push({
-                    id: cellId,
-                    name: cellName,
-                    icon: 'fas fa-users',
-                    section: 'cell',
-                    active: true,
-                    isDefault: false
-                });
-                
-                createCellPage(newCell);
-                updateAllUI();
-                closeModal('newCellModal');
-                saveDataToStorage();
-                alert('Cell created successfully!');
-            });
-
-            // New Menu Form
-            document.getElementById('newMenuForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                const menuName = document.getElementById('menuName').value;
-                const menuId = document.getElementById('menuId').value;
-                const menuIcon = document.getElementById('menuIcon').value;
-                const menuSection = document.getElementById('menuSection').value;
-                
-                churchData.menus.push({
-                    id: menuId,
-                    name: menuName,
-                    icon: menuIcon,
-                    section: menuSection,
-                    active: true,
-                    isDefault: false
-                });
-                
-                updateAllUI();
-                closeModal('newMenuModal');
-                saveDataToStorage();
-                alert('Menu added successfully!');
-            });
-
-            // New User Form
-            document.getElementById('newUserForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                const username = document.getElementById('userUsername').value;
-                const password = document.getElementById('userPassword').value;
-                const role = document.getElementById('userRole').value;
-                const status = document.getElementById('userStatusToggle').checked ? 'active' : 'inactive';
-                
-                // Get selected restricted menus
-                const restrictedMenus = [];
-                document.querySelectorAll('#restrictedMenusOptions input:checked').forEach(checkbox => {
-                    restrictedMenus.push(checkbox.value);
-                });
-                
-                const newUser = {
-                    id: churchData.nextIds.user,
-                    username: username,
-                    password: password,
-                    role: role,
-                    restrictedMenus: restrictedMenus,
-                    status: status
-                };
-                
-                churchData.users.push(newUser);
-                churchData.nextIds.user++;
-                
-                updateAllUI();
-                closeModal('newUserModal');
-                saveDataToStorage();
-                alert('User added successfully!');
+                try {
+                    const data = await apiRequest(API_ENDPOINTS.CELLS, {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    // Update local data
+                    churchData.cells.push(data);
+                    
+                    // Create cell page
+                    createCellPage(data);
+                    
+                    // Update UI
+                    updateAllUI();
+                    
+                    closeModal('newCellModal');
+                    this.reset();
+                    
+                    alert('Cell created successfully!');
+                } catch (error) {
+                    alert('Failed to create cell: ' + error.message);
+                }
             });
 
             // Add Report Form
-            document.getElementById('addReportForm').addEventListener('submit', function(e) {
+            document.getElementById('addReportForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 const cellId = document.getElementById('reportCellId').value;
                 const date = document.getElementById('reportDate').value;
@@ -4446,7 +4023,7 @@
                 const attendees = [];
                 document.querySelectorAll('#attendeesContainer input:checked').forEach(checkbox => {
                     const memberId = parseInt(checkbox.value);
-                    const member = churchData.members[cellId].find(m => m.id === memberId);
+                    const member = churchData.members.find(m => m.id === memberId && m.cellId === cellId);
                     if (member) {
                         attendees.push({
                             id: member.id,
@@ -4457,29 +4034,35 @@
                     }
                 });
                 
-                const newReport = {
-                    id: churchData.nextIds.report,
+                const payload = {
                     cellId: cellId,
                     date: date + 'T' + time,
                     venue: venue,
                     meetingType: meetingType,
                     description: description,
-                    attendees: attendees,
-                    createdAt: new Date()
+                    attendees: attendees
                 };
                 
-                churchData.reports.push(newReport);
-                churchData.nextIds.report++;
-                
-                updateAllUI();
-                updateCellReports(cellId);
-                closeModal('addReportModal');
-                saveDataToStorage();
-                alert('Report added successfully!');
+                try {
+                    const data = await apiRequest(API_ENDPOINTS.REPORTS, {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    // Update local data
+                    churchData.reports.push(data);
+                    
+                    updateAllUI();
+                    updateCellReports(cellId);
+                    closeModal('addReportModal');
+                    alert('Report added successfully!');
+                } catch (error) {
+                    alert('Failed to add report: ' + error.message);
+                }
             });
 
             // Add Member Form
-            document.getElementById('addMemberForm').addEventListener('submit', function(e) {
+            document.getElementById('addMemberForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 const cellId = document.getElementById('memberCellId').value;
                 const title = document.getElementById('memberTitle').value;
@@ -4489,28 +4072,32 @@
                 const email = document.getElementById('memberEmail').value;
                 const role = document.getElementById('memberRole').value;
                 
-                const newMember = {
-                    id: churchData.nextIds.member,
+                const payload = {
+                    cellId: cellId,
                     title: title,
                     name: name,
                     gender: gender,
                     mobile: mobile,
                     email: email,
-                    role: role,
-                    joinedDate: new Date()
+                    role: role
                 };
                 
-                if (!churchData.members[cellId]) {
-                    churchData.members[cellId] = [];
+                try {
+                    const data = await apiRequest(API_ENDPOINTS.MEMBERS, {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    // Update local data
+                    churchData.members.push(data);
+                    
+                    updateCellMembersTable(cellId);
+                    updateAllMembersTable();
+                    closeModal('addMemberModal');
+                    alert('Member added successfully!');
+                } catch (error) {
+                    alert('Failed to add member: ' + error.message);
                 }
-                
-                churchData.members[cellId].push(newMember);
-                churchData.nextIds.member++;
-                
-                updateCellMembersTable(cellId);
-                closeModal('addMemberModal');
-                saveDataToStorage();
-                alert('Member added successfully!');
             });
 
             // Delegate events for dynamically created buttons
@@ -4518,7 +4105,7 @@
                 // Handle Add Report buttons on cell pages
                 if (e.target.classList.contains('add-report-btn') || e.target.closest('.add-report-btn')) {
                     const btn = e.target.classList.contains('add-report-btn') ? e.target : e.target.closest('.add-report-btn');
-                    const cellId = btn.getAttribute('data-cell-id');
+                    const cellId = btn.getAttribute('data-cell-id').replace('cell-', '');
                     document.getElementById('reportCellId').value = cellId;
                     showModal('addReportModal');
                 }
@@ -4526,7 +4113,7 @@
                 // Handle Add Member buttons on cell pages
                 if (e.target.classList.contains('add-member-btn') || e.target.closest('.add-member-btn')) {
                     const btn = e.target.classList.contains('add-member-btn') ? e.target : e.target.closest('.add-member-btn');
-                    const cellId = btn.getAttribute('data-cell-id');
+                    const cellId = btn.getAttribute('data-cell-id').replace('cell-', '');
                     document.getElementById('memberCellId').value = cellId;
                     showModal('addMemberModal');
                 }
@@ -4534,14 +4121,8 @@
                 // Handle editable fields
                 if (e.target.classList.contains('editable-field')) {
                     const field = e.target;
-                    const cellId = field.getAttribute('data-cell-id');
+                    const cellId = field.getAttribute('data-cell-id').replace('cell-', '');
                     const fieldName = field.getAttribute('data-field');
-                    
-                    // Don't allow editing template cell
-                    if (cellId === 'cells-template') {
-                        alert('This is a template cell. Create a new cell to edit properties.');
-                        return;
-                    }
                     
                     const currentValue = field.textContent;
                     const newValue = prompt(`Edit ${fieldName}:`, currentValue);
@@ -4558,17 +4139,17 @@
                                 if (cellPageTitle) {
                                     cellPageTitle.textContent = newValue;
                                 }
-                                
-                                // Update menu name
-                                const menu = churchData.menus.find(m => m.id === cellId);
-                                if (menu) {
-                                    menu.name = newValue;
-                                    updateSidebarMenus();
-                                }
                             }
                             
                             updateAllUI();
-                            saveDataToStorage();
+                            
+                            // Update in backend
+                            apiRequest(`${API_ENDPOINTS.CELLS}/${cellId}`, {
+                                method: 'PUT',
+                                body: JSON.stringify({ [fieldName]: newValue })
+                            }).catch(error => {
+                                console.error('Failed to update cell:', error);
+                            });
                         }
                     }
                 }
@@ -4581,23 +4162,57 @@
             document.addEventListener('scroll', resetIdleTimer);
         }
 
+        // Helper functions
+        async function deleteReport(id) {
+            if (confirm('Are you sure you want to delete this report?')) {
+                try {
+                    await apiRequest(`${API_ENDPOINTS.REPORTS}/${id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    // Update local data
+                    churchData.reports = churchData.reports.filter(report => report.id !== id);
+                    
+                    updateRecentReports();
+                    
+                    // Update all cell reports
+                    churchData.cells.forEach(cell => {
+                        updateCellReports(cell.id);
+                    });
+                    
+                    alert('Report deleted successfully!');
+                } catch (error) {
+                    alert('Failed to delete report: ' + error.message);
+                }
+            }
+        }
+
+        function updateCellReports(cellId) {
+            searchReports(cellId);
+        }
+
+        // Update sessions table
+        function updateSessionsTable() {
+            const tbody = document.getElementById('sessionsBody');
+            tbody.innerHTML = '';
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="11" style="text-align: center; padding: 40px; color: var(--gray-color);">
+                        Session tracking would be implemented with a proper backend.
+                        <br><br>
+                        <small>In a full implementation, this would show user login/logout times, IP addresses, browser info, etc.</small>
+                    </td>
+                </tr>
+            `;
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
             initializeApplication();
             setupEventListeners();
             applyThemeFromStorage();
             updateCurrentLogoPreview();
-            
-            // Show login modal
-            document.getElementById('loginModal').classList.add('active');
-            document.body.classList.add('login-active');
-            
-            // Simulate real-time updates
-            setInterval(() => {
-                if (churchData.currentUser) {
-                    updateStats();
-                }
-            }, 5000);
         });
 
         // Handle window resize for mobile
@@ -4606,149 +4221,6 @@
                 sidebar.classList.remove('open');
             }
         });
-
-        // Helper functions
-        function deleteReport(id) {
-            if (confirm('Are you sure you want to delete this report?')) {
-                churchData.reports = churchData.reports.filter(report => report.id !== id);
-                updateRecentReports();
-                
-                // Update all cell reports
-                churchData.cells.forEach(cell => {
-                    updateCellReports(cell.id);
-                });
-                
-                saveDataToStorage();
-                alert('Report deleted successfully!');
-            }
-        }
-
-        function toggleMenu(menuId, isActive) {
-            const menu = churchData.menus.find(m => m.id === menuId);
-            if (menu) {
-                menu.active = isActive;
-                updateSidebarMenus();
-                updatePageManagementTable();
-                saveDataToStorage();
-            }
-        }
-
-        function editMenu(menuId) {
-            const menu = churchData.menus.find(m => m.id === menuId);
-            if (menu) {
-                document.getElementById('editMenuId').value = menuId;
-                document.getElementById('editMenuName').value = menu.name;
-                document.getElementById('editMenuIcon').value = menu.icon;
-                document.getElementById('editMenuSection').value = menu.section;
-                document.getElementById('editMenuActiveToggle').checked = menu.active;
-                showModal('editMenuModal');
-            }
-        }
-        
-        function saveEditedMenu() {
-            const menuId = document.getElementById('editMenuId').value;
-            const menu = churchData.menus.find(m => m.id === menuId);
-            if (menu) {
-                menu.name = document.getElementById('editMenuName').value;
-                menu.icon = document.getElementById('editMenuIcon').value;
-                menu.section = document.getElementById('editMenuSection').value;
-                menu.active = document.getElementById('editMenuActiveToggle').checked;
-                
-                updateAllUI();
-                closeModal('editMenuModal');
-                saveDataToStorage();
-                alert('Menu updated successfully!');
-            }
-        }
-
-        function deleteMenu(menuId) {
-            if (confirm('Are you sure you want to delete this menu?')) {
-                // Don't delete if it's a default menu
-                const menu = churchData.menus.find(m => m.id === menuId);
-                if (menu && menu.isDefault) {
-                    alert('Default menus cannot be deleted.');
-                    return;
-                }
-                
-                churchData.menus = churchData.menus.filter(m => m.id !== menuId);
-                updateAllUI();
-                saveDataToStorage();
-                alert('Menu deleted successfully!');
-            }
-        }
-
-        function editUser(userId) {
-            const user = churchData.users.find(u => u.id === userId);
-            if (user) {
-                document.getElementById('editUserId').value = userId;
-                document.getElementById('editUserUsername').value = user.username;
-                document.getElementById('editUserPassword').value = user.password === '******' ? 'superuser123' : user.password;
-                document.getElementById('editUserRole').value = user.role;
-                document.getElementById('editUserStatusToggle').checked = user.status === 'active';
-                document.getElementById('editUserStatusText').textContent = user.status === 'active' ? 'Active' : 'Inactive';
-                
-                // Populate restricted menus
-                setTimeout(() => {
-                    populateEditRestrictedMenusOptions();
-                }, 100);
-                
-                showModal('editUserModal');
-            }
-        }
-        
-        function saveEditedUser() {
-            const userId = parseInt(document.getElementById('editUserId').value);
-            const user = churchData.users.find(u => u.id === userId);
-            if (user) {
-                user.username = document.getElementById('editUserUsername').value;
-                user.password = document.getElementById('editUserPassword').value;
-                user.role = document.getElementById('editUserRole').value;
-                user.status = document.getElementById('editUserStatusToggle').checked ? 'active' : 'inactive';
-                
-                // Get selected restricted menus
-                const restrictedMenus = [];
-                document.querySelectorAll('#editRestrictedMenusOptions input:checked').forEach(checkbox => {
-                    restrictedMenus.push(checkbox.value);
-                });
-                user.restrictedMenus = restrictedMenus;
-                
-                updateAllUI();
-                closeModal('editUserModal');
-                saveDataToStorage();
-                alert('User updated successfully!');
-            }
-        }
-
-        function deleteUser(userId) {
-            if (userId === 1) {
-                alert('The default superuser cannot be deleted.');
-                return;
-            }
-            
-            if (confirm('Are you sure you want to delete this user?')) {
-                churchData.users = churchData.users.filter(u => u.id !== userId);
-                updateAllUI();
-                saveDataToStorage();
-                alert('User deleted successfully!');
-            }
-        }
-
-        function updateCellReports(cellId) {
-            searchReports(cellId);
-        }
-
-        fetch("/api/cells", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: "Cell A",
-            venue: "Church Hall",
-            day: "Sunday",
-            time: "17:00",
-            description: "Evening cell"
-          })
-        });
-
     </script>
 </body>
 </html>
