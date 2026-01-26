@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Cell</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #ffffff;
+      color: #1e1e1e;
+    }
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+    .bg-logo {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 180px;
+      height: 180px;
+      opacity: 0.08;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      z-index: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 6rem;
+      color: #1e3a5f;
+    }
+    h1 {
+      margin: 0 0 24px;
+      font-size: 2rem;
+      color: #1e3a5f;
+    }
+    form {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 16px;
+    }
+    label {
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: block;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #dcdcdc;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-primary { background: #1e3a5f; color: white; }
+    .btn-secondary { background: #e0e0e0; }
+  </style>
+</head>
+<body>
+  <div id="bgLogo" class="bg-logo"><i class="fas fa-church"></i></div>
+  <div class="page">
+    <h1>Add New Cell</h1>
+    <form id="newCellForm">
+      <div>
+        <label for="cellName">Cell Name *</label>
+        <input type="text" id="cellName" required>
+      </div>
+      <div>
+        <label for="cellVenue">Venue *</label>
+        <input type="text" id="cellVenue" required>
+      </div>
+      <div>
+        <label for="cellDay">Day of Meeting *</label>
+        <select id="cellDay" required>
+          <option value="">Select Day</option>
+          <option>Monday</option>
+          <option>Tuesday</option>
+          <option>Wednesday</option>
+          <option>Thursday</option>
+          <option>Friday</option>
+          <option>Saturday</option>
+          <option>Sunday</option>
+        </select>
+      </div>
+      <div>
+        <label for="cellTime">Time *</label>
+        <input type="time" id="cellTime" required>
+      </div>
+      <div>
+        <label for="cellDescription">Description</label>
+        <textarea id="cellDescription" rows="4"></textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Create Cell</button>
+        <button type="button" class="btn btn-secondary" onclick="window.location.href='/'">Back</button>
+      </div>
+    </form>
+  </div>
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please login first.');
+      window.location.href = '/';
+    }
+
+    const logo = localStorage.getItem('logoImage');
+    if (logo) {
+      const bg = document.getElementById('bgLogo');
+      bg.style.backgroundImage = `url(${logo})`;
+      bg.innerHTML = '';
+    }
+
+    async function apiRequest(endpoint, options = {}) {
+      const response = await fetch(endpoint, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          ...(options.headers || {})
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Request failed');
+      }
+      return data;
+    }
+
+    document.getElementById('newCellForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('cellName').value.trim(),
+        venue: document.getElementById('cellVenue').value.trim(),
+        day: document.getElementById('cellDay').value,
+        time: document.getElementById('cellTime').value,
+        description: document.getElementById('cellDescription').value.trim()
+      };
+      try {
+        await apiRequest('/api/cells', { method: 'POST', body: JSON.stringify(payload) });
+        alert('Cell created successfully!');
+        e.target.reset();
+      } catch (err) {
+        alert('Failed to create cell: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

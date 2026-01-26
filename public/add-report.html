@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Report</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { margin: 0; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background: #fff; color: #1e1e1e; }
+    .page { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+    .bg-logo { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); width: 180px; height: 180px; opacity: 0.08; background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 6rem; color: #1e3a5f; }
+    h1 { margin: 0 0 24px; font-size: 2rem; color: #1e3a5f; }
+    form { position: relative; z-index: 1; display: grid; gap: 16px; }
+    label { font-weight: 600; margin-bottom: 6px; display: block; }
+    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #dcdcdc; border-radius: 8px; font-size: 1rem; }
+    .attendees-container { border: 1px solid #ddd; border-radius: 8px; padding: 12px; max-height: 220px; overflow-y: auto; }
+    .attendee-item { padding: 6px 0; display: flex; gap: 8px; align-items: center; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+    .btn-primary { background: #1e3a5f; color: white; }
+    .btn-secondary { background: #e0e0e0; }
+  </style>
+</head>
+<body>
+  <div id="bgLogo" class="bg-logo"><i class="fas fa-church"></i></div>
+  <div class="page">
+    <h1>Add Report</h1>
+    <form id="addReportForm">
+      <div>
+        <label for="reportCellId">Cell Group *</label>
+        <select id="reportCellId" required></select>
+      </div>
+      <div>
+        <label for="reportDate">Date *</label>
+        <input type="date" id="reportDate" required>
+      </div>
+      <div>
+        <label for="reportTime">Time *</label>
+        <input type="time" id="reportTime" required>
+      </div>
+      <div>
+        <label for="reportVenue">Venue *</label>
+        <input type="text" id="reportVenue" required>
+      </div>
+      <div>
+        <label for="reportMeetingType">Meeting Type *</label>
+        <select id="reportMeetingType" required>
+          <option value="">Select Type</option>
+          <option value="prayer">Prayer and Planning</option>
+          <option value="bible-study-1">Bible Study 1</option>
+          <option value="bible-study-2">Bible Study 2</option>
+          <option value="outreach">Outreach Meeting</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label>Attendees (checked = present)</label>
+        <div id="attendeesContainer" class="attendees-container"></div>
+      </div>
+      <div>
+        <label for="reportDescription">Description</label>
+        <textarea id="reportDescription" rows="4"></textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Save Report</button>
+        <button type="button" class="btn btn-secondary" onclick="window.location.href='/'">Back</button>
+      </div>
+    </form>
+  </div>
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please login first.');
+      window.location.href = '/';
+    }
+
+    const logo = localStorage.getItem('logoImage');
+    if (logo) {
+      const bg = document.getElementById('bgLogo');
+      bg.style.backgroundImage = `url(${logo})`;
+      bg.innerHTML = '';
+    }
+
+    async function apiRequest(endpoint, options = {}) {
+      const response = await fetch(endpoint, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          ...(options.headers || {})
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Request failed');
+      }
+      return data;
+    }
+
+    let allMembers = [];
+
+    async function loadCells() {
+      const cells = await apiRequest('/api/cells');
+      const select = document.getElementById('reportCellId');
+      select.innerHTML = '<option value="">Select Cell</option>';
+      cells.forEach(cell => {
+        const option = document.createElement('option');
+        option.value = cell.id;
+        option.textContent = cell.name;
+        select.appendChild(option);
+      });
+    }
+
+    async function loadMembers() {
+      allMembers = await apiRequest('/api/members');
+    }
+
+    function renderAttendees(cellId) {
+      const container = document.getElementById('attendeesContainer');
+      container.innerHTML = '';
+      const members = allMembers.filter(m => m.cellId === cellId);
+      if (!members.length) {
+        container.innerHTML = '<p style="text-align:center;color:#999;">No members in this cell yet.</p>';
+        return;
+      }
+      members.forEach(member => {
+        const item = document.createElement('div');
+        item.className = 'attendee-item';
+        item.innerHTML = `
+          <input type="checkbox" value="${member.id}" checked>
+          <span>${member.title} ${member.name} (${member.role})</span>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    document.getElementById('reportCellId').addEventListener('change', (e) => {
+      renderAttendees(e.target.value);
+    });
+
+    document.getElementById('addReportForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const cellId = document.getElementById('reportCellId').value;
+      const date = document.getElementById('reportDate').value;
+      const time = document.getElementById('reportTime').value;
+      const venue = document.getElementById('reportVenue').value;
+      const meetingType = document.getElementById('reportMeetingType').value;
+      const description = document.getElementById('reportDescription').value;
+
+      const present = [];
+      const absent = [];
+      const members = allMembers.filter(m => m.cellId === cellId);
+      const selectedIds = new Set(
+        Array.from(document.querySelectorAll('#attendeesContainer input:checked')).map(cb => parseInt(cb.value))
+      );
+      members.forEach(member => {
+        const entry = { id: member.id, title: member.title, name: member.name, role: member.role };
+        if (selectedIds.has(member.id)) present.push(entry);
+        else absent.push(entry);
+      });
+
+      const payload = {
+        cellId,
+        date: date + 'T' + time,
+        venue,
+        meetingType,
+        description,
+        attendees: { present, absent }
+      };
+
+      try {
+        await apiRequest('/api/reports', { method: 'POST', body: JSON.stringify(payload) });
+        alert('Report added successfully!');
+        e.target.reset();
+        document.getElementById('attendeesContainer').innerHTML = '';
+      } catch (err) {
+        alert('Failed to add report: ' + err.message);
+      }
+    });
+
+    Promise.all([loadCells(), loadMembers()])
+      .then(() => {
+        const cellId = document.getElementById('reportCellId').value;
+        if (cellId) renderAttendees(cellId);
+      })
+      .catch(err => alert('Failed to load data: ' + err.message));
+  </script>
+</body>
+</html>

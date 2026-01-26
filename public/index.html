@@ -3013,6 +3013,11 @@
             document.getElementById('logoTitle').value = churchData.settings.logoTitle;
             document.getElementById('logoSubtitle').value = churchData.settings.logoSubtitle;
             
+            const savedLogo = localStorage.getItem('logoImage');
+            if (savedLogo) {
+                churchData.settings.logo = savedLogo;
+            }
+
             // Update login modal logo
             updateLoginLogo();
             
@@ -4737,6 +4742,7 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     churchData.settings.logo = e.target.result;
+                    localStorage.setItem('logoImage', e.target.result);
                     updateLoginLogo();
                     updateCurrentLogoPreview();
                     
