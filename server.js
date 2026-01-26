@@ -6,6 +6,7 @@ const path = require("path");
 const { Pool } = require("pg");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+require("dotenv").config();
 
 // ===============================
 // 2) CREATE APP
@@ -64,6 +65,18 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ error: "Not authorized" });
   }
   next();
+}
+
+async function createSession(userId, req) {
+  const ipAddress = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString();
+  const userAgent = (req.headers["user-agent"] || "").toString();
+  const result = await pool.query(
+    `INSERT INTO sessions (user_id, login_time, ip_address, user_agent)
+     VALUES ($1, NOW(), $2, $3)
+     RETURNING id::text as id`,
+    [userId, ipAddress, userAgent]
+  );
+  return result.rows[0]?.id || null;
 }
 
 // ===============================
@@ -145,8 +158,11 @@ app.post("/api/otp/login", (req, res) => {
     { expiresIn: "8h" }
   );
 
+  const sessionId = await createSession(user.id, req);
+
   res.json({
     token,
+    sessionId,
     username: user.username,
     role: user.role
   });
@@ -183,8 +199,11 @@ app.post("/api/login", async (req, res) => {
       { expiresIn: "8h" }
     );
 
+    const sessionId = await createSession(user.id, req);
+
     res.json({
       token,
+      sessionId,
       username: user.username,
       role: user.role
     });
@@ -311,6 +330,48 @@ app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to delete user" });
+  }
+});
+
+// SESSIONS (PROTECTED, ADMIN ONLY)
+app.get("/api/sessions", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT s.id::text as id,
+              s.login_time as "loginTime",
+              s.logout_time as "logoutTime",
+              s.ip_address as "ipAddress",
+              s.user_agent as "userAgent",
+              u.username
+       FROM sessions s
+       JOIN users u ON u.id = s.user_id
+       ORDER BY s.login_time DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load sessions" });
+  }
+});
+
+app.put("/api/sessions/:id/end", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE sessions
+       SET logout_time = NOW()
+       WHERE id = $1
+       RETURNING id::text as id`,
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to end session" });
   }
 });
 

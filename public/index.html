@@ -2463,15 +2463,10 @@
         </div>
         
         <!-- Page Management System -->
-        <div id="page-management" class="page-content">
-            <div class="page-header">
-                <h1>Page Management System</h1>
-                <div class="page-actions">
-                    <button class="btn btn-success" id="addNewMenuBtn">
-                        <i class="fas fa-plus"></i> Add New Menu
-                    </button>
-                </div>
-            </div>
+      <div id="page-management" class="page-content">
+          <div class="page-header">
+              <h1>Page Management System</h1>
+          </div>
             
             <div class="table-container">
                 <table id="pageManagementTable">
@@ -2653,6 +2648,7 @@
             reports: [],
             members: [],
             users: [],
+            sessions: [],
             currentUser: null,
             settings: {
                 theme: 'light',
@@ -2739,6 +2735,16 @@
                 const reportsData = await apiRequest(API_ENDPOINTS.REPORTS);
                 churchData.reports = reportsData;
 
+                // Load sessions (admin only)
+                try {
+                    const sessionsData = await apiRequest(API_ENDPOINTS.SESSIONS);
+                    churchData.sessions = sessionsData;
+                } catch (error) {
+                    if (error.message !== 'Not authorized') {
+                        console.warn('Failed to load sessions:', error.message);
+                    }
+                }
+                
                 // Load users (admin only)
                 try {
                     const usersData = await apiRequest(API_ENDPOINTS.USERS);
@@ -2821,6 +2827,7 @@
             updateSidebarMenus();
             updateAllMembersTable();
             updateAccessManagementTable();
+            updatePageManagementTable();
             updateSessionsTable();
         }
 
@@ -3045,6 +3052,7 @@
 
             // Apply user permissions
             applyUserPermissions();
+            applyPageVisibility();
         }
 
         // Apply user permissions
@@ -3439,6 +3447,34 @@
             return options;
         }
 
+        function getPageVisibility() {
+            try {
+                const raw = localStorage.getItem('pageVisibility');
+                return raw ? JSON.parse(raw) : {};
+            } catch {
+                return {};
+            }
+        }
+
+        function setPageVisibility(pageId, isVisible) {
+            const visibility = getPageVisibility();
+            visibility[pageId] = isVisible;
+            localStorage.setItem('pageVisibility', JSON.stringify(visibility));
+        }
+
+        function applyPageVisibility() {
+            const visibility = getPageVisibility();
+            document.querySelectorAll('.nav-item').forEach(item => {
+                const pageId = item.getAttribute('data-page');
+                if (!pageId) return;
+                if (visibility[pageId] === false) {
+                    item.style.display = 'none';
+                } else {
+                    item.style.display = 'flex';
+                }
+            });
+        }
+
         function populateRestrictedMenusOptions(containerId) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -3499,6 +3535,42 @@
                     </td>
                 `;
                 tbody.appendChild(row);
+            });
+        }
+
+        function updatePageManagementTable() {
+            const tbody = document.getElementById('pageManagementBody');
+            if (!tbody) return;
+
+            const visibility = getPageVisibility();
+            const pages = getMenuOptions();
+            tbody.innerHTML = '';
+
+            pages.forEach(page => {
+                const isActive = visibility[page.id] !== false;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${page.label}</td>
+                    <td>${page.id}</td>
+                    <td>-</td>
+                    <td>system</td>
+                    <td>
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${isActive ? 'checked' : ''} data-page-id="${page.id}" class="page-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </td>
+                    <td>-</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            document.querySelectorAll('.page-toggle').forEach(toggle => {
+                toggle.addEventListener('change', function() {
+                    const pageId = this.getAttribute('data-page-id');
+                    setPageVisibility(pageId, this.checked);
+                    applyPageVisibility();
+                });
             });
         }
 
@@ -3851,6 +3923,9 @@
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('role', data.role);
                 localStorage.setItem('username', data.username);
+                if (data.sessionId) {
+                    localStorage.setItem('sessionId', data.sessionId);
+                }
                 
                 churchData.currentUser = {
                     username: data.username,
@@ -3904,6 +3979,9 @@
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('role', data.role);
                 localStorage.setItem('username', data.username);
+                if (data.sessionId) {
+                    localStorage.setItem('sessionId', data.sessionId);
+                }
                 
                 churchData.currentUser = {
                     username: data.username,
@@ -4203,10 +4281,20 @@
 
             // Perform logout
             window.performLogout = function() {
+                const sessionId = localStorage.getItem('sessionId');
+                if (sessionId) {
+                    apiRequest(`${API_ENDPOINTS.SESSIONS}/${sessionId}/end`, {
+                        method: 'PUT'
+                    }).catch(error => {
+                        console.warn('Failed to end session:', error.message);
+                    });
+                }
+
                 // Clear local storage
                 localStorage.removeItem('token');
                 localStorage.removeItem('role');
                 localStorage.removeItem('username');
+                localStorage.removeItem('sessionId');
                 
                 // Reset current user
                 churchData.currentUser = null;
@@ -4216,6 +4304,7 @@
                 churchData.members = [];
                 churchData.reports = [];
                 churchData.users = [];
+                churchData.sessions = [];
                 
                 // Close all modals
                 document.querySelectorAll('.modal-overlay.active').forEach(modal => {
@@ -4465,16 +4554,60 @@
         function updateSessionsTable() {
             const tbody = document.getElementById('sessionsBody');
             tbody.innerHTML = '';
+            if (!churchData.sessions.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="11" style="text-align: center; padding: 40px; color: var(--gray-color);">
+                            No sessions recorded yet.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
 
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="11" style="text-align: center; padding: 40px; color: var(--gray-color);">
-                        Session tracking would be implemented with a proper backend.
-                        <br><br>
-                        <small>In a full implementation, this would show user login/logout times, IP addresses, browser info, etc.</small>
-                    </td>
-                </tr>
-            `;
+            function parseUserAgent(ua) {
+                const agent = ua || '';
+                let browser = 'Unknown';
+                let os = 'Unknown';
+
+                if (agent.includes('Edg/')) browser = 'Edge';
+                else if (agent.includes('Chrome/')) browser = 'Chrome';
+                else if (agent.includes('Firefox/')) browser = 'Firefox';
+                else if (agent.includes('Safari/') && !agent.includes('Chrome/')) browser = 'Safari';
+
+                if (agent.includes('Windows')) os = 'Windows';
+                else if (agent.includes('Mac OS X')) os = 'macOS';
+                else if (agent.includes('Android')) os = 'Android';
+                else if (agent.includes('iPhone') || agent.includes('iPad')) os = 'iOS';
+                else if (agent.includes('Linux')) os = 'Linux';
+
+                return { browser, os };
+            }
+
+            churchData.sessions.forEach(session => {
+                const loginTime = session.loginTime ? new Date(session.loginTime) : null;
+                const logoutTime = session.logoutTime ? new Date(session.logoutTime) : null;
+                const activeTimeMs = loginTime && logoutTime ? (logoutTime - loginTime) : null;
+                const activeTime = activeTimeMs ? Math.round(activeTimeMs / 60000) + ' min' : 'Active';
+                const status = logoutTime ? 'Ended' : 'Active';
+                const ua = parseUserAgent(session.userAgent || '');
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${session.username || ''}</td>
+                    <td>${loginTime ? loginTime.toLocaleString() : ''}</td>
+                    <td>${logoutTime ? logoutTime.toLocaleString() : ''}</td>
+                    <td>${session.ipAddress || ''}</td>
+                    <td>${ua.browser}</td>
+                    <td>${ua.os}</td>
+                    <td>${session.timezone || ''}</td>
+                    <td>${activeTime}</td>
+                    <td>-</td>
+                    <td>${activeTime}</td>
+                    <td>${status}</td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
         // Initialize on page load
