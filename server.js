@@ -216,8 +216,8 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ADD CELL (PROTECTED)
-app.post("/api/cells", requireAuth, async (req, res) => {
+// ADD CELL (PUBLIC)
+app.post("/api/cells", async (req, res) => {
   try {
     const { name, venue, day, time, description } = req.body;
 
