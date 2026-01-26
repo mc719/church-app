@@ -634,6 +634,48 @@
             line-height: 1.7;
             font-size: 0.95rem;
         }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(30, 58, 95, 0.95);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            z-index: 2000;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.2s, transform 0.2s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .members-grid {
+            display: none;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .member-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 16px;
+            border: 1px solid #eaeaea;
+            cursor: pointer;
+        }
+
+        .dark-theme .member-card {
+            background-color: #1a1a1a;
+            border-color: #333;
+        }
         
         /* Cell Page Styles */
         .cell-header {
@@ -1579,6 +1621,14 @@
                 width: 100%;
                 justify-content: center;
             }
+
+            .members-table-container {
+                display: none;
+            }
+
+            .members-grid {
+                display: grid;
+            }
             
             .theme-options {
                 grid-template-columns: 1fr;
@@ -1798,6 +1848,19 @@
                         <button type="submit" class="btn btn-success">Create Cell</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Member Details Modal -->
+    <div id="memberDetailsModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Member Details</h3>
+                <button class="close-modal" onclick="closeModal('memberDetailsModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="memberDetailsBody">
+                <!-- Filled dynamically -->
             </div>
         </div>
     </div>
@@ -2412,7 +2475,7 @@
                 </div>
             </div>
             
-            <div class="table-container">
+            <div class="table-container members-table-container">
                 <table id="allMembersTable">
                     <thead>
                         <tr>
@@ -2433,6 +2496,10 @@
                         <!-- All members from all cells will be loaded here -->
                     </tbody>
                 </table>
+            </div>
+
+            <div id="membersGrid" class="members-grid">
+                <!-- Member cards will be rendered here on mobile -->
             </div>
             
             <div style="text-align: center; margin-top: 20px; color: var(--gray-color);">
@@ -2758,6 +2825,11 @@
         let lastActivityTime = Date.now();
         const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
         const IDLE_MODAL_TIMEOUT = 30 * 1000; // 30 seconds
+        let sessionActiveMs = 0;
+        let sessionIdleMs = 0;
+        let sessionLastTick = Date.now();
+        let sessionIdle = false;
+        let sessionSyncTimer = null;
 
         // DOM elements
         const mobileMenuToggle = document.getElementById('mobileMenuToggle');
@@ -3015,48 +3087,86 @@
                 `;
                 return;
             }
-            
-            churchData.cells.forEach(cell => {
+
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonthIndex = now.getMonth();
+            const monthsElapsed = currentMonthIndex + 1;
+
+            function getMonthlyReportCounts(cellId) {
+                const counts = new Array(monthsElapsed).fill(0);
+                churchData.reports.forEach(report => {
+                    if (report.cellId !== cellId) return;
+                    const dt = new Date(report.date);
+                    if (dt.getFullYear() !== currentYear) return;
+                    const m = dt.getMonth();
+                    if (m >= 0 && m <= currentMonthIndex) {
+                        counts[m] += 1;
+                    }
+                });
+                return counts;
+            }
+
+            function getCellStatus(cellId) {
+                const counts = getMonthlyReportCounts(cellId);
+                const currentMonthCount = counts[currentMonthIndex] || 0;
+                if (currentMonthCount <= 2) {
+                    return { status: 'red', text: 'Below Target (0-2)' };
+                }
+                if (currentMonthCount <= 3) {
+                    return { status: 'amber', text: 'At Risk (3)' };
+                }
+                return { status: 'green', text: 'On Track (4+)' };
+            }
+
+            function getGreenPercentage(cellId) {
+                const counts = getMonthlyReportCounts(cellId);
+                const greenMonths = counts.filter(count => count >= 4).length;
+                const percentage = monthsElapsed ? Math.round((greenMonths / monthsElapsed) * 100) : 0;
+                return { greenMonths, percentage };
+            }
+
+            const sortedCells = [...churchData.cells].sort((a, b) => {
+                const aStats = getGreenPercentage(a.id);
+                const bStats = getGreenPercentage(b.id);
+                if (bStats.percentage !== aStats.percentage) {
+                    return bStats.percentage - aStats.percentage;
+                }
+                return a.name.localeCompare(b.name);
+            });
+
+            sortedCells.forEach(cell => {
                 // Count members in this cell
                 const memberCount = churchData.members.filter(member => member.cellId === cell.id).length;
                 
-                // Determine status based on recent reports
-                const thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                const recentReports = churchData.reports.filter(report => 
-                    report.cellId === cell.id && new Date(report.date) > thirtyDaysAgo
-                );
-                
-                let status = 'blue';
-                let statusText = 'No Recent Reports';
-                
-                if (recentReports.length > 0) {
-                    status = 'green';
-                    statusText = 'Active';
-                }
-                
-                const statusClass = `status-${status}`;
+                const statusInfo = getCellStatus(cell.id);
+                const statusClass = `status-${statusInfo.status}`;
+                const percentStats = getGreenPercentage(cell.id);
                 
                 const row = document.createElement('tr');
+                row.style.cursor = 'pointer';
+                row.addEventListener('click', () => {
+                    showToast(`${cell.name}: ${percentStats.percentage}% green months in ${currentYear}`);
+                });
                 row.innerHTML = `
                     <td>${cell.name}</td>
                     <td>${cell.day} at ${cell.time}</td>
                     <td>${memberCount}</td>
-                    <td><span class="${statusClass}">${statusText}</span></td>
+                    <td><span class="${statusClass}">${statusInfo.text}</span></td>
                     <td>
                         <div class="action-buttons">
-                            <button class="action-btn edit-btn" onclick="editCell('${cell.id}')">
+                            <button class="action-btn edit-btn" onclick="event.stopPropagation(); editCell('${cell.id}')">
                                 <i class="fas fa-edit"></i> Edit
                             </button>
-                            <button class="action-btn delete-btn" onclick="confirmDeleteCell('${cell.id}', '${cell.name}')">
+                            <button class="action-btn delete-btn" onclick="event.stopPropagation(); confirmDeleteCell('${cell.id}', '${cell.name}')">
                                 <i class="fas fa-trash"></i> Delete
                             </button>
                         </div>
                     </td>
                 `;
-          cellsTableBody.appendChild(row);
-      });
-  }
+                cellsTableBody.appendChild(row);
+            });
+        }
 
   function editCell(cellId) {
       const cell = churchData.cells.find(c => c.id === cellId);
@@ -3146,7 +3256,7 @@
   }
 
   // Update recent reports
-  function updateRecentReports() {
+        function updateRecentReports() {
             const oneWeekAgo = new Date();
             oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
@@ -3181,6 +3291,7 @@
                     minute: '2-digit'
                 });
 
+                const { present, absent } = getReportAttendance(report);
                 const reportCard = document.createElement('div');
                 reportCard.className = 'report-card';
                 reportCard.innerHTML = `
@@ -3198,7 +3309,8 @@
                     </div>
                     <div class="report-content">
                         <strong>Meeting Type:</strong> ${getMeetingTypeText(report.meetingType)}<br>
-                        <strong>Attendees:</strong> ${Array.isArray(report.attendees) ? report.attendees.length : 0}<br><br>
+                        <strong>Present:</strong> ${present.length}<br>
+                        <strong>Absent:</strong> ${absent.length}<br><br>
                         ${report.description || 'No additional information'}
                     </div>
                 `;
@@ -3244,6 +3356,22 @@
             // Apply user permissions
             applyUserPermissions();
             applyPageVisibility();
+        }
+
+        function showToast(message) {
+            let toast = document.getElementById('appToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'appToast';
+                toast.className = 'toast';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.classList.add('show');
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
         }
 
         // Apply user permissions
@@ -3524,8 +3652,10 @@
                                     </div>
                                     <div class="report-content">
                                         <strong>Meeting Type:</strong> ${getMeetingTypeText(report.meetingType)}<br>
-                                        <strong>Attendees:</strong> ${Array.isArray(report.attendees) ? report.attendees.length : 0}<br>
-                                        <strong>Present Members:</strong> ${Array.isArray(report.attendees) && report.attendees.length ? report.attendees.map(a => a.name).join(', ') : 'None'}<br><br>
+                                        <strong>Present:</strong> ${getReportAttendance(report).present.length}<br>
+                                        <strong>Absent:</strong> ${getReportAttendance(report).absent.length}<br>
+                                        <strong>Present Members:</strong> ${getReportAttendance(report).present.length ? getReportAttendance(report).present.map(a => a.name).join(', ') : 'None'}<br>
+                                        <strong>Absent Members:</strong> ${getReportAttendance(report).absent.length ? getReportAttendance(report).absent.map(a => a.name).join(', ') : 'None'}<br><br>
                                         ${report.description || 'No additional information'}
                                     </div>
                                 </div>
@@ -3584,9 +3714,13 @@
         // Update all members table (new function)
         function updateAllMembersTable() {
             const tbody = document.getElementById('allMembersBody');
+            const grid = document.getElementById('membersGrid');
             if (!tbody) return;
             
             tbody.innerHTML = '';
+            if (grid) {
+                grid.innerHTML = '';
+            }
             
             churchData.members.forEach(member => {
                 const cell = churchData.cells.find(c => c.id === member.cellId);
@@ -3606,9 +3740,44 @@
                     <td>${new Date(member.joinedDate).toLocaleDateString()}</td>
                 `;
                 tbody.appendChild(row);
+
+                if (grid) {
+                    const card = document.createElement('div');
+                    card.className = 'member-card';
+                    card.innerHTML = `
+                        <div style="font-weight: 600;">${member.name}</div>
+                        <div style="color: var(--gray-color); margin-top: 4px;">${member.role || ''}</div>
+                        <div style="margin-top: 8px; font-size: 0.9rem;">
+                            ${cell ? cell.name : 'Unknown Cell'}
+                        </div>
+                    `;
+                    card.addEventListener('click', () => {
+                        showMemberDetails(member, cell);
+                    });
+                    grid.appendChild(card);
+                }
             });
             
             document.getElementById('membersCount').textContent = churchData.members.length;
+        }
+
+        function showMemberDetails(member, cell) {
+            const body = document.getElementById('memberDetailsBody');
+            if (!body) return;
+            body.innerHTML = `
+                <div style="display: grid; gap: 10px;">
+                    <div><strong>Name:</strong> ${member.name || ''}</div>
+                    <div><strong>Title:</strong> ${member.title || ''}</div>
+                    <div><strong>Gender:</strong> ${member.gender || ''}</div>
+                    <div><strong>Mobile:</strong> ${member.mobile || ''}</div>
+                    <div><strong>Email:</strong> ${member.email || ''}</div>
+                    <div><strong>Role:</strong> ${member.role || ''}</div>
+                    <div><strong>Cell:</strong> ${cell ? cell.name : 'Unknown Cell'}</div>
+                    <div><strong>Venue:</strong> ${cell ? cell.venue : ''}</div>
+                    <div><strong>Day/Time:</strong> ${cell ? `${cell.day} ${cell.time}` : ''}</div>
+                </div>
+            `;
+            showModal('memberDetailsModal');
         }
 
         // Search members function
@@ -4123,6 +4292,20 @@
             }
         }
 
+        function getReportAttendance(report) {
+            const attendees = report.attendees;
+            if (Array.isArray(attendees)) {
+                return { present: attendees, absent: [] };
+            }
+            if (attendees && typeof attendees === 'object') {
+                return {
+                    present: Array.isArray(attendees.present) ? attendees.present : [],
+                    absent: Array.isArray(attendees.absent) ? attendees.absent : []
+                };
+            }
+            return { present: [], absent: [] };
+        }
+
         // Show forgot password modal
         function showForgotPassword() {
             closeModal('loginModal');
@@ -4230,6 +4413,14 @@
                 closeModal('forgotPasswordModal');
                 document.body.classList.remove('login-active');
                 resetIdleTimer();
+                sessionActiveMs = 0;
+                sessionIdleMs = 0;
+                sessionLastTick = Date.now();
+                sessionIdle = false;
+                if (sessionSyncTimer) {
+                    clearInterval(sessionSyncTimer);
+                }
+                sessionSyncTimer = setInterval(syncSessionMetrics, 30000);
                 await loadAllData();
                 applyUserPermissions();
                 
@@ -4289,6 +4480,14 @@
                 
                 // Reset idle timer
                 resetIdleTimer();
+                sessionActiveMs = 0;
+                sessionIdleMs = 0;
+                sessionLastTick = Date.now();
+                sessionIdle = false;
+                if (sessionSyncTimer) {
+                    clearInterval(sessionSyncTimer);
+                }
+                sessionSyncTimer = setInterval(syncSessionMetrics, 30000);
                 
                 // Load data and update UI
                 await loadAllData();
@@ -4412,7 +4611,16 @@
                 clearTimeout(idleModalTimer);
             }
             
-            lastActivityTime = Date.now();
+            const now = Date.now();
+            const delta = now - sessionLastTick;
+            if (sessionIdle) {
+                sessionIdleMs += delta;
+            } else {
+                sessionActiveMs += delta;
+            }
+            sessionLastTick = now;
+            sessionIdle = false;
+            lastActivityTime = now;
             
             if (churchData.currentUser) {
                 idleTimer = setTimeout(showIdleModal, IDLE_TIMEOUT);
@@ -4422,6 +4630,7 @@
         function showIdleModal() {
             if (!churchData.currentUser) return;
             
+            sessionIdle = true;
             idleCountdown = 30;
             document.getElementById('idleCountdown').textContent = idleCountdown;
             showModal('idleModal');
@@ -4443,6 +4652,28 @@
                 clearInterval(idleModalTimer);
             }
             resetIdleTimer();
+        }
+
+        function syncSessionMetrics() {
+            const sessionId = localStorage.getItem('sessionId');
+            if (!sessionId) return;
+            const now = Date.now();
+            const delta = now - sessionLastTick;
+            if (sessionIdle) {
+                sessionIdleMs += delta;
+            } else {
+                sessionActiveMs += delta;
+            }
+            sessionLastTick = now;
+            apiRequest(`${API_ENDPOINTS.SESSIONS}/${sessionId}/metrics`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    idleMs: sessionIdleMs,
+                    activeMs: sessionActiveMs
+                })
+            }).catch(error => {
+                console.warn('Failed to sync session metrics:', error.message);
+            });
         }
 
         // Setup event listeners
@@ -4609,6 +4840,7 @@
             window.performLogout = function() {
                 const sessionId = localStorage.getItem('sessionId');
                 if (sessionId) {
+                    syncSessionMetrics();
                     apiRequest(`${API_ENDPOINTS.SESSIONS}/${sessionId}/end`, {
                         method: 'PUT'
                     }).catch(error => {
@@ -4652,6 +4884,11 @@
                 if (idleModalTimer) {
                     clearInterval(idleModalTimer);
                     idleModalTimer = null;
+                }
+
+                if (sessionSyncTimer) {
+                    clearInterval(sessionSyncTimer);
+                    sessionSyncTimer = null;
                 }
                 
                 // Reset UI
@@ -4705,17 +4942,23 @@
                 const description = document.getElementById('reportDescription').value;
                 
                 // Get selected attendees
-                const attendees = [];
-                document.querySelectorAll('#attendeesContainer input:checked').forEach(checkbox => {
-                    const memberId = parseInt(checkbox.value);
-                    const member = churchData.members.find(m => m.id === memberId && m.cellId === cellId);
-                    if (member) {
-                        attendees.push({
-                            id: member.id,
-                            title: member.title,
-                            name: member.name,
-                            role: member.role
-                        });
+                const present = [];
+                const absent = [];
+                const allMembers = churchData.members.filter(m => m.cellId === cellId);
+                const selectedIds = new Set(
+                    Array.from(document.querySelectorAll('#attendeesContainer input:checked')).map(cb => parseInt(cb.value))
+                );
+                allMembers.forEach(member => {
+                    const entry = {
+                        id: member.id,
+                        title: member.title,
+                        name: member.name,
+                        role: member.role
+                    };
+                    if (selectedIds.has(member.id)) {
+                        present.push(entry);
+                    } else {
+                        absent.push(entry);
                     }
                 });
                 
@@ -4725,7 +4968,7 @@
                     venue: venue,
                     meetingType: meetingType,
                     description: description,
-                    attendees: attendees
+                    attendees: { present, absent }
                 };
                 
                 try {
@@ -4913,10 +5156,15 @@
             churchData.sessions.forEach(session => {
                 const loginTime = session.loginTime ? new Date(session.loginTime) : null;
                 const logoutTime = session.logoutTime ? new Date(session.logoutTime) : null;
-                const activeTimeMs = loginTime && logoutTime ? (logoutTime - loginTime) : null;
-                const activeTime = activeTimeMs ? Math.round(activeTimeMs / 60000) + ' min' : 'Active';
+                const activeMs = typeof session.activeMs === 'number' ? session.activeMs : 0;
+                const idleMs = typeof session.idleMs === 'number' ? session.idleMs : 0;
+                const totalMs = activeMs + idleMs;
+                const activeTime = totalMs ? Math.round(activeMs / 60000) + ' min' : '-';
+                const idleTime = totalMs ? Math.round(idleMs / 60000) + ' min' : '-';
+                const totalTime = totalMs ? Math.round(totalMs / 60000) + ' min' : '-';
                 const status = logoutTime ? 'Ended' : 'Active';
                 const ua = parseUserAgent(session.userAgent || '');
+                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -4926,10 +5174,10 @@
                     <td>${session.ipAddress || ''}</td>
                     <td>${ua.browser}</td>
                     <td>${ua.os}</td>
-                    <td>${session.timezone || ''}</td>
+                    <td>${timezone}</td>
                     <td>${activeTime}</td>
-                    <td>-</td>
-                    <td>${activeTime}</td>
+                    <td>${idleTime}</td>
+                    <td>${totalTime}</td>
                     <td>${status}</td>
                 `;
                 tbody.appendChild(row);
