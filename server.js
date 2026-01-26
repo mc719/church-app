@@ -71,8 +71,8 @@ async function createSession(userId, req) {
   const ipAddress = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString();
   const userAgent = (req.headers["user-agent"] || "").toString();
   const result = await pool.query(
-    `INSERT INTO sessions (user_id, login_time, ip_address, user_agent)
-     VALUES ($1, NOW(), $2, $3)
+    `INSERT INTO sessions (user_id, login_time, last_activity, ip_address, user_agent, idle_ms, active_ms)
+     VALUES ($1, NOW(), NOW(), $2, $3, 0, 0)
      RETURNING id::text as id`,
     [userId, ipAddress, userAgent]
   );
@@ -260,11 +260,12 @@ app.post("/api/users", requireAuth, requireAdmin, async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const restrictedMenusJson = JSON.stringify(restrictedMenus || []);
     const result = await pool.query(
       `INSERT INTO users (username, email, password_hash, role, status, restricted_menus)
        VALUES ($1,$2,$3,$4,$5,$6)
        RETURNING id::text as id, username, email, role, status, restricted_menus as "restrictedMenus"`,
-      [username, email, passwordHash, role, status ?? true, restrictedMenus || []]
+      [username, email, passwordHash, role, status ?? true, restrictedMenusJson]
     );
 
     res.json(result.rows[0]);
@@ -282,6 +283,7 @@ app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
     if (password) {
       passwordHash = await bcrypt.hash(password, 10);
     }
+    const restrictedMenusJson = restrictedMenus ? JSON.stringify(restrictedMenus) : null;
 
     const result = await pool.query(
       `UPDATE users
@@ -299,7 +301,7 @@ app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
         passwordHash,
         role ?? null,
         status ?? null,
-        restrictedMenus ?? null,
+        restrictedMenusJson,
         req.params.id
       ]
     );
@@ -342,6 +344,9 @@ app.get("/api/sessions", requireAuth, requireAdmin, async (req, res) => {
               s.logout_time as "logoutTime",
               s.ip_address as "ipAddress",
               s.user_agent as "userAgent",
+              s.idle_ms as "idleMs",
+              s.active_ms as "activeMs",
+              s.last_activity as "lastActivity",
               u.username
        FROM sessions s
        JOIN users u ON u.id = s.user_id
@@ -372,6 +377,30 @@ app.put("/api/sessions/:id/end", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to end session" });
+  }
+});
+
+app.put("/api/sessions/:id/metrics", requireAuth, async (req, res) => {
+  try {
+    const { idleMs, activeMs } = req.body || {};
+    const result = await pool.query(
+      `UPDATE sessions
+       SET idle_ms = COALESCE($1, idle_ms),
+           active_ms = COALESCE($2, active_ms),
+           last_activity = NOW()
+       WHERE id = $3
+       RETURNING id::text as id`,
+      [idleMs ?? null, activeMs ?? null, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update session metrics" });
   }
 });
 
@@ -609,6 +638,40 @@ app.post("/api/reports", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to add report" });
+  }
+});
+
+// UPDATE REPORT (PROTECTED)
+app.put("/api/reports/:id", requireAuth, async (req, res) => {
+  try {
+    const { date, venue, meetingType, description, attendees } = req.body;
+    const result = await pool.query(
+      `UPDATE reports
+       SET date = COALESCE($1, date),
+           venue = COALESCE($2, venue),
+           meeting_type = COALESCE($3, meeting_type),
+           description = COALESCE($4, description),
+           attendees = COALESCE($5, attendees),
+           report_date = COALESCE(($1::timestamptz)::date, report_date)
+       WHERE id = $6
+       RETURNING id::text as id,
+                 cell_id::text as "cellId",
+                 date,
+                 venue,
+                 meeting_type as "meetingType",
+                 description,
+                 attendees`,
+      [date ?? null, venue ?? null, meetingType ?? null, description ?? null, attendees ?? null, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update report" });
   }
 });
 

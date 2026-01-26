@@ -635,6 +635,18 @@
             font-size: 0.95rem;
         }
 
+        .month-header {
+            cursor: pointer;
+        }
+
+        .accordion-content {
+            display: none;
+        }
+
+        .accordion-section.open .accordion-content {
+            display: block;
+        }
+
         .toast {
             position: fixed;
             top: 20px;
@@ -2237,6 +2249,59 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Report Modal -->
+    <div id="editReportModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Edit Report</h3>
+                <button class="close-modal" onclick="closeModal('editReportModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editReportForm">
+                    <input type="hidden" id="editReportId">
+                    <input type="hidden" id="editReportCellId">
+                    <div class="form-group">
+                        <label for="editReportDate">Date *</label>
+                        <input type="date" id="editReportDate" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editReportTime">Time *</label>
+                        <input type="time" id="editReportTime" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editReportVenue">Venue *</label>
+                        <input type="text" id="editReportVenue" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editReportMeetingType">Meeting Type *</label>
+                        <select id="editReportMeetingType" class="form-control" required>
+                            <option value="">Select Type</option>
+                            <option value="prayer">Prayer and Planning</option>
+                            <option value="bible-study-1">Bible Study 1</option>
+                            <option value="bible-study-2">Bible Study 2</option>
+                            <option value="outreach">Outreach Meeting</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Attendees</label>
+                        <div id="editAttendeesContainer" class="attendees-container">
+                            <!-- Attendees will be populated here -->
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editReportDescription">Description</label>
+                        <textarea id="editReportDescription" class="form-control" rows="4"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn" onclick="closeModal('editReportModal')">Cancel</button>
+                        <button type="submit" class="btn btn-success">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
     <!-- Add New Menu Modal -->
     <div id="newMenuModal" class="modal-overlay">
@@ -3617,13 +3682,14 @@
                 const reportsList = monthData.reports;
                 
                 const monthSection = document.createElement('div');
-                monthSection.className = 'monthly-reports';
+                monthSection.className = 'monthly-reports accordion-section';
                 monthSection.innerHTML = `
                     <div class="month-header">
                         <div class="month-title">${monthData.display}</div>
                         <div class="reports-count">${reportsList.length} Reports</div>
                     </div>
-                    <div class="reports-grid">
+                    <div class="accordion-content">
+                        <div class="reports-grid">
                         ${reportsList.map(report => {
                             const reportDate = new Date(report.date);
                             const formattedDate = reportDate.toLocaleDateString('en-US', {
@@ -3636,6 +3702,7 @@
                                 hour: '2-digit',
                                 minute: '2-digit'
                             });
+                            const canEdit = canEditReport(report);
                             
                             return `
                                 <div class="report-card">
@@ -3645,6 +3712,11 @@
                                             <div class="report-venue">${report.venue}</div>
                                         </div>
                                         <div class="action-buttons">
+                                            ${canEdit ? `
+                                            <button class="action-btn edit-btn" onclick="editReport('${report.id}')">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            ` : ''}
                                             <button class="action-btn delete-btn" onclick="deleteReport(${report.id})">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -3661,10 +3733,17 @@
                                 </div>
                             `;
                         }).join('')}
+                        </div>
                     </div>
                 `;
                 
                 container.appendChild(monthSection);
+                const header = monthSection.querySelector('.month-header');
+                if (header) {
+                    header.addEventListener('click', () => {
+                        monthSection.classList.toggle('open');
+                    });
+                }
             });
         }
 
@@ -4304,6 +4383,62 @@
                 };
             }
             return { present: [], absent: [] };
+        }
+
+        function canEditReport(report) {
+            const role = churchData.currentUser?.role;
+            if (role === 'superuser' || role === 'admin') {
+                return true;
+            }
+            const reportDate = new Date(report.date);
+            const now = new Date();
+            const diffDays = Math.floor((now - reportDate) / (1000 * 60 * 60 * 24));
+            return diffDays <= 14;
+        }
+
+        function populateEditAttendees(cellId, attendance) {
+            const container = document.getElementById('editAttendeesContainer');
+            if (!container) return;
+            const members = churchData.members.filter(member => member.cellId === cellId);
+            const presentIds = new Set(attendance.present.map(a => a.id));
+
+            container.innerHTML = '';
+            members.forEach(member => {
+                const attendeeItem = document.createElement('div');
+                attendeeItem.className = 'attendee-item';
+                attendeeItem.innerHTML = `
+                    <input type="checkbox" id="edit-attendee-${member.id}" value="${member.id}" ${presentIds.has(member.id) ? 'checked' : ''}>
+                    <label for="edit-attendee-${member.id}">${member.title} ${member.name} (${member.role})</label>
+                `;
+                container.appendChild(attendeeItem);
+            });
+
+            if (members.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--gray-color);">No members in this cell yet.</p>';
+            }
+        }
+
+        function editReport(reportId) {
+            const report = churchData.reports.find(r => String(r.id) === String(reportId));
+            if (!report || !canEditReport(report)) {
+                alert('You are not allowed to edit this report.');
+                return;
+            }
+            const date = new Date(report.date);
+            const dateValue = date.toISOString().slice(0, 10);
+            const timeValue = date.toISOString().slice(11, 16);
+            const attendance = getReportAttendance(report);
+
+            document.getElementById('editReportId').value = report.id;
+            document.getElementById('editReportCellId').value = report.cellId;
+            document.getElementById('editReportDate').value = dateValue;
+            document.getElementById('editReportTime').value = timeValue;
+            document.getElementById('editReportVenue').value = report.venue || '';
+            document.getElementById('editReportMeetingType').value = report.meetingType || '';
+            document.getElementById('editReportDescription').value = report.description || '';
+            populateEditAttendees(report.cellId, attendance);
+
+            showModal('editReportModal');
         }
 
         // Show forgot password modal
@@ -4986,6 +5121,64 @@
                     alert('Report added successfully!');
                 } catch (error) {
                     alert('Failed to add report: ' + error.message);
+                }
+            });
+
+            document.getElementById('editReportForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const reportId = document.getElementById('editReportId').value;
+                const cellId = document.getElementById('editReportCellId').value;
+                const date = document.getElementById('editReportDate').value;
+                const time = document.getElementById('editReportTime').value;
+                const venue = document.getElementById('editReportVenue').value;
+                const meetingType = document.getElementById('editReportMeetingType').value;
+                const description = document.getElementById('editReportDescription').value;
+
+                const present = [];
+                const absent = [];
+                const allMembers = churchData.members.filter(m => m.cellId === cellId);
+                const selectedIds = new Set(
+                    Array.from(document.querySelectorAll('#editAttendeesContainer input:checked')).map(cb => parseInt(cb.value))
+                );
+                allMembers.forEach(member => {
+                    const entry = {
+                        id: member.id,
+                        title: member.title,
+                        name: member.name,
+                        role: member.role
+                    };
+                    if (selectedIds.has(member.id)) {
+                        present.push(entry);
+                    } else {
+                        absent.push(entry);
+                    }
+                });
+
+                const payload = {
+                    date: date + 'T' + time,
+                    venue: venue,
+                    meetingType: meetingType,
+                    description: description,
+                    attendees: { present, absent }
+                };
+
+                try {
+                    const updated = await apiRequest(`${API_ENDPOINTS.REPORTS}/${reportId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+
+                    const index = churchData.reports.findIndex(r => String(r.id) === String(reportId));
+                    if (index !== -1) {
+                        churchData.reports[index] = updated;
+                    }
+
+                    updateAllUI();
+                    updateCellReports(cellId);
+                    closeModal('editReportModal');
+                    alert('Report updated successfully!');
+                } catch (error) {
+                    alert('Failed to update report: ' + error.message);
                 }
             });
 
