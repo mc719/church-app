@@ -3020,12 +3020,20 @@
             const token = localStorage.getItem('token');
             const role = localStorage.getItem('role');
             const username = localStorage.getItem('username');
+            const restrictedMenus = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem('restrictedMenus') || '[]');
+                } catch {
+                    return [];
+                }
+            })();
             
             if (token && role && username) {
                 churchData.currentUser = {
                     username: username,
                     role: role,
-                    token: token
+                    token: token,
+                    restrictedMenus: restrictedMenus
                 };
                 
                 document.body.classList.remove('login-active');
@@ -3445,6 +3453,7 @@
             if (!currentUser) return;
             
             const allNavItems = document.querySelectorAll('.nav-item');
+            const restricted = new Set(currentUser.restrictedMenus || []);
             
             allNavItems.forEach(navItem => {
                 const pageId = navItem.getAttribute('data-page');
@@ -3459,6 +3468,19 @@
                     }
                 } else {
                     navItem.style.display = 'flex';
+                }
+
+                if (pageId && restricted.has(pageId)) {
+                    navItem.style.display = 'none';
+                }
+            });
+
+            document.querySelectorAll('.page-content').forEach(page => {
+                const pageId = page.id;
+                if (pageId && restricted.has(pageId)) {
+                    page.style.display = 'none';
+                } else {
+                    page.style.display = '';
                 }
             });
         }
@@ -4538,11 +4560,13 @@
                 if (data.sessionId) {
                     localStorage.setItem('sessionId', data.sessionId);
                 }
+                localStorage.setItem('restrictedMenus', JSON.stringify(data.restrictedMenus || []));
                 
                 churchData.currentUser = {
                     username: data.username,
                     role: data.role,
-                    token: data.token
+                    token: data.token,
+                    restrictedMenus: data.restrictedMenus || []
                 };
                 
                 closeModal('forgotPasswordModal');
@@ -4602,11 +4626,13 @@
                 if (data.sessionId) {
                     localStorage.setItem('sessionId', data.sessionId);
                 }
+                localStorage.setItem('restrictedMenus', JSON.stringify(data.restrictedMenus || []));
                 
                 churchData.currentUser = {
                     username: data.username,
                     role: data.role,
-                    token: data.token
+                    token: data.token,
+                    restrictedMenus: data.restrictedMenus || []
                 };
                 
                 // Close login modal
@@ -4653,6 +4679,12 @@
                 item.classList.remove('active');
             });
             
+            const restricted = new Set(churchData.currentUser?.restrictedMenus || []);
+            if (restricted.has(pageId)) {
+                alert('You do not have access to this page.');
+                return;
+            }
+
             const targetPage = document.getElementById(pageId);
             if (targetPage) {
                 targetPage.classList.add('active');
@@ -4988,6 +5020,7 @@
                 localStorage.removeItem('role');
                 localStorage.removeItem('username');
                 localStorage.removeItem('sessionId');
+                localStorage.removeItem('restrictedMenus');
                 
                 // Reset current user
                 churchData.currentUser = null;

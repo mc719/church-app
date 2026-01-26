@@ -97,10 +97,10 @@ app.post("/api/otp/send", async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    const result = await pool.query(
-      "SELECT id, username, role, status, email FROM users WHERE email = $1",
-      [email]
-    );
+  const result = await pool.query(
+    "SELECT id, username, role, status, email, restricted_menus FROM users WHERE email = $1",
+    [email]
+  );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Unrecognized email" });
@@ -164,7 +164,8 @@ app.post("/api/otp/login", async (req, res) => {
     token,
     sessionId,
     username: user.username,
-    role: user.role
+    role: user.role,
+    restrictedMenus: user.restricted_menus || []
   });
 });
 
@@ -174,7 +175,7 @@ app.post("/api/login", async (req, res) => {
     const { username, password } = req.body;
 
     const result = await pool.query(
-      "SELECT id, username, password_hash, role, status FROM users WHERE username = $1",
+      "SELECT id, username, password_hash, role, status, restricted_menus FROM users WHERE username = $1",
       [username]
     );
 
@@ -205,7 +206,8 @@ app.post("/api/login", async (req, res) => {
       token,
       sessionId,
       username: user.username,
-      role: user.role
+      role: user.role,
+      restrictedMenus: user.restricted_menus || []
     });
 
   } catch (err) {
