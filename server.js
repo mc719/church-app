@@ -42,6 +42,7 @@ function isExpired(ts) {
 // 5) AUTH MIDDLEWARE (PASTE HERE)
 // ===============================
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-secret";
+const ACCESS_CODE = process.env.ACCESS_CODE || "";
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
@@ -57,6 +58,46 @@ function requireAuth(req, res, next) {
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
+}
+
+function requireAuthOrAccessCode(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  const accessCode = req.headers["x-access-code"];
+
+  if (accessCode && ACCESS_CODE && accessCode === ACCESS_CODE) {
+    return next();
+  }
+
+  if (!token) {
+    return res.status(401).json({ error: "Missing token or access code" });
+  }
+
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+
+const rateLimitStore = new Map();
+function rateLimit({ keyPrefix, windowMs, max }) {
+  return (req, res, next) => {
+    const key = `${keyPrefix}:${req.ip}`;
+    const now = Date.now();
+    const entry = rateLimitStore.get(key) || { count: 0, resetAt: now + windowMs };
+    if (now > entry.resetAt) {
+      entry.count = 0;
+      entry.resetAt = now + windowMs;
+    }
+    entry.count += 1;
+    rateLimitStore.set(key, entry);
+    if (entry.count > max) {
+      return res.status(429).json({ error: "Too many requests. Try again later." });
+    }
+    next();
+  };
 }
 
 function requireAdmin(req, res, next) {
@@ -89,7 +130,7 @@ app.get("/api/test", (req, res) => {
 });
 
 // OTP SEND (PUBLIC) - by email
-app.post("/api/otp/send", async (req, res) => {
+app.post("/api/otp/send", rateLimit({ keyPrefix: "otp-send", windowMs: 60_000, max: 5 }), async (req, res) => {
   try {
     const { email } = req.body || {};
 
@@ -132,7 +173,7 @@ app.post("/api/otp/send", async (req, res) => {
 });
 
 // OTP LOGIN (PUBLIC)
-app.post("/api/otp/login", async (req, res) => {
+app.post("/api/otp/login", rateLimit({ keyPrefix: "otp-login", windowMs: 60_000, max: 10 }), async (req, res) => {
   const { email, code } = req.body || {};
 
   if (!email || !code) {
@@ -170,7 +211,7 @@ app.post("/api/otp/login", async (req, res) => {
 });
 
 // LOGIN ROUTE (PUBLIC)
-app.post("/api/login", async (req, res) => {
+app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10 }), async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -216,8 +257,8 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ADD CELL (PUBLIC)
-app.post("/api/cells", async (req, res) => {
+// ADD CELL (AUTH OR ACCESS CODE)
+app.post("/api/cells", requireAuthOrAccessCode, async (req, res) => {
   try {
     const { name, venue, day, time, description } = req.body;
 
@@ -495,8 +536,8 @@ app.get("/api/members", requireAuth, async (req, res) => {
   }
 });
 
-// ADD MEMBER (PUBLIC)
-app.post("/api/members", async (req, res) => {
+// ADD MEMBER (AUTH OR ACCESS CODE)
+app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
   try {
     const { cellId, title, name, gender, mobile, email, role } = req.body;
 

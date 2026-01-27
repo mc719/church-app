@@ -107,6 +107,10 @@
         <input type="text" id="cellName" required>
       </div>
       <div>
+        <label for="accessCode">Access Code *</label>
+        <input type="password" id="accessCode" required>
+      </div>
+      <div>
         <label for="cellVenue">Venue *</label>
         <input type="text" id="cellVenue" required>
       </div>
@@ -162,9 +166,10 @@
         description: document.getElementById('cellDescription').value.trim()
       };
       try {
+        const accessCode = document.getElementById('accessCode').value.trim();
         const response = await fetch('/api/cells', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-ACCESS-CODE': accessCode },
           body: JSON.stringify(payload)
         });
         const data = await response.json();
@@ -187,7 +192,7 @@
           };
           const memberRes = await fetch('/api/members', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-ACCESS-CODE': accessCode },
             body: JSON.stringify(memberPayload)
           });
           const memberData = await memberRes.json();
