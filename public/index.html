@@ -1358,6 +1358,26 @@
         .logo-text-settings .form-group {
             margin-bottom: 20px;
         }
+
+        .health-check {
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            border: 1px solid #eaeaea;
+            margin-top: 30px;
+        }
+
+        .dark-theme .health-check {
+            background-color: #1a1a1a;
+            border-color: #333;
+        }
+
+        .health-status {
+            margin-top: 12px;
+            color: var(--gray-color);
+            font-weight: 500;
+        }
         
         /* Footer */
         .footer {
@@ -2843,6 +2863,16 @@
                     </button>
                 </div>
             </div>
+
+            <div class="health-check">
+                <div class="page-header" style="margin: 0 0 12px;">
+                    <h2>System Health</h2>
+                </div>
+                <button class="btn" id="healthCheckBtn">
+                    <i class="fas fa-heartbeat"></i> Check Database
+                </button>
+                <div class="health-status" id="healthCheckStatus">Status: Not checked</div>
+            </div>
         </div>
         
         <!-- Footer -->
@@ -2862,7 +2892,8 @@
             MEMBERS: `${API_BASE}/members`,
             REPORTS: `${API_BASE}/reports`,
             USERS: `${API_BASE}/users`,
-            SESSIONS: `${API_BASE}/sessions`
+            SESSIONS: `${API_BASE}/sessions`,
+            HEALTH: `${API_BASE}/health`
         };
 
         // Data storage for frontend cache
@@ -4775,6 +4806,25 @@
             alert('Logo text saved successfully!');
         }
 
+        async function runHealthCheck() {
+            const statusEl = document.getElementById('healthCheckStatus');
+            if (!statusEl) return;
+            statusEl.textContent = 'Status: Checking...';
+            try {
+                const token = localStorage.getItem('token');
+                const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                const resp = await fetch(API_ENDPOINTS.HEALTH, { headers });
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+                const data = await resp.json();
+                const ts = data?.ts ? ` at ${new Date(data.ts).toLocaleString()}` : '';
+                statusEl.textContent = `Status: OK (${data?.db || 'connected'})${ts}`;
+            } catch (err) {
+                statusEl.textContent = `Status: Error (${err.message || 'Unknown error'})`;
+            }
+        }
+
         // Idle timeout functions
         function resetIdleTimer() {
             if (idleTimer) {
@@ -4888,6 +4938,9 @@
 
             // Save logo text
             document.getElementById('saveLogoTextBtn').addEventListener('click', saveLogoText);
+
+            // Health check
+            document.getElementById('healthCheckBtn')?.addEventListener('click', runHealthCheck);
 
             // Modal close when clicking outside
             document.querySelectorAll('.modal-overlay').forEach(modal => {
