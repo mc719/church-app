@@ -95,6 +95,32 @@
     }
     .btn-primary { background: #1e3a5f; color: white; }
     .btn-secondary { background: #e0e0e0; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    .modal {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      width: min(420px, 90vw);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .modal h2 {
+      margin: 0 0 12px;
+      color: #1e3a5f;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      justify-content: flex-end;
+    }
   </style>
 </head>
 <body>
@@ -105,10 +131,6 @@
       <div>
         <label for="cellName">Cell Name *</label>
         <input type="text" id="cellName" required>
-      </div>
-      <div>
-        <label for="accessCode">Access Code *</label>
-        <input type="password" id="accessCode" required>
       </div>
       <div>
         <label for="cellVenue">Venue *</label>
@@ -148,6 +170,17 @@
       </div>
     </form>
   </div>
+  <div id="accessModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Access Code</h2>
+      <label for="accessCodeInput">Enter access code to continue</label>
+      <input type="password" id="accessCodeInput" autocomplete="one-time-code">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="accessCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="accessSubmitBtn">Continue</button>
+      </div>
+    </div>
+  </div>
   <script>
     const logo = localStorage.getItem('logoImage');
     if (logo) {
@@ -156,8 +189,49 @@
       bg.innerHTML = '';
     }
 
+    let accessCode = '';
+    const accessModal = document.getElementById('accessModal');
+    const accessInput = document.getElementById('accessCodeInput');
+    const accessSubmitBtn = document.getElementById('accessSubmitBtn');
+    const accessCancelBtn = document.getElementById('accessCancelBtn');
+
+    function closeAccessModal() {
+      accessModal.style.display = 'none';
+    }
+
+    accessSubmitBtn.addEventListener('click', async () => {
+      accessCode = accessInput.value.trim();
+      if (!accessCode) {
+        alert('Access code is required.');
+        return;
+      }
+      try {
+        const response = await fetch('/api/access/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessCode })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Invalid access code');
+        }
+        closeAccessModal();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    accessCancelBtn.addEventListener('click', () => {
+      window.location.href = '/';
+    });
+
     document.getElementById('newCellForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!accessCode) {
+        alert('Access code is required.');
+        accessModal.style.display = 'flex';
+        return;
+      }
       const payload = {
         name: document.getElementById('cellName').value.trim(),
         venue: document.getElementById('cellVenue').value.trim(),
@@ -166,7 +240,6 @@
         description: document.getElementById('cellDescription').value.trim()
       };
       try {
-        const accessCode = document.getElementById('accessCode').value.trim();
         const response = await fetch('/api/cells', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-ACCESS-CODE': accessCode },

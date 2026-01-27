@@ -65,7 +65,11 @@ function requireAuthOrAccessCode(req, res, next) {
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
   const accessCode = req.headers["x-access-code"];
 
-  if (accessCode && ACCESS_CODE && accessCode === ACCESS_CODE) {
+  if (!ACCESS_CODE) {
+    return res.status(403).json({ error: "Access code not configured" });
+  }
+
+  if (accessCode && accessCode === ACCESS_CODE) {
     return next();
   }
 
@@ -80,6 +84,20 @@ function requireAuthOrAccessCode(req, res, next) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
+
+app.post("/api/access/verify", (req, res) => {
+  const { accessCode } = req.body || {};
+  if (!ACCESS_CODE) {
+    return res.status(403).json({ error: "Access code not configured" });
+  }
+  if (!accessCode) {
+    return res.status(400).json({ error: "Access code required" });
+  }
+  if (accessCode !== ACCESS_CODE) {
+    return res.status(401).json({ error: "Invalid access code" });
+  }
+  res.json({ ok: true });
+});
 
 const rateLimitStore = new Map();
 function rateLimit({ keyPrefix, windowMs, max }) {
