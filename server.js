@@ -495,8 +495,8 @@ app.get("/api/members", requireAuth, async (req, res) => {
   }
 });
 
-// ADD MEMBER (PROTECTED)
-app.post("/api/members", requireAuth, async (req, res) => {
+// ADD MEMBER (PUBLIC)
+app.post("/api/members", async (req, res) => {
   try {
     const { cellId, title, name, gender, mobile, email, role } = req.body;
 

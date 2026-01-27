@@ -64,6 +64,28 @@
       gap: 12px;
       flex-wrap: wrap;
     }
+    .member-group {
+      border: 1px solid #e6e6e6;
+      border-radius: 8px;
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+    .member-group + .member-group {
+      margin-top: 12px;
+    }
+    .member-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .btn-link {
+      background: transparent;
+      border: none;
+      color: #1e3a5f;
+      cursor: pointer;
+      font-weight: 600;
+      padding: 0;
+    }
     .btn {
       padding: 12px 20px;
       border-radius: 8px;
@@ -109,6 +131,13 @@
         <label for="cellDescription">Description</label>
         <textarea id="cellDescription" rows="4"></textarea>
       </div>
+      <div>
+        <h2 style="margin: 8px 0 0; font-size: 1.1rem; color: #1e3a5f;">Add Members (Optional)</h2>
+      </div>
+      <div id="membersContainer"></div>
+      <div class="member-actions">
+        <button type="button" class="btn-link" id="addMemberRowBtn">+ Add another member</button>
+      </div>
       <div class="actions">
         <button type="submit" class="btn btn-primary">Create Cell</button>
         <button type="button" class="btn btn-secondary" onclick="window.location.href='/'">Back</button>
@@ -142,12 +171,110 @@
         if (!response.ok) {
           throw new Error(data.error || 'Request failed');
         }
+        
+        const memberRows = Array.from(document.querySelectorAll('.member-group'));
+        for (const row of memberRows) {
+          const name = row.querySelector('.memberName').value.trim();
+          if (!name) continue;
+
+          const memberPayload = {
+            cellId: data.id,
+            title: row.querySelector('.memberTitle').value,
+            name: name,
+            gender: row.querySelector('.memberGender').value,
+            mobile: row.querySelector('.memberMobile').value.trim(),
+            role: row.querySelector('.memberRole').value
+          };
+          const memberRes = await fetch('/api/members', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(memberPayload)
+          });
+          const memberData = await memberRes.json();
+          if (!memberRes.ok) {
+            throw new Error(memberData.error || 'Failed to add member');
+          }
+        }
+
         alert('Cell created successfully!');
         e.target.reset();
+        resetMemberRows();
       } catch (err) {
         alert('Failed to create cell: ' + err.message);
       }
     });
+
+    const membersContainer = document.getElementById('membersContainer');
+    const addMemberRowBtn = document.getElementById('addMemberRowBtn');
+
+    function memberRowTemplate() {
+      return `
+        <div class="member-group">
+          <div>
+            <label>Title</label>
+            <select class="memberTitle">
+              <option value="">Select Title</option>
+              <option>Brother</option>
+              <option>Sister</option>
+              <option>Dcns</option>
+              <option>Dcn</option>
+              <option>Pastor</option>
+              <option>Mr</option>
+              <option>Mrs</option>
+              <option>Miss</option>
+              <option>Master</option>
+            </select>
+          </div>
+          <div>
+            <label>Full Name</label>
+            <input type="text" class="memberName">
+          </div>
+          <div>
+            <label>Gender</label>
+            <select class="memberGender">
+              <option value="">Select Gender</option>
+              <option>Male</option>
+              <option>Female</option>
+            </select>
+          </div>
+          <div>
+            <label>Mobile</label>
+            <input type="tel" class="memberMobile">
+          </div>
+          <div>
+            <label>Cell Role</label>
+            <select class="memberRole">
+              <option value="">Select Role</option>
+              <option>Cell Leader</option>
+              <option>Assistant Leader</option>
+              <option>Member</option>
+              <option>New Member</option>
+            </select>
+          </div>
+          <div class="member-actions">
+            <button type="button" class="btn-link remove-member-btn">Remove</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function addMemberRow() {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = memberRowTemplate();
+      const row = wrapper.firstElementChild;
+      row.querySelector('.remove-member-btn').addEventListener('click', () => {
+        row.remove();
+      });
+      membersContainer.appendChild(row);
+    }
+
+    function resetMemberRows() {
+      membersContainer.innerHTML = '';
+      addMemberRow();
+    }
+
+    addMemberRowBtn.addEventListener('click', addMemberRow);
+    resetMemberRows();
   </script>
 </body>
 </html>
