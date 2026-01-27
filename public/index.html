@@ -98,6 +98,9 @@
             margin-bottom: 10px;
             object-fit: contain;
             border-radius: 8px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
         
         .logo-placeholder {
@@ -1206,6 +1209,9 @@
         .login-logo {
             margin-bottom: 30px;
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         
         .login-logo img {
@@ -1213,8 +1219,9 @@
             max-height: 80px;
             object-fit: contain;
             border-radius: 8px;
-            margin-bottom: 15px;
+            margin: 0 auto 15px;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            display: block;
         }
         
         .login-logo-placeholder {
@@ -3051,6 +3058,7 @@
 
             // Update login modal logo
             updateLoginLogo();
+            updateSidebarLogo();
             
             // Check if user is already logged in
             const token = localStorage.getItem('token');
@@ -3810,7 +3818,7 @@
             const tbody = document.getElementById(`cellMembersBody-${cellId}`);
             if (!tbody) return;
             
-            const members = churchData.members.filter(member => member.cellId === cellId);
+            const members = churchData.members.filter(member => String(member.cellId) === String(cellId));
 
             tbody.innerHTML = '';
             members.forEach(member => {
@@ -4246,7 +4254,7 @@
 
         // Edit member
         function editMember(cellId, memberId) {
-            const member = churchData.members.find(m => m.id === memberId && m.cellId === cellId);
+            const member = churchData.members.find(m => m.id === memberId && String(m.cellId) === String(cellId));
             if (member) {
                 document.getElementById('editMemberId').value = memberId;
                 document.getElementById('editMemberCellId').value = cellId;
@@ -4281,7 +4289,7 @@
                 });
                 
                 // Update local data
-                const memberIndex = churchData.members.findIndex(m => m.id === memberId && m.cellId === cellId);
+                const memberIndex = churchData.members.findIndex(m => m.id === memberId && String(m.cellId) === String(cellId));
                 if (memberIndex !== -1) {
                     churchData.members[memberIndex] = { ...churchData.members[memberIndex], ...payload };
                     updateCellMembersTable(cellId);
@@ -4339,6 +4347,21 @@
             } else {
                 loginLogoImage.style.display = 'none';
                 loginLogoPlaceholder.style.display = 'flex';
+            }
+        }
+
+        function updateSidebarLogo() {
+            const logoImage = churchData.settings.logo;
+            const sidebarLogoImage = document.getElementById('logoImage');
+            const sidebarLogoPlaceholder = document.getElementById('logoIcon');
+
+            if (logoImage) {
+                sidebarLogoImage.src = logoImage;
+                sidebarLogoImage.style.display = 'block';
+                sidebarLogoPlaceholder.style.display = 'none';
+            } else {
+                sidebarLogoImage.style.display = 'none';
+                sidebarLogoPlaceholder.style.display = 'flex';
             }
         }
 
@@ -4775,14 +4798,8 @@
                     churchData.settings.logo = e.target.result;
                     localStorage.setItem('logoImage', e.target.result);
                     updateLoginLogo();
+                    updateSidebarLogo();
                     updateCurrentLogoPreview();
-                    
-                    const logoImage = document.getElementById('logoImage');
-                    const logoIcon = document.getElementById('logoIcon');
-                    
-                    logoImage.src = e.target.result;
-                    logoImage.style.display = 'block';
-                    logoIcon.style.display = 'none';
                     
                     alert('Logo uploaded successfully!');
                 };
