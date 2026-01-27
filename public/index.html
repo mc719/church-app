@@ -3840,6 +3840,18 @@
                         </div>
                     </td>
                 `;
+                const editBtn = row.querySelector('.edit-member-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => {
+                        editMember(cellId, member.id);
+                    });
+                }
+                const deleteBtn = row.querySelector('.delete-member-btn');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', () => {
+                        confirmDeleteMember(cellId, member.id, member.name);
+                    });
+                }
                 tbody.appendChild(row);
             });
 
@@ -5348,24 +5360,6 @@
                     showModal('addMemberModal');
                 }
 
-                // Handle edit/delete member buttons in cell members table
-                const editMemberBtn = e.target.closest('.edit-member-btn');
-                if (editMemberBtn) {
-                    const cellId = editMemberBtn.getAttribute('data-cell-id');
-                    const memberId = parseInt(editMemberBtn.getAttribute('data-member-id'), 10);
-                    editMember(cellId, memberId);
-                    return;
-                }
-
-                const deleteMemberBtn = e.target.closest('.delete-member-btn');
-                if (deleteMemberBtn) {
-                    const cellId = deleteMemberBtn.getAttribute('data-cell-id');
-                    const memberId = parseInt(deleteMemberBtn.getAttribute('data-member-id'), 10);
-                    const memberName = deleteMemberBtn.getAttribute('data-member-name') || 'member';
-                    confirmDeleteMember(cellId, memberId, memberName);
-                    return;
-                }
-                
                 // Handle editable fields
                 if (e.target.classList.contains('editable-field')) {
                     const field = e.target;
