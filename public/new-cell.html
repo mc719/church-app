@@ -221,9 +221,15 @@
       }
     });
 
-    accessCancelBtn.addEventListener('click', () => {
-      window.location.href = '/';
-    });
+    function handleAccessCancel() {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.close();
+      }
+    }
+
+    accessCancelBtn.addEventListener('click', handleAccessCancel);
 
     document.getElementById('newCellForm').addEventListener('submit', async (e) => {
       e.preventDefault();
