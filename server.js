@@ -143,6 +143,16 @@ async function createSession(userId, req) {
 // ===============================
 
 // Test route
+// Health check (DB connectivity)
+app.get("/api/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ ok: true, db: "connected", ts: new Date().toISOString() });
+  } catch (err) {
+    console.error("Health check failed:", err);
+    res.status(500).json({ ok: false, db: "error" });
+  }
+});
 app.get("/api/test", (req, res) => {
   res.json({ message: "Server is working 🎉" });
 });
