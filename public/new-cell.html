@@ -267,6 +267,7 @@
             name: name,
             gender: row.querySelector('.memberGender').value,
             mobile: row.querySelector('.memberMobile').value.trim(),
+            email: row.querySelector('.memberEmail').value.trim(),
             role: row.querySelector('.memberRole').value
           };
           const memberRes = await fetch('/api/members', {
@@ -324,6 +325,10 @@
           <div>
             <label>Mobile</label>
             <input type="tel" class="memberMobile">
+          </div>
+          <div>
+            <label>Email</label>
+            <input type="email" class="memberEmail">
           </div>
           <div>
             <label>Cell Role</label>
