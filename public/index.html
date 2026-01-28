@@ -422,6 +422,32 @@
             background-color: #1a1a1a;
             border-color: #333;
         }
+
+
+        .table-pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            margin: 12px 0 30px;
+        }
+
+        .table-pagination .page-info {
+            color: var(--gray-color);
+            font-weight: 600;
+        }
+
+        .table-pagination .btn {
+            padding: 8px 14px;
+            font-size: 0.85rem;
+        }
+
+        .table-pagination .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
         
         table {
             width: 100%;
@@ -2546,6 +2572,7 @@
                     </tbody>
                 </table>
             </div>
+            <div class="table-pagination" id="cellsPagination"></div>
             
             <div class="page-header">
                 <h2>Recent Reports (Last 7 Days)</h2>
@@ -2589,6 +2616,7 @@
                     </tbody>
                 </table>
             </div>
+            <div class="table-pagination" id="membersPagination"></div>
 
             <div id="membersGrid" class="members-grid">
                 <!-- Member cards will be rendered here on mobile -->
@@ -2662,6 +2690,7 @@
                     </tbody>
                 </table>
             </div>
+            <div class="table-pagination" id="cellMembersPagination-cells-template"></div>
             
             <div class="page-header">
                 <h2>Reports | Cell Data</h2>
@@ -2735,6 +2764,7 @@
                     </tbody>
                 </table>
             </div>
+            <div class="table-pagination" id="pageManagementPagination"></div>
         </div>
         
         <!-- Access Management System -->
@@ -2766,6 +2796,7 @@
                     </tbody>
                 </table>
             </div>
+            <div class="table-pagination" id="accessPagination"></div>
         </div>
         
         <!-- Sessions Page -->
@@ -2796,6 +2827,7 @@
                     </tbody>
                 </table>
             </div>
+            <div class="table-pagination" id="sessionsPagination"></div>
         </div>
         
         <!-- Settings Page -->
@@ -2920,6 +2952,48 @@
             },
             currentYear: new Date().getFullYear()
         };
+
+
+        const PAGE_SIZE = 20;
+        const paginationState = {
+            cells: 1,
+            members: 1,
+            access: 1,
+            pageManagement: 1,
+            sessions: 1,
+            cellMembers: {}
+        };
+
+        function getTotalPages(totalItems) {
+            return Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+        }
+
+        function clampPage(page, totalPages) {
+            return Math.min(Math.max(page, 1), totalPages);
+        }
+
+        function renderPagination(containerId, page, totalPages, onChange) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = `
+                <button class="btn btn-secondary" ${page <= 1 ? 'disabled' : ''} data-page="prev">Prev</button>
+                <span class="page-info">Page ${page} of ${totalPages}</span>
+                <button class="btn btn-secondary" ${page >= totalPages ? 'disabled' : ''} data-page="next">Next</button>
+            `;
+
+            const prevBtn = container.querySelector('[data-page="prev"]');
+            const nextBtn = container.querySelector('[data-page="next"]');
+
+            prevBtn?.addEventListener('click', () => onChange(page - 1));
+            nextBtn?.addEventListener('click', () => onChange(page + 1));
+        }
+
 
         // Idle timeout variables
         let idleTimer = null;
@@ -3190,6 +3264,7 @@
             navigateToPage('members');
         }
 
+        
         // Update cells table
         function updateCellsTable() {
             cellsTableBody.innerHTML = '';
@@ -3202,6 +3277,7 @@
                         </td>
                     </tr>
                 `;
+                renderPagination('cellsPagination', 1, 1, () => {});
                 return;
             }
 
@@ -3252,7 +3328,12 @@
                 return a.name.localeCompare(b.name);
             });
 
-            sortedCells.forEach(cell => {
+            const totalPages = getTotalPages(sortedCells.length);
+            paginationState.cells = clampPage(paginationState.cells, totalPages);
+            const startIndex = (paginationState.cells - 1) * PAGE_SIZE;
+            const pageCells = sortedCells.slice(startIndex, startIndex + PAGE_SIZE);
+
+            pageCells.forEach(cell => {
                 // Count members in this cell
                 const memberCount = churchData.members.filter(member => member.cellId === cell.id).length;
                 
@@ -3283,7 +3364,13 @@
                 `;
                 cellsTableBody.appendChild(row);
             });
+
+            renderPagination('cellsPagination', paginationState.cells, totalPages, (newPage) => {
+                paginationState.cells = newPage;
+                updateCellsTable();
+            });
         }
+
 
   function editCell(cellId) {
       const cell = churchData.cells.find(c => c.id === cellId);
@@ -3594,6 +3681,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="table-pagination" id="cellMembersPagination-${cell.id}"></div>
                 
                 <div class="page-header">
                     <h2>Reports | Cell Data</h2>
@@ -3813,15 +3901,21 @@
             });
         }
 
+        
         // Update cell members table
         function updateCellMembersTable(cellId) {
             const tbody = document.getElementById(`cellMembersBody-${cellId}`);
             if (!tbody) return;
             
             const members = churchData.members.filter(member => String(member.cellId) === String(cellId));
+            const totalPages = getTotalPages(members.length);
+            const currentPage = clampPage(paginationState.cellMembers[cellId] || 1, totalPages);
+            paginationState.cellMembers[cellId] = currentPage;
+            const startIndex = (currentPage - 1) * PAGE_SIZE;
+            const pageMembers = members.slice(startIndex, startIndex + PAGE_SIZE);
 
             tbody.innerHTML = '';
-            members.forEach(member => {
+            pageMembers.forEach(member => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${member.title}</td>
@@ -3866,8 +3960,15 @@
             }
             
             updateAllMembersTable();
+
+            renderPagination(`cellMembersPagination-${cellId}`, currentPage, totalPages, (newPage) => {
+                paginationState.cellMembers[cellId] = newPage;
+                updateCellMembersTable(cellId);
+            });
         }
 
+
+        
         // Update all members table (new function)
         function updateAllMembersTable() {
             const tbody = document.getElementById('allMembersBody');
@@ -3878,8 +3979,13 @@
             if (grid) {
                 grid.innerHTML = '';
             }
+
+            const totalPages = getTotalPages(churchData.members.length);
+            paginationState.members = clampPage(paginationState.members, totalPages);
+            const startIndex = (paginationState.members - 1) * PAGE_SIZE;
+            const pageMembers = churchData.members.slice(startIndex, startIndex + PAGE_SIZE);
             
-            churchData.members.forEach(member => {
+            pageMembers.forEach(member => {
                 const cell = churchData.cells.find(c => c.id === member.cellId);
                 
                 const row = document.createElement('tr');
@@ -3916,7 +4022,13 @@
             });
             
             document.getElementById('membersCount').textContent = churchData.members.length;
+
+            renderPagination('membersPagination', paginationState.members, totalPages, (newPage) => {
+                paginationState.members = newPage;
+                updateAllMembersTable();
+            });
         }
+
 
         function showMemberDetails(member, cell) {
             const body = document.getElementById('memberDetailsBody');
@@ -4069,13 +4181,19 @@
             });
         }
 
+        
         function updateAccessManagementTable() {
             const tbody = document.getElementById('accessManagementBody');
             if (!tbody) return;
 
             tbody.innerHTML = '';
 
-            churchData.users.forEach(user => {
+            const totalPages = getTotalPages(churchData.users.length);
+            paginationState.access = clampPage(paginationState.access, totalPages);
+            const startIndex = (paginationState.access - 1) * PAGE_SIZE;
+            const pageUsers = churchData.users.slice(startIndex, startIndex + PAGE_SIZE);
+
+            pageUsers.forEach(user => {
                 const restrictedMenus = (user.restrictedMenus || []).join(', ');
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -4098,8 +4216,15 @@
                 `;
                 tbody.appendChild(row);
             });
+
+            renderPagination('accessPagination', paginationState.access, totalPages, (newPage) => {
+                paginationState.access = newPage;
+                updateAccessManagementTable();
+            });
         }
 
+
+        
         function updatePageManagementTable() {
             const tbody = document.getElementById('pageManagementBody');
             if (!tbody) return;
@@ -4115,7 +4240,12 @@
             });
             tbody.innerHTML = '';
 
-            pages.forEach(page => {
+            const totalPages = getTotalPages(pages.length);
+            paginationState.pageManagement = clampPage(paginationState.pageManagement, totalPages);
+            const startIndex = (paginationState.pageManagement - 1) * PAGE_SIZE;
+            const pageItems = pages.slice(startIndex, startIndex + PAGE_SIZE);
+
+            pageItems.forEach(page => {
                 const isActive = visibility[page.id] !== false;
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -4143,6 +4273,11 @@
                 tbody.appendChild(row);
             });
 
+            renderPagination('pageManagementPagination', paginationState.pageManagement, totalPages, (newPage) => {
+                paginationState.pageManagement = newPage;
+                updatePageManagementTable();
+            });
+
             document.querySelectorAll('.page-toggle').forEach(toggle => {
                 toggle.addEventListener('change', function() {
                     const pageId = this.getAttribute('data-page-id');
@@ -4151,6 +4286,7 @@
                 });
             });
         }
+
 
         function editPageMenu(pageId) {
             const meta = getPageMeta();
@@ -5433,6 +5569,7 @@
             searchReports(cellId);
         }
 
+        
         // Update sessions table
         function updateSessionsTable() {
             const tbody = document.getElementById('sessionsBody');
@@ -5445,6 +5582,7 @@
                         </td>
                     </tr>
                 `;
+                renderPagination('sessionsPagination', 1, 1, () => {});
                 return;
             }
 
@@ -5467,7 +5605,12 @@
                 return { browser, os };
             }
 
-            churchData.sessions.forEach(session => {
+            const totalPages = getTotalPages(churchData.sessions.length);
+            paginationState.sessions = clampPage(paginationState.sessions, totalPages);
+            const startIndex = (paginationState.sessions - 1) * PAGE_SIZE;
+            const pageSessions = churchData.sessions.slice(startIndex, startIndex + PAGE_SIZE);
+
+            pageSessions.forEach(session => {
                 const loginTime = session.loginTime ? new Date(session.loginTime) : null;
                 const logoutTime = session.logoutTime ? new Date(session.logoutTime) : null;
                 const activeMs = typeof session.activeMs === 'number' ? session.activeMs : 0;
@@ -5496,7 +5639,13 @@
                 `;
                 tbody.appendChild(row);
             });
+
+            renderPagination('sessionsPagination', paginationState.sessions, totalPages, (newPage) => {
+                paginationState.sessions = newPage;
+                updateSessionsTable();
+            });
         }
+
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
