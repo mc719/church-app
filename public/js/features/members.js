@@ -1,0 +1,233 @@
+function updateCellMembersTable(cellId) {
+            const tbody = document.getElementById(`cellMembersBody-${cellId}`);
+            if (!tbody) return;
+            
+            const members = churchData.members.filter(member => String(member.cellId) === String(cellId));
+            const totalPages = getTotalPages(members.length);
+            const currentPage = clampPage(paginationState.cellMembers[cellId] || 1, totalPages);
+            paginationState.cellMembers[cellId] = currentPage;
+            const startIndex = (currentPage - 1) * PAGE_SIZE;
+            const pageMembers = members.slice(startIndex, startIndex + PAGE_SIZE);
+
+            tbody.innerHTML = '';
+            pageMembers.forEach(member => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${member.title}</td>
+                    <td>${member.name}</td>
+                    <td>${member.gender}</td>
+                    <td>${member.mobile}</td>
+                    <td>${member.role}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn edit-btn edit-member-btn" data-cell-id="${cellId}" data-member-id="${member.id}">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="action-btn delete-btn delete-member-btn" data-cell-id="${cellId}" data-member-id="${member.id}" data-member-name="${member.name}">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </td>
+                `;
+                const editBtn = row.querySelector('.edit-member-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => {
+                        editMember(cellId, member.id);
+                    });
+                }
+                const deleteBtn = row.querySelector('.delete-member-btn');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', () => {
+                        confirmDeleteMember(cellId, member.id, member.name);
+                    });
+                }
+                tbody.appendChild(row);
+            });
+
+            if (members.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--gray-color);">
+                            No members found. Click "Add Member" to add members to this cell.
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            updateAllMembersTable();
+
+            renderPagination(`cellMembersPagination-${cellId}`, currentPage, totalPages, (newPage) => {
+                paginationState.cellMembers[cellId] = newPage;
+                updateCellMembersTable(cellId);
+            });
+        }
+
+function updateAllMembersTable() {
+            const tbody = document.getElementById('allMembersBody');
+            const grid = document.getElementById('membersGrid');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            if (grid) {
+                grid.innerHTML = '';
+            }
+
+            const totalPages = getTotalPages(churchData.members.length);
+            paginationState.members = clampPage(paginationState.members, totalPages);
+            const startIndex = (paginationState.members - 1) * PAGE_SIZE;
+            const pageMembers = churchData.members.slice(startIndex, startIndex + PAGE_SIZE);
+            
+            pageMembers.forEach(member => {
+                const cell = churchData.cells.find(c => c.id === member.cellId);
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${member.title}</td>
+                    <td>${member.name}</td>
+                    <td>${member.gender}</td>
+                    <td>${member.mobile}</td>
+                    <td>${member.email || ''}</td>
+                    <td>${cell ? cell.name : 'Unknown Cell'}</td>
+                    <td>${member.role}</td>
+                    <td>${cell ? cell.venue : ''}</td>
+                    <td>${cell ? cell.day : ''}</td>
+                    <td>${cell ? cell.time : ''}</td>
+                    <td>${new Date(member.joinedDate).toLocaleDateString()}</td>
+                `;
+                tbody.appendChild(row);
+
+                if (grid) {
+                    const card = document.createElement('div');
+                    card.className = 'member-card';
+                    card.innerHTML = `
+                        <div style="font-weight: 600;">${member.name}</div>
+                        <div style="color: var(--gray-color); margin-top: 4px;">${member.role || ''}</div>
+                        <div style="margin-top: 8px; font-size: 0.9rem;">
+                            ${cell ? cell.name : 'Unknown Cell'}
+                        </div>
+                    `;
+                    card.addEventListener('click', () => {
+                        showMemberDetails(member, cell);
+                    });
+                    grid.appendChild(card);
+                }
+            });
+            
+            document.getElementById('membersCount').textContent = churchData.members.length;
+
+            renderPagination('membersPagination', paginationState.members, totalPages, (newPage) => {
+                paginationState.members = newPage;
+                updateAllMembersTable();
+            });
+        }
+
+function showMemberDetails(member, cell) {
+            const body = document.getElementById('memberDetailsBody');
+            if (!body) return;
+            body.innerHTML = `
+                <div style="display: grid; gap: 10px;">
+                    <div><strong>Name:</strong> ${member.name || ''}</div>
+                    <div><strong>Title:</strong> ${member.title || ''}</div>
+                    <div><strong>Gender:</strong> ${member.gender || ''}</div>
+                    <div><strong>Mobile:</strong> ${member.mobile || ''}</div>
+                    <div><strong>Email:</strong> ${member.email || ''}</div>
+                    <div><strong>Role:</strong> ${member.role || ''}</div>
+                    <div><strong>Cell:</strong> ${cell ? cell.name : 'Unknown Cell'}</div>
+                    <div><strong>Venue:</strong> ${cell ? cell.venue : ''}</div>
+                    <div><strong>Day/Time:</strong> ${cell ? `${cell.day} ${cell.time}` : ''}</div>
+                </div>
+            `;
+            showModal('memberDetailsModal');
+        }
+
+function searchMembers() {
+            const searchTerm = document.getElementById('searchMembers').value.toLowerCase();
+            const rows = document.querySelectorAll('#allMembersBody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+            
+            // Update count
+            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+            document.getElementById('membersCount').textContent = visibleRows.length;
+        }
+
+function editMember(cellId, memberId) {
+            const member = churchData.members.find(m => m.id === memberId && String(m.cellId) === String(cellId));
+            if (member) {
+                document.getElementById('editMemberId').value = memberId;
+                document.getElementById('editMemberCellId').value = cellId;
+                document.getElementById('editMemberTitle').value = member.title;
+                document.getElementById('editMemberName').value = member.name;
+                document.getElementById('editMemberGender').value = member.gender;
+                document.getElementById('editMemberMobile').value = member.mobile;
+                document.getElementById('editMemberEmail').value = member.email || '';
+                document.getElementById('editMemberRole').value = member.role;
+                showModal('editMemberModal');
+            }
+        }
+
+async function saveEditedMember() {
+            try {
+                const memberId = parseInt(document.getElementById('editMemberId').value);
+                const cellId = document.getElementById('editMemberCellId').value;
+                
+                const payload = {
+                    title: document.getElementById('editMemberTitle').value,
+                    name: document.getElementById('editMemberName').value,
+                    gender: document.getElementById('editMemberGender').value,
+                    mobile: document.getElementById('editMemberMobile').value,
+                    email: document.getElementById('editMemberEmail').value,
+                    role: document.getElementById('editMemberRole').value
+                };
+                
+                await apiRequest(`${API_ENDPOINTS.MEMBERS}/${memberId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+                
+                // Update local data
+                const memberIndex = churchData.members.findIndex(m => m.id === memberId && String(m.cellId) === String(cellId));
+                if (memberIndex !== -1) {
+                    churchData.members[memberIndex] = { ...churchData.members[memberIndex], ...payload };
+                    updateCellMembersTable(cellId);
+                    updateAllMembersTable();
+                }
+                
+                closeModal('editMemberModal');
+                alert('Member updated successfully!');
+            } catch (error) {
+                alert('Failed to update member: ' + error.message);
+            }
+        }
+
+function confirmDeleteMember(cellId, memberId, memberName) {
+            document.getElementById('deleteConfirmText').textContent = 
+                `Are you sure you want to delete member "${memberName}"? This action cannot be undone.`;
+            
+            currentDeleteCallback = () => deleteMember(cellId, memberId);
+            showModal('deleteConfirmModal');
+        }
+
+async function deleteMember(cellId, memberId) {
+            try {
+                await apiRequest(`${API_ENDPOINTS.MEMBERS}/${memberId}`, {
+                    method: 'DELETE'
+                });
+                
+                // Update local data
+                const memberIndex = churchData.members.findIndex(m => m.id === memberId && m.cellId === cellId);
+                if (memberIndex !== -1) {
+                    churchData.members.splice(memberIndex, 1);
+                    updateCellMembersTable(cellId);
+                    updateAllMembersTable();
+                }
+                
+                closeModal('deleteConfirmModal');
+                alert('Member deleted successfully!');
+            } catch (error) {
+                alert('Failed to delete member: ' + error.message);
+            }
+        }
