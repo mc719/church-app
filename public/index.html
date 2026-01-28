@@ -3163,9 +3163,9 @@
                     applyUserPermissions();
                     
                     if (role === 'superuser' || role === 'admin') {
-                        navigateToPage('dashboard');
+                        restoreActivePage('dashboard');
                     } else {
-                        navigateToPage('members');
+                        restoreActivePage('members');
                     }
                 });
                 
@@ -4861,11 +4861,11 @@
                 await loadAllData();
                 applyUserPermissions();
                 
-                // Navigate based on role
+                // Navigate based on role (restore last page if allowed)
                 if (data.role === 'superuser' || data.role === 'admin') {
-                    navigateToPage('dashboard');
+                    restoreActivePage('dashboard');
                 } else {
-                    navigateToPage('members');
+                    restoreActivePage('members');
                 }
                 
                 alert('Login successful!');
@@ -4875,6 +4875,21 @@
                 alert('Login failed. Please check your credentials and try again.');
             }
         });
+
+        function restoreActivePage(defaultPage) {
+            const savedPage = localStorage.getItem('activePage');
+            if (savedPage) {
+                const restricted = new Set(churchData.currentUser?.restrictedMenus || []);
+                const isMember = churchData.currentUser?.role === 'member';
+                const allowedByRole = !isMember || savedPage === 'dashboard' || savedPage === 'members' || savedPage.startsWith('cell-');
+                const targetExists = document.getElementById(savedPage);
+                if (targetExists && !restricted.has(savedPage) && allowedByRole) {
+                    navigateToPage(savedPage);
+                    return;
+                }
+            }
+            navigateToPage(defaultPage);
+        }
 
         // Navigation function
         function navigateToPage(pageId) {
@@ -4904,6 +4919,8 @@
                 if (window.innerWidth <= 1024) {
                     sidebar.classList.remove('open');
                 }
+
+                localStorage.setItem('activePage', pageId);
             }
         }
 
