@@ -751,6 +751,13 @@
             }
         }
 
+        function updateHighlightLabel(toggleId, textId) {
+            const toggle = document.getElementById(toggleId);
+            const text = document.getElementById(textId);
+            if (!toggle || !text) return;
+            text.textContent = toggle.checked ? 'Yes' : 'No';
+        }
+
         // Idle timeout functions
         function resetIdleTimer() {
             if (idleTimer) {
@@ -832,6 +839,17 @@
                 sidebar.classList.toggle('open');
             });
 
+            // Close sidebar when clicking outside on mobile
+            document.addEventListener('click', (e) => {
+                if (window.innerWidth > 1024) return;
+                if (!sidebar.classList.contains('open')) return;
+                const clickedInsideSidebar = sidebar.contains(e.target);
+                const clickedToggle = mobileMenuToggle.contains(e.target);
+                if (!clickedInsideSidebar && !clickedToggle) {
+                    sidebar.classList.remove('open');
+                }
+            });
+
             // Logo click
             document.getElementById('logoLink').addEventListener('click', () => {
                 if (churchData.currentUser) {
@@ -864,6 +882,16 @@
 
             // Save logo text
             document.getElementById('saveLogoTextBtn').addEventListener('click', saveLogoText);
+
+            // Member highlight toggles
+            document.getElementById('memberHighlightToggle')?.addEventListener('change', () => {
+                updateHighlightLabel('memberHighlightToggle', 'memberHighlightText');
+            });
+            document.getElementById('editMemberHighlightToggle')?.addEventListener('change', () => {
+                updateHighlightLabel('editMemberHighlightToggle', 'editMemberHighlightText');
+            });
+            updateHighlightLabel('memberHighlightToggle', 'memberHighlightText');
+            updateHighlightLabel('editMemberHighlightToggle', 'editMemberHighlightText');
 
             // Health check
             document.getElementById('healthCheckBtn')?.addEventListener('click', runHealthCheck);
@@ -1210,6 +1238,8 @@
                 const mobile = document.getElementById('memberMobile').value;
                 const email = document.getElementById('memberEmail').value;
                 const role = document.getElementById('memberRole').value;
+                const highlightToggle = document.getElementById('memberHighlightToggle');
+                const highlight = highlightToggle ? highlightToggle.checked : false;
                 
                 const payload = {
                     cellId: cellId,
@@ -1229,6 +1259,9 @@
                     
                     // Update local data
                     churchData.members.push(data);
+                    if (highlight && typeof setMemberHighlight === 'function') {
+                        setMemberHighlight(data.id, true);
+                    }
                     
                     updateCellMembersTable(cellId);
                     updateAllMembersTable();
@@ -1255,6 +1288,11 @@
                     const cellId = btn.getAttribute('data-cell-id').replace('cell-', '');
                     document.getElementById('memberCellId').value = cellId;
                     showModal('addMemberModal');
+                    const addHighlightToggle = document.getElementById('memberHighlightToggle');
+                    if (addHighlightToggle) {
+                        addHighlightToggle.checked = false;
+                        updateHighlightLabel('memberHighlightToggle', 'memberHighlightText');
+                    }
                 }
 
                 // Handle editable fields

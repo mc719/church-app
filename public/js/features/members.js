@@ -1,3 +1,26 @@
+function getMemberHighlights() {
+            try {
+                return JSON.parse(localStorage.getItem('memberHighlights') || '{}');
+            } catch {
+                return {};
+            }
+        }
+
+function setMemberHighlight(memberId, isHighlighted) {
+            const highlights = getMemberHighlights();
+            if (isHighlighted) {
+                highlights[String(memberId)] = true;
+            } else {
+                delete highlights[String(memberId)];
+            }
+            localStorage.setItem('memberHighlights', JSON.stringify(highlights));
+        }
+
+function isMemberHighlighted(memberId) {
+            const highlights = getMemberHighlights();
+            return !!highlights[String(memberId)];
+        }
+
 function updateCellMembersTable(cellId) {
             const tbody = document.getElementById(`cellMembersBody-${cellId}`);
             if (!tbody) return;
@@ -12,6 +35,9 @@ function updateCellMembersTable(cellId) {
             tbody.innerHTML = '';
             pageMembers.forEach(member => {
                 const row = document.createElement('tr');
+                if (isMemberHighlighted(member.id)) {
+                    row.classList.add('member-highlight');
+                }
                 row.innerHTML = `
                     <td>${member.title}</td>
                     <td>${member.name}</td>
@@ -81,6 +107,9 @@ function updateAllMembersTable() {
                 const cell = churchData.cells.find(c => c.id === member.cellId);
                 
                 const row = document.createElement('tr');
+                if (isMemberHighlighted(member.id)) {
+                    row.classList.add('member-highlight');
+                }
                 row.innerHTML = `
                     <td>${member.title}</td>
                     <td>${member.name}</td>
@@ -165,6 +194,13 @@ function editMember(cellId, memberId) {
                 document.getElementById('editMemberMobile').value = member.mobile;
                 document.getElementById('editMemberEmail').value = member.email || '';
                 document.getElementById('editMemberRole').value = member.role;
+                const highlightToggle = document.getElementById('editMemberHighlightToggle');
+                if (highlightToggle) {
+                    highlightToggle.checked = isMemberHighlighted(memberId);
+                    if (typeof updateHighlightLabel === 'function') {
+                        updateHighlightLabel('editMemberHighlightToggle', 'editMemberHighlightText');
+                    }
+                }
                 showModal('editMemberModal');
             }
         }
@@ -182,6 +218,8 @@ async function saveEditedMember() {
                     email: document.getElementById('editMemberEmail').value,
                     role: document.getElementById('editMemberRole').value
                 };
+                const highlightToggle = document.getElementById('editMemberHighlightToggle');
+                const highlight = highlightToggle ? highlightToggle.checked : false;
                 
                 await apiRequest(`${API_ENDPOINTS.MEMBERS}/${memberId}`, {
                     method: 'PUT',
@@ -192,6 +230,7 @@ async function saveEditedMember() {
                 const memberIndex = churchData.members.findIndex(m => m.id === memberId && String(m.cellId) === String(cellId));
                 if (memberIndex !== -1) {
                     churchData.members[memberIndex] = { ...churchData.members[memberIndex], ...payload };
+                    setMemberHighlight(memberId, highlight);
                     updateCellMembersTable(cellId);
                     updateAllMembersTable();
                 }
@@ -221,6 +260,7 @@ async function deleteMember(cellId, memberId) {
                 const memberIndex = churchData.members.findIndex(m => m.id === memberId && m.cellId === cellId);
                 if (memberIndex !== -1) {
                     churchData.members.splice(memberIndex, 1);
+                    setMemberHighlight(memberId, false);
                     updateCellMembersTable(cellId);
                     updateAllMembersTable();
                 }

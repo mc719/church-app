@@ -333,73 +333,82 @@ function createCellPage(cell) {
                     </div>
                 </div>
                 
-                <div class="page-header">
-                    <h2>Members List</h2>
+                <div class="cell-tabs" id="cellTabs-${cell.id}">
+                    <button class="cell-tab-btn active" data-tab="members">Members List</button>
+                    <button class="cell-tab-btn" data-tab="reports">Reports | Cell Data</button>
                 </div>
                 
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Name</th>
-                                <th>Gender</th>
-                                <th>Mobile</th>
-                                <th>Cell Role</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cellMembersBody-${cell.id}">
-                            <!-- Members will be loaded dynamically -->
-                        </tbody>
-                    </table>
-                </div>
-                <div class="table-pagination" id="cellMembersPagination-${cell.id}"></div>
-                
-                <div class="page-header">
-                    <h2>Reports | Cell Data</h2>
-                </div>
-                
-                <div class="search-container">
-                    <div class="search-box">
-                        <input type="text" id="searchReports-${cell.id}" placeholder="Search reports..." oninput="searchReports('${cell.id}')">
+                <div class="cell-tab-content active" id="cellTabMembers-${cell.id}">
+                    <div class="page-header">
+                        <h2>Members List</h2>
                     </div>
-                    <div class="search-box">
-                        <select id="filterYear-${cell.id}" onchange="searchReports('${cell.id}')">
-                            <option value="">All Years</option>
-                        </select>
+                    
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Name</th>
+                                    <th>Gender</th>
+                                    <th>Mobile</th>
+                                    <th>Cell Role</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cellMembersBody-${cell.id}">
+                                <!-- Members will be loaded dynamically -->
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="search-box">
-                        <select id="filterMonth-${cell.id}" onchange="searchReports('${cell.id}')">
-                            <option value="">All Months</option>
-                            <option value="0">January</option>
-                            <option value="1">February</option>
-                            <option value="2">March</option>
-                            <option value="3">April</option>
-                            <option value="4">May</option>
-                            <option value="5">June</option>
-                            <option value="6">July</option>
-                            <option value="7">August</option>
-                            <option value="8">September</option>
-                            <option value="9">October</option>
-                            <option value="10">November</option>
-                            <option value="11">December</option>
-                        </select>
-                    </div>
-                    <div class="search-box">
-                        <select id="filterMeetingType-${cell.id}" onchange="searchReports('${cell.id}')">
-                            <option value="">All Meeting Types</option>
-                            <option value="prayer">Prayer and Planning</option>
-                            <option value="bible-study-1">Bible Study 1</option>
-                            <option value="bible-study-2">Bible Study 2</option>
-                            <option value="outreach">Outreach Meeting</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
+                    <div class="table-pagination" id="cellMembersPagination-${cell.id}"></div>
                 </div>
                 
-                <div id="monthlyReportsContainer-${cell.id}">
-                    <!-- Monthly reports will be loaded dynamically -->
+                <div class="cell-tab-content" id="cellTabReports-${cell.id}">
+                    <div class="page-header">
+                        <h2>Reports | Cell Data</h2>
+                    </div>
+                    
+                    <div class="search-container">
+                        <div class="search-box">
+                            <input type="text" id="searchReports-${cell.id}" placeholder="Search reports..." oninput="searchReports('${cell.id}')">
+                        </div>
+                        <div class="search-box">
+                            <select id="filterYear-${cell.id}" onchange="searchReports('${cell.id}')">
+                                <option value="">All Years</option>
+                            </select>
+                        </div>
+                        <div class="search-box">
+                            <select id="filterMonth-${cell.id}" onchange="searchReports('${cell.id}')">
+                                <option value="">All Months</option>
+                                <option value="0">January</option>
+                                <option value="1">February</option>
+                                <option value="2">March</option>
+                                <option value="3">April</option>
+                                <option value="4">May</option>
+                                <option value="5">June</option>
+                                <option value="6">July</option>
+                                <option value="7">August</option>
+                                <option value="8">September</option>
+                                <option value="9">October</option>
+                                <option value="10">November</option>
+                                <option value="11">December</option>
+                            </select>
+                        </div>
+                        <div class="search-box">
+                            <select id="filterMeetingType-${cell.id}" onchange="searchReports('${cell.id}')">
+                                <option value="">All Meeting Types</option>
+                                <option value="prayer">Prayer and Planning</option>
+                                <option value="bible-study-1">Bible Study 1</option>
+                                <option value="bible-study-2">Bible Study 2</option>
+                                <option value="outreach">Outreach Meeting</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="monthlyReportsContainer-${cell.id}">
+                        <!-- Monthly reports will be loaded dynamically -->
+                    </div>
                 </div>
             `;
             
@@ -407,6 +416,31 @@ function createCellPage(cell) {
             updateCellMembersTable(cell.id);
             updateCellReports(cell.id);
             populateYearFilter(cell.id);
+            setupCellTabs(cell.id);
+        }
+
+function setupCellTabs(cellId) {
+            const tabs = document.getElementById(`cellTabs-${cellId}`);
+            const membersPane = document.getElementById(`cellTabMembers-${cellId}`);
+            const reportsPane = document.getElementById(`cellTabReports-${cellId}`);
+            if (!tabs || !membersPane || !reportsPane) return;
+
+            const buttons = tabs.querySelectorAll('.cell-tab-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    const tab = btn.getAttribute('data-tab');
+                    if (tab === 'reports') {
+                        membersPane.classList.remove('active');
+                        reportsPane.classList.add('active');
+                    } else {
+                        reportsPane.classList.remove('active');
+                        membersPane.classList.add('active');
+                    }
+                });
+            });
         }
 
 function populateYearFilter(cellId) {

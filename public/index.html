@@ -347,6 +347,16 @@
                             <option value="New Member">New Member</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>Highlight Member (Yes/No)</label>
+                        <div class="highlight-toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="memberHighlightToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="toggle-label" id="memberHighlightText">No</span>
+                        </div>
+                    </div>
                     <div class="form-actions">
                         <button type="button" class="btn" onclick="closeModal('addMemberModal')">Cancel</button>
                         <button type="submit" class="btn btn-success">Add Member</button>
@@ -411,6 +421,16 @@
                             <option value="Member">Member</option>
                             <option value="New Member">New Member</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Highlight Member (Yes/No)</label>
+                        <div class="highlight-toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="editMemberHighlightToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="toggle-label" id="editMemberHighlightText">No</span>
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn" onclick="closeModal('editMemberModal')">Cancel</button>
@@ -551,6 +571,9 @@
                             <option value="fas fa-layer-group"></option>
                             <option value="fas fa-chart-line"></option>
                             <option value="fas fa-clipboard-list"></option>
+                            <option value="fas fa-group"></option>
+                            <option value="fas fa-clipboard-list"></option>
+
                         </datalist>
                         <small id="editPageIconPreview" style="display: inline-block; margin-top: 8px;">
                             <i class="fas fa-home"></i>
@@ -931,74 +954,83 @@
                 </div>
             </div>
             
-            <div class="page-header">
-                <h2>Members List</h2>
+            <div class="cell-tabs" id="cellTabs-cells-template">
+                <button class="cell-tab-btn active" data-tab="members">Members List</button>
+                <button class="cell-tab-btn" data-tab="reports">Reports | Cell Data</button>
             </div>
             
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Name</th>
-                            <th>Gender</th>
-                            <th>Mobile</th>
-                            <th>Cell Role</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="cellMembersBody-cells-template">
-                        <!-- Members will be loaded dynamically -->
-                    </tbody>
-                </table>
-            </div>
-            <div class="table-pagination" id="cellMembersPagination-cells-template"></div>
-            
-            <div class="page-header">
-                <h2>Reports | Cell Data</h2>
-            </div>
-            
-            <div class="search-container">
-                <div class="search-box">
-                    <input type="text" id="searchReports-cells-template" placeholder="Search reports..." oninput="searchReports('cells-template')">
+            <div class="cell-tab-content active" id="cellTabMembers-cells-template">
+                <div class="page-header">
+                    <h2>Members List</h2>
                 </div>
-                <div class="search-box">
-                    <select id="filterYear-cells-template" onchange="searchReports('cells-template')">
-                        <option value="">All Years</option>
-                    </select>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Name</th>
+                                <th>Gender</th>
+                                <th>Mobile</th>
+                                <th>Cell Role</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cellMembersBody-cells-template">
+                            <!-- Members will be loaded dynamically -->
+                        </tbody>
+                    </table>
                 </div>
-                <div class="search-box">
-                    <select id="filterMonth-cells-template" onchange="searchReports('cells-template')">
-                        <option value="">All Months</option>
-                        <option value="0">January</option>
-                        <option value="1">February</option>
-                        <option value="2">March</option>
-                        <option value="3">April</option>
-                        <option value="4">May</option>
-                        <option value="5">June</option>
-                        <option value="6">July</option>
-                        <option value="7">August</option>
-                        <option value="8">September</option>
-                        <option value="9">October</option>
-                        <option value="10">November</option>
-                        <option value="11">December</option>
-                    </select>
-                </div>
-                <div class="search-box">
-                    <select id="filterMeetingType-cells-template" onchange="searchReports('cells-template')">
-                        <option value="">All Meeting Types</option>
-                        <option value="prayer">Prayer and Planning</option>
-                        <option value="bible-study-1">Bible Study 1</option>
-                        <option value="bible-study-2">Bible Study 2</option>
-                        <option value="outreach">Outreach Meeting</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
+                <div class="table-pagination" id="cellMembersPagination-cells-template"></div>
             </div>
             
-            <div id="monthlyReportsContainer-cells-template">
-                <div style="text-align: center; padding: 40px; color: var(--gray-color);">
-                    This is a template cell. Create a new cell to start adding reports.
+            <div class="cell-tab-content" id="cellTabReports-cells-template">
+                <div class="page-header">
+                    <h2>Reports | Cell Data</h2>
+                </div>
+                
+                <div class="search-container">
+                    <div class="search-box">
+                        <input type="text" id="searchReports-cells-template" placeholder="Search reports..." oninput="searchReports('cells-template')">
+                    </div>
+                    <div class="search-box">
+                        <select id="filterYear-cells-template" onchange="searchReports('cells-template')">
+                            <option value="">All Years</option>
+                        </select>
+                    </div>
+                    <div class="search-box">
+                        <select id="filterMonth-cells-template" onchange="searchReports('cells-template')">
+                            <option value="">All Months</option>
+                            <option value="0">January</option>
+                            <option value="1">February</option>
+                            <option value="2">March</option>
+                            <option value="3">April</option>
+                            <option value="4">May</option>
+                            <option value="5">June</option>
+                            <option value="6">July</option>
+                            <option value="7">August</option>
+                            <option value="8">September</option>
+                            <option value="9">October</option>
+                            <option value="10">November</option>
+                            <option value="11">December</option>
+                        </select>
+                    </div>
+                    <div class="search-box">
+                        <select id="filterMeetingType-cells-template" onchange="searchReports('cells-template')">
+                            <option value="">All Meeting Types</option>
+                            <option value="prayer">Prayer and Planning</option>
+                            <option value="bible-study-1">Bible Study 1</option>
+                            <option value="bible-study-2">Bible Study 2</option>
+                            <option value="outreach">Outreach Meeting</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="monthlyReportsContainer-cells-template">
+                    <div style="text-align: center; padding: 40px; color: var(--gray-color);">
+                        This is a template cell. Create a new cell to start adding reports.
+                    </div>
                 </div>
             </div>
         </div>
