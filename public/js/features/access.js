@@ -130,13 +130,13 @@ function updateAccessManagementTable() {
                 const restrictedMenus = (user.restrictedMenus || []).join(', ');
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${user.username}</td>
-                    <td>${user.email || ''}</td>
-                    <td>******</td>
-                    <td>${user.role}</td>
-                    <td>${restrictedMenus || '-'}</td>
-                    <td>${user.status ? 'Active' : 'Inactive'}</td>
-                    <td>
+                    <td data-label="Username">${user.username}</td>
+                    <td data-label="Email">${user.email || ''}</td>
+                    <td data-label="Password">******</td>
+                    <td data-label="Role">${user.role}</td>
+                    <td data-label="Restricted Menus">${restrictedMenus || '-'}</td>
+                    <td data-label="Status">${user.status ? 'Active' : 'Inactive'}</td>
+                    <td data-label="Actions">
                         <div class="action-buttons">
                             <button class="action-btn edit-btn" onclick="editUser('${user.id}')">
                                 <i class="fas fa-edit"></i> Edit
@@ -180,17 +180,17 @@ function updatePageManagementTable() {
                 const isActive = visibility[page.id] !== false;
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${page.label}</td>
-                    <td>${page.id}</td>
-                    <td><i class="${page.icon}"></i></td>
-                    <td>system</td>
-                    <td>
+                    <td data-label="Menu Name">${page.label}</td>
+                    <td data-label="Menu ID">${page.id}</td>
+                    <td data-label="Icon"><i class="${page.icon}"></i></td>
+                    <td data-label="Section">system</td>
+                    <td data-label="Active">
                         <label class="toggle-switch">
                             <input type="checkbox" ${isActive ? 'checked' : ''} data-page-id="${page.id}" class="page-toggle">
                             <span class="toggle-slider"></span>
                         </label>
                     </td>
-                    <td>
+                    <td data-label="Actions">
                         <div class="action-buttons">
                             <button class="action-btn edit-btn" onclick="editPageMenu('${page.id}')">
                                 <i class="fas fa-edit"></i> Edit

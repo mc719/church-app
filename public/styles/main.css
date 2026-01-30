@@ -1733,6 +1733,71 @@
             .members-grid {
                 display: grid;
             }
+
+            .table-container .mobile-grid-table thead {
+                display: none;
+            }
+
+            .table-container .mobile-grid-table,
+            .table-container .mobile-grid-table tbody,
+            .table-container .mobile-grid-table tr,
+            .table-container .mobile-grid-table td {
+                display: block;
+                width: 100%;
+            }
+
+            .table-container .mobile-grid-table tbody {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .table-container .mobile-grid-table tbody tr {
+                background: #ffffff;
+                border: 1px solid #eaeaea;
+                border-radius: 12px;
+                padding: 16px;
+                box-shadow: var(--shadow);
+            }
+
+            .dark-theme .table-container .mobile-grid-table tbody tr {
+                background-color: #1a1a1a;
+                border-color: #333;
+            }
+
+            .table-container .mobile-grid-table tbody td {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 8px 0;
+                border: none;
+            }
+
+            .table-container .mobile-grid-table tbody td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: var(--gray-color);
+                flex: 0 0 45%;
+            }
+
+            .settings-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .settings-card {
+                background: #ffffff;
+                border: 1px solid #eaeaea;
+                border-radius: var(--border-radius);
+                padding: 20px;
+                box-shadow: var(--shadow);
+            }
+
+            .dark-theme .settings-card {
+                background-color: #1a1a1a;
+                border-color: #333;
+            }
             
             .theme-options {
                 grid-template-columns: 1fr;

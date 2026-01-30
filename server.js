@@ -692,6 +692,250 @@ app.get("/api/reports", requireAuth, async (req, res) => {
   }
 });
 
+// ===============================
+// 6.5) FIRST-TIMERS & FOLLOW-UPS
+// ===============================
+
+// GET FIRST-TIMERS (PROTECTED)
+app.get("/api/first-timers", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ft.id::text as id,
+              ft.name,
+              ft.mobile,
+              ft.date_joined as "dateJoined",
+              ft.status,
+              ft.foundation_school as "foundationSchool",
+              ft.cell_id::text as "cellId",
+              c.name as "cellName"
+       FROM first_timers ft
+       LEFT JOIN cells c ON c.id = ft.cell_id
+       ORDER BY ft.date_joined DESC NULLS LAST, ft.id DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load first-timers" });
+  }
+});
+
+// ADD FIRST-TIMER (PROTECTED)
+app.post("/api/first-timers", requireAuth, async (req, res) => {
+  try {
+    const { name, mobile, dateJoined, status, foundationSchool, cellId } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING id::text as id,
+                 name,
+                 mobile,
+                 date_joined as "dateJoined",
+                 status,
+                 foundation_school as "foundationSchool",
+                 cell_id::text as "cellId"`,
+      [
+        name,
+        mobile,
+        dateJoined || null,
+        status || "amber",
+        foundationSchool || "Not Yet",
+        cellId || null
+      ]
+    );
+
+    // If a cell is selected, add to members list as First-Timer
+    if (cellId) {
+      await pool.query(
+        `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, joined_date, is_first_timer)
+         VALUES ($1,$2,$3,$4,$5,$6,$7, NOW(), TRUE)`,
+        [cellId, "First-Timer", name, "Unknown", mobile || "", null, "First-Timer"]
+      );
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to add first-timer" });
+  }
+});
+
+// UPDATE FIRST-TIMER (PROTECTED)
+app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
+  try {
+    const { name, mobile, dateJoined, status, foundationSchool, cellId } = req.body;
+    const result = await pool.query(
+      `UPDATE first_timers
+       SET name = COALESCE($1, name),
+           mobile = COALESCE($2, mobile),
+           date_joined = COALESCE($3, date_joined),
+           status = COALESCE($4, status),
+           foundation_school = COALESCE($5, foundation_school),
+           cell_id = COALESCE($6, cell_id)
+       WHERE id = $7
+       RETURNING id::text as id,
+                 name,
+                 mobile,
+                 date_joined as "dateJoined",
+                 status,
+                 foundation_school as "foundationSchool",
+                 cell_id::text as "cellId"`,
+      [
+        name ?? null,
+        mobile ?? null,
+        dateJoined ?? null,
+        status ?? null,
+        foundationSchool ?? null,
+        cellId ?? null,
+        req.params.id
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "First-timer not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update first-timer" });
+  }
+});
+
+// DELETE FIRST-TIMER (PROTECTED)
+app.delete("/api/first-timers/:id", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM first_timers WHERE id = $1 RETURNING id::text as id",
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "First-timer not found" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete first-timer" });
+  }
+});
+
+// GET FOLLOW-UP RECORDS (PROTECTED)
+app.get("/api/follow-ups", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT fu.id::text as id,
+              fu.first_timer_id::text as "firstTimerId",
+              ft.name as "firstTimerName",
+              fu.followup_date as "date",
+              fu.followup_time as "time",
+              fu.comment,
+              fu.visitation_arranged as "visitationArranged",
+              fu.visitation_date as "visitationDate"
+       FROM follow_ups fu
+       LEFT JOIN first_timers ft ON ft.id = fu.first_timer_id
+       ORDER BY fu.followup_date DESC NULLS LAST, fu.id DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load follow-up records" });
+  }
+});
+
+// ADD FOLLOW-UP (PROTECTED)
+app.post("/api/follow-ups", requireAuth, async (req, res) => {
+  try {
+    const { firstTimerId, date, time, comment, visitationArranged, visitationDate } = req.body;
+    const result = await pool.query(
+      `INSERT INTO follow_ups (first_timer_id, followup_date, followup_time, comment, visitation_arranged, visitation_date)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING id::text as id,
+                 first_timer_id::text as "firstTimerId",
+                 followup_date as "date",
+                 followup_time as "time",
+                 comment,
+                 visitation_arranged as "visitationArranged",
+                 visitation_date as "visitationDate"`,
+      [
+        firstTimerId,
+        date || null,
+        time || null,
+        comment || null,
+        !!visitationArranged,
+        visitationDate || null
+      ]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to add follow-up record" });
+  }
+});
+
+// UPDATE FOLLOW-UP (PROTECTED)
+app.put("/api/follow-ups/:id", requireAuth, async (req, res) => {
+  try {
+    const { firstTimerId, date, time, comment, visitationArranged, visitationDate } = req.body;
+    const result = await pool.query(
+      `UPDATE follow_ups
+       SET first_timer_id = COALESCE($1, first_timer_id),
+           followup_date = COALESCE($2, followup_date),
+           followup_time = COALESCE($3, followup_time),
+           comment = COALESCE($4, comment),
+           visitation_arranged = COALESCE($5, visitation_arranged),
+           visitation_date = COALESCE($6, visitation_date)
+       WHERE id = $7
+       RETURNING id::text as id,
+                 first_timer_id::text as "firstTimerId",
+                 followup_date as "date",
+                 followup_time as "time",
+                 comment,
+                 visitation_arranged as "visitationArranged",
+                 visitation_date as "visitationDate"`,
+      [
+        firstTimerId ?? null,
+        date ?? null,
+        time ?? null,
+        comment ?? null,
+        typeof visitationArranged === "boolean" ? visitationArranged : null,
+        visitationDate ?? null,
+        req.params.id
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Follow-up record not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update follow-up record" });
+  }
+});
+
+// DELETE FOLLOW-UP (PROTECTED)
+app.delete("/api/follow-ups/:id", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM follow_ups WHERE id = $1 RETURNING id::text as id",
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Follow-up record not found" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete follow-up record" });
+  }
+});
+
 // ADD REPORT (PROTECTED)
 app.post("/api/reports", requireAuth, async (req, res) => {
   try {

@@ -440,6 +440,106 @@
             </div>
         </div>
     </div>
+
+    <!-- Add/Edit First-Timer Modal -->
+    <div id="firstTimerModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="firstTimerModalTitle">Add First-Timer</h3>
+                <button class="close-modal" onclick="closeModal('firstTimerModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="firstTimerForm">
+                    <input type="hidden" id="firstTimerId">
+                    <div class="form-group">
+                        <label for="firstTimerName">Name *</label>
+                        <input type="text" id="firstTimerName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerMobile">Mobile *</label>
+                        <input type="tel" id="firstTimerMobile" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerDateJoined">Date Joined</label>
+                        <input type="date" id="firstTimerDateJoined" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerStatus">Status</label>
+                        <select id="firstTimerStatus" class="form-control">
+                            <option value="green">Green</option>
+                            <option value="amber" selected>Amber</option>
+                            <option value="red">Red</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerFoundation">Foundation School</label>
+                        <select id="firstTimerFoundation" class="form-control">
+                            <option value="Yes">Yes</option>
+                            <option value="Not Yet" selected>Not Yet</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerCell">Cell</label>
+                        <select id="firstTimerCell" class="form-control">
+                            <option value="">Select Cell</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn" onclick="closeModal('firstTimerModal')">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="firstTimerSaveBtn">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Follow-up Modal -->
+    <div id="followUpModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="followUpModalTitle">Add Follow-up Record</h3>
+                <button class="close-modal" onclick="closeModal('followUpModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="followUpForm">
+                    <input type="hidden" id="followUpId">
+                    <div class="form-group">
+                        <label for="followUpFirstTimer">First-Timer *</label>
+                        <select id="followUpFirstTimer" class="form-control" required>
+                            <option value="">Select First-Timer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="followUpDate">Date</label>
+                        <input type="date" id="followUpDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="followUpTime">Time</label>
+                        <input type="time" id="followUpTime" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="followUpComment">Comment</label>
+                        <textarea id="followUpComment" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Visitation Arranged</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="followUpVisitationArranged">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="followUpVisitationDate">Visitation Date</label>
+                        <input type="date" id="followUpVisitationDate" class="form-control">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn" onclick="closeModal('followUpModal')">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="followUpSaveBtn">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
     <!-- Edit Menu Modal -->
     <div id="editMenuModal" class="modal-overlay">
@@ -795,6 +895,10 @@
             
             <div class="nav-section-title" id="adminTitle">Administrator</div>
             
+            <div class="nav-item" data-page="first-timers" id="firstTimersNav">
+                <i class="fas fa-user-check"></i>
+                <span>First-Timers</span>
+            </div>
             <div class="nav-item" data-page="page-management" id="pageManagementNav">
                 <i class="fas fa-file-alt"></i>
                 <span>Page Management</span>
@@ -914,7 +1018,75 @@
         
         <!-- Dynamic cell pages will be created here -->
         <div id="dynamicCellPages"></div>
-        
+
+        <!-- First-Timers Page -->
+        <div id="first-timers" class="page-content">
+            <div class="page-header">
+                <h1>First-Timers</h1>
+                <div class="page-actions">
+                    <button class="btn btn-success" id="addFirstTimerBtn">
+                        <i class="fas fa-user-plus"></i> Add New First-Timer
+                    </button>
+                </div>
+            </div>
+
+            <div class="cell-tabs" id="firstTimersTabs">
+                <button class="cell-tab-btn active" data-tab="list">First-Timers List</button>
+                <button class="cell-tab-btn" data-tab="followups">Follow-up Records</button>
+            </div>
+
+            <div class="cell-tab-content active" id="firstTimersListTab">
+                <div class="table-container">
+                    <table id="firstTimersTable" class="mobile-grid-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Mobile</th>
+                                <th>Date Joined</th>
+                                <th>Status</th>
+                                <th>Foundation School</th>
+                                <th>Cell</th>
+                                <th>Last Follow-up</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="firstTimersBody">
+                            <!-- First-timers will load here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="cell-tab-content" id="firstTimersFollowupsTab">
+                <div class="page-header" style="margin-top: 0;">
+                    <h2>Follow-up Records</h2>
+                    <div class="page-actions">
+                        <button class="btn btn-success" id="addFollowUpBtn">
+                            <i class="fas fa-plus"></i> Add Record
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="followUpsTable" class="mobile-grid-table">
+                        <thead>
+                            <tr>
+                                <th>First-Timer</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Comment</th>
+                                <th>Visitation Arranged</th>
+                                <th>Visitation Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="followUpsBody">
+                            <!-- Follow-up records will load here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Cells Template Page (Hidden) -->
         <div id="cells-template" class="page-content" style="display: none;">
             <div class="page-header">
@@ -1226,6 +1398,7 @@
     <script src="/js/features/cells.js"></script>
     <script src="/js/features/members.js"></script>
     <script src="/js/features/reports.js"></script>
+    <script src="/js/features/firsttimers.js"></script>
     <script src="/js/features/access.js"></script>
     <script src="/js/features/sessions.js"></script>
 </body>

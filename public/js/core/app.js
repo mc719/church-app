@@ -7,7 +7,9 @@
             REPORTS: `${API_BASE}/reports`,
             USERS: `${API_BASE}/users`,
             SESSIONS: `${API_BASE}/sessions`,
-            HEALTH: `${API_BASE}/health`
+            HEALTH: `${API_BASE}/health`,
+            FIRST_TIMERS: `${API_BASE}/first-timers`,
+            FOLLOW_UPS: `${API_BASE}/follow-ups`
         };
 
         // Data storage for frontend cache
@@ -17,6 +19,8 @@
             members: [],
             users: [],
             sessions: [],
+            firstTimers: [],
+            followUps: [],
             pageMeta: {},
             currentUser: null,
             settings: {
@@ -151,6 +155,22 @@
                 const reportsData = await apiRequest(API_ENDPOINTS.REPORTS);
                 churchData.reports = reportsData;
 
+                // Load first-timers
+                try {
+                    const firstTimersData = await apiRequest(API_ENDPOINTS.FIRST_TIMERS);
+                    churchData.firstTimers = firstTimersData;
+                } catch (error) {
+                    console.warn('Failed to load first-timers:', error.message);
+                }
+
+                // Load follow-ups
+                try {
+                    const followUpsData = await apiRequest(API_ENDPOINTS.FOLLOW_UPS);
+                    churchData.followUps = followUpsData;
+                } catch (error) {
+                    console.warn('Failed to load follow-ups:', error.message);
+                }
+
                 // Load sessions (admin only)
                 try {
                     const sessionsData = await apiRequest(API_ENDPOINTS.SESSIONS);
@@ -256,6 +276,12 @@
             updateRecentReports();
             updateSidebarMenus();
             updateAllMembersTable();
+            if (typeof updateFirstTimersTable === 'function') {
+                updateFirstTimersTable();
+            }
+            if (typeof updateFollowUpsTable === 'function') {
+                updateFollowUpsTable();
+            }
             updateAccessManagementTable();
             updatePageManagementTable();
             updateSessionsTable();
@@ -914,6 +940,40 @@
             updateHighlightLabel('editMemberHighlightToggle', 'editMemberHighlightText');
 
             setupPageManagementRealtime();
+
+            // First-timers buttons and tabs
+            document.getElementById('addFirstTimerBtn')?.addEventListener('click', () => {
+                if (typeof openFirstTimerModal === 'function') {
+                    openFirstTimerModal();
+                }
+            });
+
+            document.getElementById('addFollowUpBtn')?.addEventListener('click', () => {
+                if (typeof openFollowUpModal === 'function') {
+                    openFollowUpModal();
+                }
+            });
+
+            const ftTabs = document.getElementById('firstTimersTabs');
+            if (ftTabs) {
+                const buttons = ftTabs.querySelectorAll('.cell-tab-btn');
+                const listTab = document.getElementById('firstTimersListTab');
+                const followTab = document.getElementById('firstTimersFollowupsTab');
+                buttons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        buttons.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        const tab = btn.getAttribute('data-tab');
+                        if (tab === 'followups') {
+                            listTab?.classList.remove('active');
+                            followTab?.classList.add('active');
+                        } else {
+                            followTab?.classList.remove('active');
+                            listTab?.classList.add('active');
+                        }
+                    });
+                });
+            }
 
             // Health check
             document.getElementById('healthCheckBtn')?.addEventListener('click', runHealthCheck);

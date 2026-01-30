@@ -52,17 +52,17 @@ function updateSessionsTable() {
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${session.username || ''}</td>
-                    <td>${loginTime ? loginTime.toLocaleString() : ''}</td>
-                    <td>${logoutTime ? logoutTime.toLocaleString() : ''}</td>
-                    <td>${session.ipAddress || ''}</td>
-                    <td>${ua.browser}</td>
-                    <td>${ua.os}</td>
-                    <td>${timezone}</td>
-                    <td>${activeTime}</td>
-                    <td>${idleTime}</td>
-                    <td>${totalTime}</td>
-                    <td>${status}</td>
+                    <td data-label="User">${session.username || ''}</td>
+                    <td data-label="Start Time">${loginTime ? loginTime.toLocaleString() : ''}</td>
+                    <td data-label="Logout Time">${logoutTime ? logoutTime.toLocaleString() : ''}</td>
+                    <td data-label="IP Address">${session.ipAddress || ''}</td>
+                    <td data-label="Browser">${ua.browser}</td>
+                    <td data-label="OS">${ua.os}</td>
+                    <td data-label="Timezone">${timezone}</td>
+                    <td data-label="Active Time">${activeTime}</td>
+                    <td data-label="Idle Time">${idleTime}</td>
+                    <td data-label="Total Time">${totalTime}</td>
+                    <td data-label="Status">${status}</td>
                 `;
                 tbody.appendChild(row);
             });
