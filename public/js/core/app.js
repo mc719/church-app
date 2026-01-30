@@ -1379,6 +1379,15 @@
             updateCurrentLogoPreview();
         });
 
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'logoImage') {
+                churchData.settings.logo = event.newValue || null;
+                updateLoginLogo();
+                updateSidebarLogo();
+                updateCurrentLogoPreview();
+            }
+        });
+
         // Handle window resize for mobile
         window.addEventListener('resize', () => {
             if (window.innerWidth > 1024) {
