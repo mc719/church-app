@@ -758,6 +758,26 @@
             text.textContent = toggle.checked ? 'Yes' : 'No';
         }
 
+        function setupPageManagementRealtime() {
+            const navMenu = document.getElementById('navMenu');
+            if (!navMenu || window.pageManagementObserver) return;
+
+            let debounceTimer = null;
+            const observer = new MutationObserver(() => {
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                }
+                debounceTimer = setTimeout(() => {
+                    if (typeof updatePageManagementTable === 'function') {
+                        updatePageManagementTable();
+                    }
+                }, 50);
+            });
+
+            observer.observe(navMenu, { childList: true, subtree: true, attributes: true });
+            window.pageManagementObserver = observer;
+        }
+
         // Idle timeout functions
         function resetIdleTimer() {
             if (idleTimer) {
@@ -892,6 +912,8 @@
             });
             updateHighlightLabel('memberHighlightToggle', 'memberHighlightText');
             updateHighlightLabel('editMemberHighlightToggle', 'editMemberHighlightText');
+
+            setupPageManagementRealtime();
 
             // Health check
             document.getElementById('healthCheckBtn')?.addEventListener('click', runHealthCheck);
