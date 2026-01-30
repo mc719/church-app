@@ -164,10 +164,20 @@ function updatePageManagementTable() {
             const meta = getPageMeta();
             const pages = [];
             document.querySelectorAll('.nav-item').forEach(item => {
-                if (item.closest('#cellGroupsContainer')) return;
                 const id = item.getAttribute('data-page');
-                if (!id || !meta[id]) return;
-                pages.push({ id, label: meta[id].label, icon: meta[id].icon });
+                if (!id) return;
+
+                const inCellGroup = !!item.closest('#cellGroupsContainer');
+                const label = item.querySelector('span')?.textContent?.trim() || id;
+                const icon = item.querySelector('i')?.className || (meta[id]?.icon || 'fas fa-file-alt');
+
+                if (inCellGroup) {
+                    pages.push({ id, label, icon, section: 'cell' });
+                    return;
+                }
+
+                if (!meta[id]) return;
+                pages.push({ id, label: meta[id].label, icon: meta[id].icon, section: 'system' });
             });
             tbody.innerHTML = '';
 
@@ -183,7 +193,7 @@ function updatePageManagementTable() {
                     <td data-label="Menu Name">${page.label}</td>
                     <td data-label="Menu ID">${page.id}</td>
                     <td data-label="Icon"><i class="${page.icon}"></i></td>
-                    <td data-label="Section">system</td>
+                    <td data-label="Section">${page.section || 'system'}</td>
                     <td data-label="Active">
                         <label class="toggle-switch">
                             <input type="checkbox" ${isActive ? 'checked' : ''} data-page-id="${page.id}" class="page-toggle">
