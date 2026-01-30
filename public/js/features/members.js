@@ -222,6 +222,9 @@ async function saveEditedMember() {
                 
                 closeModal('editMemberModal');
                 alert('Member updated successfully!');
+                if (typeof refreshNotificationsSilently === 'function') {
+                    refreshNotificationsSilently();
+                }
             } catch (error) {
                 alert('Failed to update member: ' + error.message);
             }

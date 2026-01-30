@@ -224,6 +224,9 @@ async function saveEditedCell() {
           updateAllUI();
           closeModal('editCellModal');
           alert('Cell updated successfully!');
+          if (typeof refreshNotificationsSilently === 'function') {
+              refreshNotificationsSilently();
+          }
       } catch (error) {
           alert('Failed to update cell: ' + error.message);
       }

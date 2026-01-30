@@ -11,7 +11,8 @@
             HEALTH: `${API_BASE}/health`,
             FIRST_TIMERS: `${API_BASE}/first-timers`,
             FOLLOW_UPS: `${API_BASE}/follow-ups`,
-            SETTINGS_LOGO: `${API_BASE}/settings/logo`
+            SETTINGS_LOGO: `${API_BASE}/settings/logo`,
+            NOTIFICATIONS: `${API_BASE}/notifications`
         };
 
         // Data storage for frontend cache
@@ -172,6 +173,14 @@
                     churchData.followUps = followUpsData;
                 } catch (error) {
                     console.warn('Failed to load follow-ups:', error.message);
+                }
+
+                // Load notifications
+                try {
+                    const notificationsData = await apiRequest(API_ENDPOINTS.NOTIFICATIONS);
+                    churchData.notifications = notificationsData;
+                } catch (error) {
+                    console.warn('Failed to load notifications:', error.message);
                 }
 
                 // Load sessions (admin only)
@@ -507,6 +516,22 @@
             });
         }
 
+        async function fetchNotifications() {
+            try {
+                const data = await apiRequest(API_ENDPOINTS.NOTIFICATIONS);
+                churchData.notifications = data;
+                saveNotificationsToStorage();
+                updateNotificationsUI();
+            } catch (error) {
+                console.warn('Failed to load notifications:', error.message);
+            }
+        }
+
+        function refreshNotificationsSilently() {
+            if (!localStorage.getItem('token')) return;
+            fetchNotifications();
+        }
+
         function openNotificationModal(id) {
             const note = churchData.notifications.find(n => String(n.id) === String(id));
             if (!note) return;
@@ -517,6 +542,8 @@
             note.readAt = note.readAt || new Date().toISOString();
             saveNotificationsToStorage();
             updateNotificationsUI();
+            apiRequest(`${API_ENDPOINTS.NOTIFICATIONS}/${id}/read`, { method: 'PUT' })
+                .catch(error => console.warn('Failed to mark notification read:', error.message));
             showModal('notificationModal');
         }
 
@@ -1308,6 +1335,7 @@
                     this.reset();
                     
                     alert('Cell created successfully!');
+                    refreshNotificationsSilently();
                 } catch (error) {
                     alert('Failed to create cell: ' + error.message);
                 }
@@ -1366,6 +1394,7 @@
                     updateCellReports(cellId);
                     closeModal('addReportModal');
                     alert('Report added successfully!');
+                    refreshNotificationsSilently();
                 } catch (error) {
                     alert('Failed to add report: ' + error.message);
                 }
@@ -1424,6 +1453,7 @@
                     updateCellReports(cellId);
                     closeModal('editReportModal');
                     alert('Report updated successfully!');
+                    refreshNotificationsSilently();
                 } catch (error) {
                     alert('Failed to update report: ' + error.message);
                 }
@@ -1470,6 +1500,7 @@
                     updateAllMembersTable();
                     closeModal('addMemberModal');
                     alert('Member added successfully!');
+                    refreshNotificationsSilently();
                 } catch (error) {
                     alert('Failed to add member: ' + error.message);
                 }
@@ -1527,6 +1558,8 @@
                             apiRequest(`${API_ENDPOINTS.CELLS}/${cellId}`, {
                                 method: 'PUT',
                                 body: JSON.stringify({ [fieldName]: newValue })
+                            }).then(() => {
+                                refreshNotificationsSilently();
                             }).catch(error => {
                                 console.error('Failed to update cell:', error);
                             });

@@ -138,6 +138,22 @@ async function createSession(userId, req) {
   return result.rows[0]?.id || null;
 }
 
+async function createNotification({ title, message, type = "info", userId = null }) {
+  const result = await pool.query(
+    `INSERT INTO notifications (user_id, title, message, type)
+     VALUES ($1,$2,$3,$4)
+     RETURNING id::text as id,
+               user_id::text as "userId",
+               title,
+               message,
+               type,
+               created_at as "createdAt",
+               read_at as "readAt"`,
+    [userId, title, message, type]
+  );
+  return result.rows[0];
+}
+
 // ===============================
 // 6) ROUTES
 // ===============================
@@ -329,7 +345,18 @@ app.post("/api/cells", requireAuthOrAccessCode, async (req, res) => {
       [name, venue, day, time, description]
     );
 
-    res.json(result.rows[0]);
+    const cell = result.rows[0];
+    try {
+      await createNotification({
+        title: "New Cell Created",
+        message: `Cell "${cell.name}" was created.`,
+        type: "info"
+      });
+    } catch (err) {
+      console.warn("Notification failed:", err.message);
+    }
+
+    res.json(cell);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to add cell" });
@@ -549,7 +576,18 @@ app.put("/api/cells/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Cell not found" });
     }
 
-    res.json(result.rows[0]);
+    const cell = result.rows[0];
+    try {
+      await createNotification({
+        title: "Cell Updated",
+        message: `Cell "${cell.name}" was updated.`,
+        type: "info"
+      });
+    } catch (err) {
+      console.warn("Notification failed:", err.message);
+    }
+
+    res.json(cell);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update cell" });
@@ -641,6 +679,16 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
       }
     }
 
+    try {
+      await createNotification({
+        title: "New Member Added",
+        message: `Member "${member.name}" was added.`,
+        type: "info"
+      });
+    } catch (err) {
+      console.warn("Notification failed:", err.message);
+    }
+
     res.json(member);
   } catch (err) {
     console.error(err);
@@ -707,6 +755,16 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
           [member.name, member.mobile || null, "amber", "Not Yet", member.cellId || null, null]
         );
       }
+    }
+
+    try {
+      await createNotification({
+        title: "Member Updated",
+        message: `Member "${member.name}" was updated.`,
+        type: "info"
+      });
+    } catch (err) {
+      console.warn("Notification failed:", err.message);
     }
 
     res.json(member);
@@ -1058,7 +1116,18 @@ app.post("/api/reports", requireAuth, async (req, res) => {
       [cellId, date, venue, meetingType, description, attendees || []]
     );
 
-    res.json(result.rows[0]);
+    const report = result.rows[0];
+    try {
+      await createNotification({
+        title: "New Report Added",
+        message: "A new report was added.",
+        type: "info"
+      });
+    } catch (err) {
+      console.warn("Notification failed:", err.message);
+    }
+
+    res.json(report);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to add report" });
@@ -1092,10 +1161,67 @@ app.put("/api/reports/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Report not found" });
     }
 
-    res.json(result.rows[0]);
+    const report = result.rows[0];
+    try {
+      await createNotification({
+        title: "Report Updated",
+        message: "A report was updated.",
+        type: "info"
+      });
+    } catch (err) {
+      console.warn("Notification failed:", err.message);
+    }
+
+    res.json(report);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update report" });
+  }
+});
+
+// NOTIFICATIONS (PROTECTED)
+app.get("/api/notifications", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id::text as id,
+              user_id::text as "userId",
+              title,
+              message,
+              type,
+              created_at as "createdAt",
+              read_at as "readAt"
+       FROM notifications
+       WHERE user_id IS NULL OR user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [req.user.userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load notifications" });
+  }
+});
+
+app.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE notifications
+       SET read_at = NOW()
+       WHERE id = $1
+         AND (user_id IS NULL OR user_id = $2)
+       RETURNING id::text as id`,
+      [req.params.id, req.user.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to mark notification read" });
   }
 });
 
