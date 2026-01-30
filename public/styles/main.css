@@ -546,6 +546,38 @@
             align-items: center;
         }
 
+        .global-notification-bell {
+            position: fixed;
+            top: 22px;
+            right: 28px;
+            z-index: 1300;
+        }
+
+        .notification-bell-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 1px solid #e5e5e5;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            color: var(--primary-color);
+            position: relative;
+        }
+
+        .dark-theme .notification-bell-icon {
+            background: #1a1a1a;
+            border-color: #333;
+            color: #e0e0e0;
+        }
+
+        .notification-bell-icon:hover {
+            transform: translateY(-1px);
+        }
+
         .notification-badge {
             position: absolute;
             top: -6px;
@@ -565,7 +597,7 @@
 
         .notifications-dropdown {
             position: absolute;
-            top: calc(100% + 8px);
+            top: calc(100% + 10px);
             right: 0;
             width: 320px;
             background: #ffffff;

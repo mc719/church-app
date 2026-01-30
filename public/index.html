@@ -946,6 +946,16 @@
     
     <!-- Main Content Area -->
     <div class="main-content">
+        <div class="notification-bell global-notification-bell">
+            <div class="notification-bell-icon" id="notificationsBell" role="button" aria-label="Notifications" tabindex="0">
+                <i class="fas fa-bell"></i>
+                <span class="notification-badge" id="notificationsBadge">0</span>
+            </div>
+            <div class="notifications-dropdown" id="notificationsDropdown">
+                <div class="notifications-header">Unread Notifications</div>
+                <div class="notifications-list" id="notificationsList"></div>
+            </div>
+        </div>
         <!-- Dashboard Page (Default) -->
         <div id="dashboard" class="page-content active">
             <div class="page-header">
@@ -1113,18 +1123,6 @@
         <div id="notifications" class="page-content">
             <div class="page-header">
                 <h1>Notifications</h1>
-                <div class="page-actions">
-                    <div class="notification-bell">
-                        <button class="btn btn-secondary" id="notificationsBell" type="button">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-badge" id="notificationsBadge">0</span>
-                        </button>
-                        <div class="notifications-dropdown" id="notificationsDropdown">
-                            <div class="notifications-header">Unread Notifications</div>
-                            <div class="notifications-list" id="notificationsList"></div>
-                        </div>
-                    </div>
-                </div>
             </div>
             <div class="table-container">
                 <div style="padding: 24px; color: var(--gray-color);">

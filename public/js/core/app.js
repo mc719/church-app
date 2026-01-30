@@ -1066,6 +1066,12 @@
                     e.stopPropagation();
                     toggleNotificationsDropdown();
                 });
+                bellBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleNotificationsDropdown();
+                    }
+                });
             }
             document.addEventListener('click', (e) => {
                 const dropdown = document.getElementById('notificationsDropdown');
