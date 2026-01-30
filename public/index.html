@@ -348,7 +348,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>First-Timer? (Yes/No)</label>
+                        <label>First-Timer?</label>
                         <div class="highlight-toggle-row">
                             <label class="toggle-switch">
                                 <input type="checkbox" id="memberHighlightToggle">
@@ -423,7 +423,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>First-Timer? (Yes/No)</label>
+                        <label>First-Timer?</label>
                         <div class="highlight-toggle-row">
                             <label class="toggle-switch">
                                 <input type="checkbox" id="editMemberHighlightToggle">
@@ -1042,7 +1042,7 @@
           </div>
             
             <div class="table-container">
-                <table id="pageManagementTable">
+                <table id="pageManagementTable" class="mobile-grid-table">
                     <thead>
                         <tr>
                             <th>Menu Name</th>
@@ -1073,7 +1073,7 @@
             </div>
             
             <div class="table-container">
-                <table id="accessManagementTable">
+                <table id="accessManagementTable" class="mobile-grid-table">
                     <thead>
                         <tr>
                             <th>Username</th>
@@ -1100,7 +1100,7 @@
             </div>
             
             <div class="table-container">
-                <table id="sessionsTable">
+                <table id="sessionsTable" class="mobile-grid-table">
                     <thead>
                         <tr>
                             <th>User</th>
@@ -1130,81 +1130,87 @@
                 <h1>Settings</h1>
             </div>
             
-            <div class="page-header">
-                <h2>Appearance & Theme</h2>
-            </div>
-            
-            <div class="theme-options">
-                <div class="theme-option theme-light active" data-theme="light">
-                    <div class="theme-icon">
-                        <i class="fas fa-sun"></i>
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <div class="page-header" style="margin-top: 0;">
+                        <h2>Appearance & Theme</h2>
                     </div>
-                    <div class="theme-name">Light</div>
-                </div>
-                <div class="theme-option theme-dark" data-theme="dark">
-                    <div class="theme-icon">
-                        <i class="fas fa-moon"></i>
+                    
+                    <div class="theme-options">
+                        <div class="theme-option theme-light active" data-theme="light">
+                            <div class="theme-icon">
+                                <i class="fas fa-sun"></i>
+                            </div>
+                            <div class="theme-name">Light</div>
+                        </div>
+                        <div class="theme-option theme-dark" data-theme="dark">
+                            <div class="theme-icon">
+                                <i class="fas fa-moon"></i>
+                            </div>
+                            <div class="theme-name">Dark</div>
+                        </div>
+                        <div class="theme-option theme-auto" data-theme="auto">
+                            <div class="theme-icon">
+                                <i class="fas fa-adjust"></i>
+                            </div>
+                            <div class="theme-name">Auto</div>
+                        </div>
                     </div>
-                    <div class="theme-name">Dark</div>
-                </div>
-                <div class="theme-option theme-auto" data-theme="auto">
-                    <div class="theme-icon">
-                        <i class="fas fa-adjust"></i>
-                    </div>
-                    <div class="theme-name">Auto</div>
-                </div>
-            </div>
-            
-            <div class="page-header" style="margin-top: 40px;">
-                <h2>Logo Upload</h2>
-            </div>
-            
-            <div class="file-upload">
-                <label for="logoUpload" class="file-upload-label">
-                    <i class="fas fa-upload"></i> Upload Church Logo
-                </label>
-                <input type="file" id="logoUpload" class="file-upload-input" accept="image/*">
-            </div>
-            
-            <div class="current-logo">
-                <p>Current Logo:</p>
-                <div id="currentLogoPreview">
-                    <div class="logo-placeholder" style="font-size: 3rem;">
-                        <i class="fas fa-church"></i>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="logo-text-settings">
-                <div class="page-header" style="margin-top: 40px;">
-                    <h2>Logo Text Settings</h2>
                 </div>
                 
-                <div class="form-group">
-                    <label for="logoTitle">Church Name</label>
-                    <input type="text" id="logoTitle" class="form-control" value="Christ Embassy">
+                <div class="settings-card">
+                    <div class="page-header" style="margin-top: 0;">
+                        <h2>Logo Upload</h2>
+                    </div>
+                    
+                    <div class="file-upload">
+                        <label for="logoUpload" class="file-upload-label">
+                            <i class="fas fa-upload"></i> Upload Church Logo
+                        </label>
+                        <input type="file" id="logoUpload" class="file-upload-input" accept="image/*">
+                    </div>
+                    
+                    <div class="current-logo">
+                        <p>Current Logo:</p>
+                        <div id="currentLogoPreview">
+                            <div class="logo-placeholder" style="font-size: 3rem;">
+                                <i class="fas fa-church"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="form-group">
-                    <label for="logoSubtitle">Church Subtitle</label>
-                    <input type="text" id="logoSubtitle" class="form-control" value="Church Cell Data">
+                <div class="settings-card logo-text-settings">
+                    <div class="page-header" style="margin-top: 0;">
+                        <h2>Logo Text Settings</h2>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="logoTitle">Church Name</label>
+                        <input type="text" id="logoTitle" class="form-control" value="Christ Embassy">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="logoSubtitle">Church Subtitle</label>
+                        <input type="text" id="logoSubtitle" class="form-control" value="Church Cell Data">
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button class="btn btn-success" id="saveLogoTextBtn">
+                            <i class="fas fa-save"></i> Save Logo Text
+                        </button>
+                    </div>
                 </div>
-                
-                <div class="form-actions">
-                    <button class="btn btn-success" id="saveLogoTextBtn">
-                        <i class="fas fa-save"></i> Save Logo Text
-                    </button>
-                </div>
-            </div>
 
-            <div class="health-check">
-                <div class="page-header" style="margin: 0 0 12px;">
-                    <h2>System Health</h2>
+                <div class="settings-card health-check">
+                    <div class="page-header" style="margin: 0 0 12px;">
+                        <h2>System Health</h2>
+                    </div>
+                    <button class="btn" id="healthCheckBtn">
+                        <i class="fas fa-heartbeat"></i> Check Database
+                    </button>
+                    <div class="health-status" id="healthCheckStatus">Status: Not checked</div>
                 </div>
-                <button class="btn" id="healthCheckBtn">
-                    <i class="fas fa-heartbeat"></i> Check Database
-                </button>
-                <div class="health-status" id="healthCheckStatus">Status: Not checked</div>
             </div>
         </div>
         
