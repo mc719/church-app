@@ -1,5 +1,6 @@
 // API endpoints
         const API_BASE = '/api';
+        const DEFAULT_LOGO_URL = '/images/logo.png';
         const API_ENDPOINTS = {
             LOGIN: `${API_BASE}/login`,
             CELLS: `${API_BASE}/cells`,
@@ -26,7 +27,7 @@
             currentUser: null,
             settings: {
                 theme: 'light',
-                logo: null,
+                logo: DEFAULT_LOGO_URL,
                 logoTitle: 'Christ Embassy',
                 logoSubtitle: 'Church Cell Data'
             },
@@ -224,6 +225,8 @@
             const savedLogo = localStorage.getItem('logoImage');
             if (savedLogo) {
                 churchData.settings.logo = savedLogo;
+            } else {
+                churchData.settings.logo = DEFAULT_LOGO_URL;
             }
 
             // Update login modal logo
@@ -472,6 +475,9 @@
                 if (data?.logo) {
                     churchData.settings.logo = data.logo;
                     localStorage.setItem('logoImage', data.logo);
+                    applyLogoUpdates();
+                } else if (!churchData.settings.logo) {
+                    churchData.settings.logo = DEFAULT_LOGO_URL;
                     applyLogoUpdates();
                 }
             } catch (error) {

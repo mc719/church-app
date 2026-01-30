@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 5050;
 // ===============================
 app.use(express.json());
 app.use(express.static("public"));
+app.use("/images", express.static("images"));
 
 // ===============================
 // 4) DATABASE CONNECTION
