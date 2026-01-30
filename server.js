@@ -153,6 +153,40 @@ app.get("/api/health", async (req, res) => {
     res.status(500).json({ ok: false, db: "error" });
   }
 });
+
+// Public logo fetch
+app.get("/api/settings/logo", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT value FROM app_settings WHERE key = 'logo_image' LIMIT 1"
+    );
+    res.json({ logo: result.rows[0]?.value || null });
+  } catch (err) {
+    console.error("Failed to load logo:", err);
+    res.status(500).json({ error: "Failed to load logo" });
+  }
+});
+
+// Save logo (admin only)
+app.post("/api/settings/logo", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { logo } = req.body || {};
+    if (!logo) {
+      return res.status(400).json({ error: "Logo is required" });
+    }
+    const result = await pool.query(
+      `INSERT INTO app_settings (key, value)
+       VALUES ('logo_image', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+       RETURNING value`,
+      [logo]
+    );
+    res.json({ logo: result.rows[0]?.value || null });
+  } catch (err) {
+    console.error("Failed to save logo:", err);
+    res.status(500).json({ error: "Failed to save logo" });
+  }
+});
 app.get("/api/test", (req, res) => {
   res.json({ message: "Server is working 🎉" });
 });

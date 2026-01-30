@@ -9,7 +9,8 @@
             SESSIONS: `${API_BASE}/sessions`,
             HEALTH: `${API_BASE}/health`,
             FIRST_TIMERS: `${API_BASE}/first-timers`,
-            FOLLOW_UPS: `${API_BASE}/follow-ups`
+            FOLLOW_UPS: `${API_BASE}/follow-ups`,
+            SETTINGS_LOGO: `${API_BASE}/settings/logo`
         };
 
         // Data storage for frontend cache
@@ -457,6 +458,27 @@
         // Delete member
         
 
+        function applyLogoUpdates() {
+            updateLoginLogo();
+            updateSidebarLogo();
+            updateCurrentLogoPreview();
+        }
+
+        async function syncLogoFromServer() {
+            try {
+                const response = await fetch(API_ENDPOINTS.SETTINGS_LOGO);
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data?.logo) {
+                    churchData.settings.logo = data.logo;
+                    localStorage.setItem('logoImage', data.logo);
+                    applyLogoUpdates();
+                }
+            } catch (error) {
+                console.warn('Failed to sync logo:', error.message);
+            }
+        }
+
         // Update login logo
         function updateLoginLogo() {
             const logoImage = churchData.settings.logo;
@@ -727,19 +749,24 @@
         // Handle logo upload
         function handleLogoUpload(event) {
             const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    churchData.settings.logo = e.target.result;
-                    localStorage.setItem('logoImage', e.target.result);
-                    updateLoginLogo();
-                    updateSidebarLogo();
-                    updateCurrentLogoPreview();
-                    
-                    alert('Logo uploaded successfully!');
-                };
-                reader.readAsDataURL(file);
-            }
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const logoData = e.target.result;
+                churchData.settings.logo = logoData;
+                localStorage.setItem('logoImage', logoData);
+                applyLogoUpdates();
+
+                apiRequest(API_ENDPOINTS.SETTINGS_LOGO, {
+                    method: 'POST',
+                    body: JSON.stringify({ logo: logoData })
+                }).catch(error => {
+                    console.warn('Failed to save logo to server:', error.message);
+                });
+
+                alert('Logo uploaded successfully!');
+            };
+            reader.readAsDataURL(file);
         }
 
         // Save logo text
@@ -1439,14 +1466,13 @@
             setupEventListeners();
             applyThemeFromStorage();
             updateCurrentLogoPreview();
+            syncLogoFromServer();
         });
 
         window.addEventListener('storage', (event) => {
             if (event.key === 'logoImage') {
                 churchData.settings.logo = event.newValue || null;
-                updateLoginLogo();
-                updateSidebarLogo();
-                updateCurrentLogoPreview();
+                applyLogoUpdates();
             }
         });
 

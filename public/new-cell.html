@@ -182,12 +182,32 @@
     </div>
   </div>
   <script>
-    const logo = localStorage.getItem('logoImage');
-    if (logo) {
+    async function applyLogo(logo) {
+      if (!logo) return;
       const bg = document.getElementById('bgLogo');
       bg.style.backgroundImage = `url(${logo})`;
       bg.innerHTML = '';
     }
+
+    async function loadLogo() {
+      const cached = localStorage.getItem('logoImage');
+      if (cached) {
+        applyLogo(cached);
+      }
+      try {
+        const response = await fetch('/api/settings/logo');
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data?.logo) {
+          localStorage.setItem('logoImage', data.logo);
+          applyLogo(data.logo);
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    loadLogo();
 
     let accessCode = '';
     const accessModal = document.getElementById('accessModal');
