@@ -23,6 +23,7 @@
             sessions: [],
             firstTimers: [],
             followUps: [],
+            notifications: [],
             pageMeta: {},
             currentUser: null,
             settings: {
@@ -280,6 +281,7 @@
             updateRecentReports();
             updateSidebarMenus();
             updateAllMembersTable();
+            updateNotificationsUI();
             if (typeof updateFirstTimersTable === 'function') {
                 updateFirstTimersTable();
             }
@@ -460,6 +462,74 @@
 
         // Delete member
         
+
+        function loadNotificationsFromStorage() {
+            try {
+                const stored = JSON.parse(localStorage.getItem('notifications') || '[]');
+                if (Array.isArray(stored)) {
+                    churchData.notifications = stored;
+                }
+            } catch {
+                churchData.notifications = [];
+            }
+        }
+
+        function saveNotificationsToStorage() {
+            localStorage.setItem('notifications', JSON.stringify(churchData.notifications));
+        }
+
+        function updateNotificationsUI() {
+            const unread = churchData.notifications.filter(n => !n.readAt);
+            const badge = document.getElementById('notificationsBadge');
+            const list = document.getElementById('notificationsList');
+            if (badge) {
+                badge.textContent = unread.length;
+                badge.style.display = unread.length ? 'inline-flex' : 'none';
+            }
+            if (!list) return;
+
+            if (!unread.length) {
+                list.innerHTML = `<div class="notification-empty">No unread notifications.</div>`;
+                return;
+            }
+
+            list.innerHTML = '';
+            unread.forEach(note => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'notification-item';
+                item.innerHTML = `
+                    <div class="notification-item-title">${note.title || 'Notification'}</div>
+                    <div class="notification-item-text">${note.message || ''}</div>
+                `;
+                item.addEventListener('click', () => openNotificationModal(note.id));
+                list.appendChild(item);
+            });
+        }
+
+        function openNotificationModal(id) {
+            const note = churchData.notifications.find(n => String(n.id) === String(id));
+            if (!note) return;
+            const titleEl = document.getElementById('notificationModalTitle');
+            const bodyEl = document.getElementById('notificationModalBody');
+            if (titleEl) titleEl.textContent = note.title || 'Notification';
+            if (bodyEl) bodyEl.textContent = note.message || '';
+            note.readAt = note.readAt || new Date().toISOString();
+            saveNotificationsToStorage();
+            updateNotificationsUI();
+            showModal('notificationModal');
+        }
+
+        function toggleNotificationsDropdown() {
+            const dropdown = document.getElementById('notificationsDropdown');
+            if (!dropdown) return;
+            dropdown.classList.toggle('open');
+        }
+
+        function closeNotificationsDropdown() {
+            const dropdown = document.getElementById('notificationsDropdown');
+            dropdown?.classList.remove('open');
+        }
 
         function applyLogoUpdates() {
             updateLoginLogo();
@@ -961,6 +1031,22 @@
 
             // Save logo text
             document.getElementById('saveLogoTextBtn').addEventListener('click', saveLogoText);
+
+            // Notifications bell
+            const bellBtn = document.getElementById('notificationsBell');
+            if (bellBtn) {
+                bellBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleNotificationsDropdown();
+                });
+            }
+            document.addEventListener('click', (e) => {
+                const dropdown = document.getElementById('notificationsDropdown');
+                if (!dropdown || !dropdown.classList.contains('open')) return;
+                const bell = document.getElementById('notificationsBell');
+                if (bell?.contains(e.target) || dropdown.contains(e.target)) return;
+                closeNotificationsDropdown();
+            });
 
             // Member highlight toggles
             document.getElementById('memberHighlightToggle')?.addEventListener('change', () => {
@@ -1473,6 +1559,8 @@
             applyThemeFromStorage();
             updateCurrentLogoPreview();
             syncLogoFromServer();
+            loadNotificationsFromStorage();
+            updateNotificationsUI();
         });
 
         window.addEventListener('storage', (event) => {

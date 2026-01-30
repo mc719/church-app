@@ -540,6 +540,105 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
+        .notification-bell {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: var(--accent-color);
+            color: #ffffff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .notifications-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 320px;
+            background: #ffffff;
+            border: 1px solid #eaeaea;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            display: none;
+            z-index: 1200;
+            overflow: hidden;
+        }
+
+        .dark-theme .notifications-dropdown {
+            background: #1a1a1a;
+            border-color: #333;
+        }
+
+        .notifications-dropdown.open {
+            display: block;
+        }
+
+        .notifications-header {
+            padding: 14px 16px;
+            font-weight: 700;
+            background: #f7f9fb;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .dark-theme .notifications-header {
+            background: #222;
+            border-bottom-color: #333;
+        }
+
+        .notifications-list {
+            max-height: 360px;
+            overflow-y: auto;
+        }
+
+        .notification-item {
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: none;
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            display: block;
+        }
+
+        .notification-item:hover {
+            background: #f8fafc;
+        }
+
+        .dark-theme .notification-item:hover {
+            background: #222;
+        }
+
+        .notification-item-title {
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: var(--primary-color);
+        }
+
+        .notification-item-text {
+            color: var(--gray-color);
+            font-size: 0.9rem;
+        }
+
+        .notification-empty {
+            padding: 20px;
+            color: var(--gray-color);
+            text-align: center;
+        }
+
         .member-highlight td {
             background-color: rgba(255, 165, 0, 0.18);
         }

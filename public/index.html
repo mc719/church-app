@@ -842,6 +842,19 @@
         </div>
     </div>
     
+    <!-- Notification Modal -->
+    <div id="notificationModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="notificationModalTitle">Notification</h3>
+                <button class="close-modal" onclick="closeModal('notificationModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="notificationModalBody" style="line-height: 1.6;"></p>
+            </div>
+        </div>
+    </div>
+
     <!-- Logout Confirmation Modal -->
     <div id="logoutConfirmModal" class="modal-overlay confirmation-modal">
         <div class="modal">
@@ -888,6 +901,10 @@
             <div class="nav-item" data-page="first-timers" id="firstTimersNav">
                 <i class="fas fa-user-check"></i>
                 <span>First-Timers</span>
+            </div>
+            <div class="nav-item" data-page="notifications" id="notificationsNav">
+                <i class="fas fa-bell"></i>
+                <span>Notifications</span>
             </div>
 
             <div class="nav-divider" id="cellGroupsDivider"></div>
@@ -1088,6 +1105,30 @@
                             <!-- Follow-up records will load here -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Page -->
+        <div id="notifications" class="page-content">
+            <div class="page-header">
+                <h1>Notifications</h1>
+                <div class="page-actions">
+                    <div class="notification-bell">
+                        <button class="btn btn-secondary" id="notificationsBell" type="button">
+                            <i class="fas fa-bell"></i>
+                            <span class="notification-badge" id="notificationsBadge">0</span>
+                        </button>
+                        <div class="notifications-dropdown" id="notificationsDropdown">
+                            <div class="notifications-header">Unread Notifications</div>
+                            <div class="notifications-list" id="notificationsList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-container">
+                <div style="padding: 24px; color: var(--gray-color);">
+                    Use the bell to view unread notifications.
                 </div>
             </div>
         </div>
