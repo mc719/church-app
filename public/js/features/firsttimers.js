@@ -40,7 +40,7 @@ function updateFirstTimersTable() {
     if (!churchData.firstTimers.length) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align: center; padding: 30px; color: var(--gray-color);">
+                <td colspan="9" style="text-align: center; padding: 30px; color: var(--gray-color);">
                     No first-timers yet.
                 </td>
             </tr>
@@ -59,6 +59,7 @@ function updateFirstTimersTable() {
         row.innerHTML = `
             <td data-label="Name">${ft.name}</td>
             <td data-label="Mobile">${ft.mobile || ''}</td>
+            <td data-label="Invited By">${ft.invitedBy || ''}</td>
             <td data-label="Date Joined">${dateJoined}</td>
             <td data-label="Status">${getFirstTimerStatusLabel(ft.status)}</td>
             <td data-label="Foundation School">${ft.foundationSchool || ''}</td>
@@ -130,6 +131,7 @@ function openFirstTimerModal(ft = null) {
     document.getElementById('firstTimerId').value = ft?.id || '';
     document.getElementById('firstTimerName').value = ft?.name || '';
     document.getElementById('firstTimerMobile').value = ft?.mobile || '';
+    document.getElementById('firstTimerInvitedBy').value = ft?.invitedBy || '';
     document.getElementById('firstTimerDateJoined').value = ft?.dateJoined ? ft.dateJoined.split('T')[0] : '';
     document.getElementById('firstTimerStatus').value = ft?.status || 'amber';
     document.getElementById('firstTimerFoundation').value = ft?.foundationSchool || 'Not Yet';
@@ -149,6 +151,7 @@ async function saveFirstTimer(e) {
     const payload = {
         name: document.getElementById('firstTimerName').value.trim(),
         mobile: document.getElementById('firstTimerMobile').value.trim(),
+        invitedBy: document.getElementById('firstTimerInvitedBy').value.trim(),
         dateJoined: document.getElementById('firstTimerDateJoined').value,
         status: document.getElementById('firstTimerStatus').value,
         foundationSchool: document.getElementById('firstTimerFoundation').value,
@@ -187,6 +190,46 @@ async function deleteFirstTimer(id, name) {
         updateFollowUpsTable();
     } catch (error) {
         alert('Failed to delete first-timer: ' + error.message);
+    }
+}
+
+async function ensureFirstTimerFromMember(member) {
+    if (!member || !member.name) return;
+    const nameKey = String(member.name || '').trim().toLowerCase();
+    const mobileKey = String(member.mobile || '').trim();
+    const cellKey = String(member.cellId || '');
+
+    const exists = churchData.firstTimers.some(ft => {
+        const ftName = String(ft.name || '').trim().toLowerCase();
+        const ftMobile = String(ft.mobile || '').trim();
+        const ftCell = String(ft.cellId || '');
+        return ftName === nameKey && ftMobile === mobileKey && ftCell === cellKey;
+    });
+    if (exists) return;
+
+    const payload = {
+        name: member.name,
+        mobile: member.mobile || '',
+        invitedBy: member.invitedBy || '',
+        dateJoined: member.joinedDate ? String(member.joinedDate).split('T')[0] : '',
+        status: 'amber',
+        foundationSchool: 'Not Yet',
+        cellId: member.cellId || ''
+    };
+
+    try {
+        const created = await apiRequest(API_ENDPOINTS.FIRST_TIMERS, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const cell = churchData.cells.find(c => String(c.id) === String(created.cellId));
+        churchData.firstTimers.unshift({
+            ...created,
+            cellName: created.cellName || cell?.name || ''
+        });
+        updateFirstTimersTable();
+    } catch (error) {
+        console.warn('Failed to auto-add first-timer:', error.message);
     }
 }
 

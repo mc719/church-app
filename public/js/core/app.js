@@ -1342,6 +1342,10 @@
                     
                     // Update local data
                     churchData.members.push(data);
+
+                    if (highlight && typeof ensureFirstTimerFromMember === 'function') {
+                        await ensureFirstTimerFromMember(data);
+                    }
                     
                     updateCellMembersTable(cellId);
                     updateAllMembersTable();

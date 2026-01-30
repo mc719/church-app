@@ -212,6 +212,13 @@ async function saveEditedMember() {
                     updateCellMembersTable(cellId);
                     updateAllMembersTable();
                 }
+
+                if (highlight && typeof ensureFirstTimerFromMember === 'function') {
+                    const memberData = memberIndex !== -1
+                        ? { ...churchData.members[memberIndex], cellId: cellId }
+                        : { ...payload, cellId: cellId };
+                    await ensureFirstTimerFromMember(memberData);
+                }
                 
                 closeModal('editMemberModal');
                 alert('Member updated successfully!');

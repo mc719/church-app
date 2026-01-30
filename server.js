@@ -586,7 +586,28 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
       [cellId, title, name, gender, mobile, email, role, !!isFirstTimer]
     );
 
-    res.json(result.rows[0]);
+    const member = result.rows[0];
+
+    if (isFirstTimer) {
+      const existing = await pool.query(
+        `SELECT id
+         FROM first_timers
+         WHERE name = $1
+           AND mobile IS NOT DISTINCT FROM $2
+           AND cell_id IS NOT DISTINCT FROM $3
+         LIMIT 1`,
+        [name, mobile || null, cellId || null]
+      );
+      if (existing.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id, invited_by)
+           VALUES ($1,$2,NOW(),$3,$4,$5,$6)`,
+          [name, mobile || null, "amber", "Not Yet", cellId || null, null]
+        );
+      }
+    }
+
+    res.json(member);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to add member" });
@@ -633,7 +654,28 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Member not found" });
     }
 
-    res.json(result.rows[0]);
+    const member = result.rows[0];
+
+    if (isFirstTimer === true) {
+      const existing = await pool.query(
+        `SELECT id
+         FROM first_timers
+         WHERE name = $1
+           AND mobile IS NOT DISTINCT FROM $2
+           AND cell_id IS NOT DISTINCT FROM $3
+         LIMIT 1`,
+        [member.name, member.mobile || null, member.cellId || null]
+      );
+      if (existing.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id, invited_by)
+           VALUES ($1,$2,NOW(),$3,$4,$5,$6)`,
+          [member.name, member.mobile || null, "amber", "Not Yet", member.cellId || null, null]
+        );
+      }
+    }
+
+    res.json(member);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update member" });
@@ -706,6 +748,7 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
               ft.date_joined as "dateJoined",
               ft.status,
               ft.foundation_school as "foundationSchool",
+              ft.invited_by as "invitedBy",
               ft.cell_id::text as "cellId",
               c.name as "cellName"
        FROM first_timers ft
@@ -722,17 +765,40 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
 // ADD FIRST-TIMER (PROTECTED)
 app.post("/api/first-timers", requireAuth, async (req, res) => {
   try {
-    const { name, mobile, dateJoined, status, foundationSchool, cellId } = req.body;
+    const { name, mobile, dateJoined, status, foundationSchool, cellId, invitedBy } = req.body;
+
+    const existing = await pool.query(
+      `SELECT ft.id::text as id,
+              ft.name,
+              ft.mobile,
+              ft.date_joined as "dateJoined",
+              ft.status,
+              ft.foundation_school as "foundationSchool",
+              ft.invited_by as "invitedBy",
+              ft.cell_id::text as "cellId",
+              c.name as "cellName"
+       FROM first_timers ft
+       LEFT JOIN cells c ON c.id = ft.cell_id
+       WHERE ft.name = $1
+         AND ft.mobile IS NOT DISTINCT FROM $2
+         AND ft.cell_id IS NOT DISTINCT FROM $3
+       LIMIT 1`,
+      [name, mobile || null, cellId || null]
+    );
+    if (existing.rows.length) {
+      return res.json(existing.rows[0]);
+    }
 
     const result = await pool.query(
-      `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id, invited_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
        RETURNING id::text as id,
                  name,
                  mobile,
                  date_joined as "dateJoined",
                  status,
                  foundation_school as "foundationSchool",
+                 invited_by as "invitedBy",
                  cell_id::text as "cellId"`,
       [
         name,
@@ -740,7 +806,8 @@ app.post("/api/first-timers", requireAuth, async (req, res) => {
         dateJoined || null,
         status || "amber",
         foundationSchool || "Not Yet",
-        cellId || null
+        cellId || null,
+        invitedBy || null
       ]
     );
 
@@ -763,7 +830,7 @@ app.post("/api/first-timers", requireAuth, async (req, res) => {
 // UPDATE FIRST-TIMER (PROTECTED)
 app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
   try {
-    const { name, mobile, dateJoined, status, foundationSchool, cellId } = req.body;
+    const { name, mobile, dateJoined, status, foundationSchool, cellId, invitedBy } = req.body;
     const result = await pool.query(
       `UPDATE first_timers
        SET name = COALESCE($1, name),
@@ -771,14 +838,16 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
            date_joined = COALESCE($3, date_joined),
            status = COALESCE($4, status),
            foundation_school = COALESCE($5, foundation_school),
-           cell_id = COALESCE($6, cell_id)
-       WHERE id = $7
+           cell_id = COALESCE($6, cell_id),
+           invited_by = COALESCE($7, invited_by)
+       WHERE id = $8
        RETURNING id::text as id,
                  name,
                  mobile,
                  date_joined as "dateJoined",
                  status,
                  foundation_school as "foundationSchool",
+                 invited_by as "invitedBy",
                  cell_id::text as "cellId"`,
       [
         name ?? null,
@@ -787,6 +856,7 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
         status ?? null,
         foundationSchool ?? null,
         cellId ?? null,
+        invitedBy ?? null,
         req.params.id
       ]
     );
