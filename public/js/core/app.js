@@ -1270,7 +1270,8 @@
                     gender: gender,
                     mobile: mobile,
                     email: email,
-                    role: role
+                    role: role,
+                    isFirstTimer: highlight
                 };
                 
                 try {
@@ -1281,9 +1282,6 @@
                     
                     // Update local data
                     churchData.members.push(data);
-                    if (highlight && typeof setMemberHighlight === 'function') {
-                        setMemberHighlight(data.id, true);
-                    }
                     
                     updateCellMembersTable(cellId);
                     updateAllMembersTable();

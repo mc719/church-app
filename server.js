@@ -553,6 +553,7 @@ app.get("/api/members", requireAuth, async (req, res) => {
               mobile,
               email,
               role,
+              is_first_timer as "isFirstTimer",
               joined_date as "joinedDate"
        FROM members
        ORDER BY id`
@@ -567,11 +568,11 @@ app.get("/api/members", requireAuth, async (req, res) => {
 // ADD MEMBER (AUTH OR ACCESS CODE)
 app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { cellId, title, name, gender, mobile, email, role } = req.body;
+    const { cellId, title, name, gender, mobile, email, role, isFirstTimer } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, joined_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7, NOW())
+      `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, is_first_timer, joined_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  title,
@@ -580,8 +581,9 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
                  mobile,
                  email,
                  role,
+                 is_first_timer as "isFirstTimer",
                  joined_date as "joinedDate"`,
-      [cellId, title, name, gender, mobile, email, role]
+      [cellId, title, name, gender, mobile, email, role, !!isFirstTimer]
     );
 
     res.json(result.rows[0]);
@@ -594,7 +596,7 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE MEMBER (PROTECTED)
 app.put("/api/members/:id", requireAuth, async (req, res) => {
   try {
-    const { title, name, gender, mobile, email, role } = req.body;
+    const { title, name, gender, mobile, email, role, isFirstTimer } = req.body;
     const result = await pool.query(
       `UPDATE members
        SET title = COALESCE($1, title),
@@ -602,8 +604,9 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
            gender = COALESCE($3, gender),
            mobile = COALESCE($4, mobile),
            email = COALESCE($5, email),
-           role = COALESCE($6, role)
-       WHERE id = $7
+           role = COALESCE($6, role),
+           is_first_timer = COALESCE($7, is_first_timer)
+       WHERE id = $8
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  title,
@@ -612,6 +615,7 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
                  mobile,
                  email,
                  role,
+                 is_first_timer as "isFirstTimer",
                  joined_date as "joinedDate"`,
       [
         title ?? null,
@@ -620,6 +624,7 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
         mobile ?? null,
         email ?? null,
         role ?? null,
+        typeof isFirstTimer === "boolean" ? isFirstTimer : null,
         req.params.id
       ]
     );
