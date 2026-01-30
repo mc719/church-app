@@ -163,6 +163,7 @@ function updatePageManagementTable() {
             const visibility = getPageVisibility();
             const meta = getPageMeta();
             const pages = [];
+            let metaChanged = false;
             document.querySelectorAll('.nav-item').forEach(item => {
                 const id = item.getAttribute('data-page');
                 if (!id) return;
@@ -176,9 +177,15 @@ function updatePageManagementTable() {
                     return;
                 }
 
-                if (!meta[id]) return;
+                if (!meta[id]) {
+                    meta[id] = { label, icon };
+                    metaChanged = true;
+                }
                 pages.push({ id, label: meta[id].label, icon: meta[id].icon, section: 'system' });
             });
+            if (metaChanged) {
+                setPageMeta(meta);
+            }
             tbody.innerHTML = '';
 
             const totalPages = getTotalPages(pages.length);
