@@ -615,7 +615,7 @@
             if (!rolesSelect) return;
 
             const selected = new Set(getSelectedValues(rolesSelect));
-            const roles = ['superuser', 'admin', 'Cell Leader'];
+            const roles = ['superuser', 'admin', 'Cell-Leaders'];
 
             rolesSelect.innerHTML = '';
             if (!roles.length) {
@@ -672,7 +672,7 @@
                 });
             }
 
-            if (selectedRoles.includes('Cell Leader')) {
+            if (selectedRoles.includes('Cell-Leaders')) {
                 churchData.members.forEach(member => {
                     if (member.role !== 'Cell Leader') return;
                     if (!member.email) return;
