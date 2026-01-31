@@ -615,10 +615,7 @@
             if (!rolesSelect) return;
 
             const selected = new Set(getSelectedValues(rolesSelect));
-            const memberRoles = churchData.members.map(m => m.role).filter(Boolean);
-            const userRoles = churchData.users.map(u => u.role).filter(Boolean);
-            const roles = Array.from(new Set([...memberRoles, ...userRoles]))
-                .sort((a, b) => a.localeCompare(b));
+            const roles = ['superuser', 'admin', 'Cell Leader'];
 
             rolesSelect.innerHTML = '';
             if (!roles.length) {
@@ -667,20 +664,24 @@
                     .map(user => [user.email.toLowerCase(), user])
             );
 
-            churchData.users.forEach(user => {
-                if (selectedRoles.includes(user.role)) {
-                    recipients.set(String(user.id), `${user.username} (${user.role})`);
-                }
-            });
+            if (selectedRoles.includes('superuser') || selectedRoles.includes('admin')) {
+                churchData.users.forEach(user => {
+                    if (selectedRoles.includes(user.role)) {
+                        recipients.set(String(user.id), `${user.username} (${user.role})`);
+                    }
+                });
+            }
 
-            churchData.members.forEach(member => {
-                if (!selectedRoles.includes(member.role)) return;
-                if (!member.email) return;
-                const user = usersByEmail.get(member.email.toLowerCase());
-                if (!user) return;
-                const cellName = cellMap.get(member.cellId) || 'No Cell';
-                recipients.set(String(user.id), `${member.name} — ${cellName} (${member.role})`);
-            });
+            if (selectedRoles.includes('Cell Leader')) {
+                churchData.members.forEach(member => {
+                    if (member.role !== 'Cell Leader') return;
+                    if (!member.email) return;
+                    const user = usersByEmail.get(member.email.toLowerCase());
+                    if (!user) return;
+                    const cellName = cellMap.get(member.cellId) || 'No Cell';
+                    recipients.set(String(user.id), `${member.name} — ${cellName} (Cell Leader)`);
+                });
+            }
 
             if (!recipients.size) {
                 const opt = document.createElement('option');
