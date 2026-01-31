@@ -1157,19 +1157,15 @@
                 <div class="table-container" style="padding: 24px;">
                     <form id="sendNotificationForm">
                         <div class="form-group">
-                            <label for="notificationTargetType">Send To *</label>
-                            <select id="notificationTargetType" class="form-control" required>
-                                <option value="">Select Target Type</option>
-                                <option value="individual">Individual</option>
-                                <option value="group">Group (Cell)</option>
-                                <option value="title">Title (Member Title)</option>
-                                <option value="role">Role</option>
+                            <label for="notificationTargetRoles">Send To (Roles) *</label>
+                            <select id="notificationTargetRoles" class="form-control" multiple required>
+                                <option value="" disabled>Select Roles</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="notificationTargetValue">Target *</label>
-                            <select id="notificationTargetValue" class="form-control" required>
-                                <option value="">Select Target</option>
+                            <select id="notificationTargetValue" class="form-control" multiple required>
+                                <option value="" disabled>Select Targets</option>
                             </select>
                         </div>
                         <div class="form-group">

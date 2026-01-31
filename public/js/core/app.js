@@ -90,6 +90,7 @@
         let sessionLastTick = Date.now();
         let sessionIdle = false;
         let sessionSyncTimer = null;
+        let notificationsPollTimer = null;
 
         // DOM elements
         const mobileMenuToggle = document.getElementById('mobileMenuToggle');
@@ -292,6 +293,7 @@
             updateAllMembersTable();
             updateNotificationsUI();
             updateNotificationsTable();
+            populateNotificationRoles();
             if (typeof updateFirstTimersTable === 'function') {
                 updateFirstTimersTable();
             }
@@ -601,53 +603,114 @@
             });
         }
 
-        function populateNotificationTargets(type) {
-            const targetSelect = document.getElementById('notificationTargetValue');
-            if (!targetSelect) return;
-            targetSelect.innerHTML = '<option value="">Select Target</option>';
+        function getSelectedValues(selectEl) {
+            if (!selectEl) return [];
+            return Array.from(selectEl.selectedOptions)
+                .map(option => option.value)
+                .filter(Boolean);
+        }
 
-            if (type === 'individual') {
-                churchData.users.forEach(user => {
-                    const opt = document.createElement('option');
-                    opt.value = user.id;
-                    opt.textContent = `${user.username} (${user.role})`;
-                    targetSelect.appendChild(opt);
-                });
-            } else if (type === 'role') {
-                const roles = Array.from(new Set(churchData.users.map(u => u.role).filter(Boolean)));
+        function populateNotificationRoles() {
+            const rolesSelect = document.getElementById('notificationTargetRoles');
+            if (!rolesSelect) return;
+
+            const selected = new Set(getSelectedValues(rolesSelect));
+            const memberRoles = churchData.members.map(m => m.role).filter(Boolean);
+            const userRoles = churchData.users.map(u => u.role).filter(Boolean);
+            const roles = Array.from(new Set([...memberRoles, ...userRoles]))
+                .sort((a, b) => a.localeCompare(b));
+
+            rolesSelect.innerHTML = '';
+            if (!roles.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No roles found';
+                opt.disabled = true;
+                rolesSelect.appendChild(opt);
+                rolesSelect.disabled = true;
+            } else {
+                rolesSelect.disabled = false;
                 roles.forEach(role => {
                     const opt = document.createElement('option');
                     opt.value = role;
                     opt.textContent = role;
-                    targetSelect.appendChild(opt);
-                });
-            } else if (type === 'title') {
-                const titles = Array.from(new Set(churchData.members.map(m => m.title).filter(Boolean)));
-                titles.forEach(title => {
-                    const opt = document.createElement('option');
-                    opt.value = title;
-                    opt.textContent = title;
-                    targetSelect.appendChild(opt);
-                });
-            } else if (type === 'group') {
-                churchData.cells.forEach(cell => {
-                    const opt = document.createElement('option');
-                    opt.value = cell.id;
-                    opt.textContent = cell.name;
-                    targetSelect.appendChild(opt);
+                    if (selected.has(role)) opt.selected = true;
+                    rolesSelect.appendChild(opt);
                 });
             }
+
+            populateNotificationTargets(getSelectedValues(rolesSelect));
+        }
+
+        function populateNotificationTargets(selectedRoles = []) {
+            const targetSelect = document.getElementById('notificationTargetValue');
+            if (!targetSelect) return;
+
+            const selected = new Set(getSelectedValues(targetSelect));
+            targetSelect.innerHTML = '';
+
+            if (!selectedRoles.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Select role(s) first';
+                opt.disabled = true;
+                targetSelect.appendChild(opt);
+                targetSelect.disabled = true;
+                return;
+            }
+
+            const recipients = new Map();
+            const cellMap = new Map(churchData.cells.map(cell => [cell.id, cell.name]));
+            const usersByEmail = new Map(
+                churchData.users
+                    .filter(user => user.email)
+                    .map(user => [user.email.toLowerCase(), user])
+            );
+
+            churchData.users.forEach(user => {
+                if (selectedRoles.includes(user.role)) {
+                    recipients.set(String(user.id), `${user.username} (${user.role})`);
+                }
+            });
+
+            churchData.members.forEach(member => {
+                if (!selectedRoles.includes(member.role)) return;
+                if (!member.email) return;
+                const user = usersByEmail.get(member.email.toLowerCase());
+                if (!user) return;
+                const cellName = cellMap.get(member.cellId) || 'No Cell';
+                recipients.set(String(user.id), `${member.name} — ${cellName} (${member.role})`);
+            });
+
+            if (!recipients.size) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No recipients found for selected roles';
+                opt.disabled = true;
+                targetSelect.appendChild(opt);
+                targetSelect.disabled = true;
+                return;
+            }
+
+            recipients.forEach((label, userId) => {
+                const opt = document.createElement('option');
+                opt.value = userId;
+                opt.textContent = label;
+                if (selected.has(userId)) opt.selected = true;
+                targetSelect.appendChild(opt);
+            });
+            targetSelect.disabled = false;
         }
 
         async function sendNotification(e) {
             e.preventDefault();
-            const targetType = document.getElementById('notificationTargetType').value;
-            const targetValue = document.getElementById('notificationTargetValue').value;
+            const roles = getSelectedValues(document.getElementById('notificationTargetRoles'));
+            const targetIds = getSelectedValues(document.getElementById('notificationTargetValue'));
             const title = document.getElementById('notificationTitle').value.trim();
             const message = document.getElementById('notificationMessage').value.trim();
             const type = document.getElementById('notificationType').value;
 
-            if (!targetType || !targetValue || !title || !message) {
+            if (!roles.length || !targetIds.length || !title || !message) {
                 alert('Please complete all required fields.');
                 return;
             }
@@ -655,10 +718,12 @@
             try {
                 await apiRequest(`${API_ENDPOINTS.NOTIFICATIONS}/send`, {
                     method: 'POST',
-                    body: JSON.stringify({ targetType, targetValue, title, message, type })
+                    body: JSON.stringify({ roles, targetIds, title, message, type })
                 });
                 document.getElementById('sendNotificationForm').reset();
+                populateNotificationTargets([]);
                 alert('Notification sent.');
+                refreshNotificationsSilently();
             } catch (error) {
                 alert('Failed to send notification: ' + error.message);
             }
@@ -883,6 +948,9 @@
                     clearInterval(sessionSyncTimer);
                 }
                 sessionSyncTimer = setInterval(syncSessionMetrics, 30000);
+                if (!notificationsPollTimer) {
+                    notificationsPollTimer = setInterval(refreshNotificationsSilently, 60000);
+                }
                 
                 // Load data and update UI
                 await loadAllData();
@@ -1214,8 +1282,9 @@
             });
 
             updateNotificationsTabs();
-            document.getElementById('notificationTargetType')?.addEventListener('change', (e) => {
-                populateNotificationTargets(e.target.value);
+            document.getElementById('notificationTargetRoles')?.addEventListener('change', (e) => {
+                const roles = Array.from(e.target.selectedOptions).map(option => option.value).filter(Boolean);
+                populateNotificationTargets(roles);
             });
             document.getElementById('sendNotificationForm')?.addEventListener('submit', sendNotification);
             document.getElementById('clearNotificationsBtn')?.addEventListener('click', async () => {
@@ -1456,6 +1525,10 @@
                 if (sessionSyncTimer) {
                     clearInterval(sessionSyncTimer);
                     sessionSyncTimer = null;
+                }
+                if (notificationsPollTimer) {
+                    clearInterval(notificationsPollTimer);
+                    notificationsPollTimer = null;
                 }
                 
                 // Reset UI
@@ -1752,6 +1825,9 @@
             syncLogoFromServer();
             loadNotificationsFromStorage();
             updateNotificationsUI();
+            if (!notificationsPollTimer) {
+                notificationsPollTimer = setInterval(refreshNotificationsSilently, 60000);
+            }
         });
 
         window.addEventListener('storage', (event) => {

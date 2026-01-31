@@ -1243,45 +1243,84 @@ app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
 
 app.post("/api/notifications/send", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { targetType, targetValue, title, message, type } = req.body || {};
-    if (!title || !message || !targetType) {
-      return res.status(400).json({ error: "Target, title, and message are required" });
+    const { targetType, targetValue, title, message, type, roles, targetIds } = req.body || {};
+
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message are required" });
     }
 
     let userIds = [];
-    if (targetType === "individual") {
-      const result = await pool.query("SELECT id FROM users WHERE id = $1", [targetValue]);
-      userIds = result.rows.map(r => r.id);
-    } else if (targetType === "role") {
-      const result = await pool.query("SELECT id FROM users WHERE role = $1", [targetValue]);
-      userIds = result.rows.map(r => r.id);
-    } else if (targetType === "title") {
-      const result = await pool.query(
-        `SELECT u.id
-         FROM members m
-         JOIN users u ON u.email = m.email
-         WHERE m.title = $1`,
-        [targetValue]
-      );
-      userIds = result.rows.map(r => r.id);
-    } else if (targetType === "group") {
-      const result = await pool.query(
-        `SELECT u.id
-         FROM members m
-         JOIN users u ON u.email = m.email
-         WHERE m.cell_id = $1`,
-        [targetValue]
-      );
-      userIds = result.rows.map(r => r.id);
+
+    if (Array.isArray(targetIds) || Array.isArray(roles)) {
+      const roleList = Array.isArray(roles) ? roles.filter(Boolean) : [];
+      const targetList = Array.isArray(targetIds) ? targetIds.filter(Boolean) : [];
+
+      if (!roleList.length && !targetList.length) {
+        return res.status(400).json({ error: "Select at least one role or target" });
+      }
+
+      if (targetList.length) {
+        const result = await pool.query(
+          `SELECT id
+           FROM users
+           WHERE id::text = ANY($1)`,
+          [targetList]
+        );
+        userIds = result.rows.map(r => r.id);
+      } else if (roleList.length) {
+        const result = await pool.query(
+          `SELECT DISTINCT u.id
+           FROM users u
+           WHERE u.role = ANY($1)
+           UNION
+           SELECT DISTINCT u2.id
+           FROM members m
+           JOIN users u2 ON u2.email = m.email
+           WHERE m.role = ANY($1)`,
+          [roleList]
+        );
+        userIds = result.rows.map(r => r.id);
+      }
     } else {
-      return res.status(400).json({ error: "Unsupported target type" });
+      if (!targetType) {
+        return res.status(400).json({ error: "Target type is required" });
+      }
+
+      if (targetType === "individual") {
+        const result = await pool.query("SELECT id FROM users WHERE id = $1", [targetValue]);
+        userIds = result.rows.map(r => r.id);
+      } else if (targetType === "role") {
+        const result = await pool.query("SELECT id FROM users WHERE role = $1", [targetValue]);
+        userIds = result.rows.map(r => r.id);
+      } else if (targetType === "title") {
+        const result = await pool.query(
+          `SELECT u.id
+           FROM members m
+           JOIN users u ON u.email = m.email
+           WHERE m.title = $1`,
+          [targetValue]
+        );
+        userIds = result.rows.map(r => r.id);
+      } else if (targetType === "group") {
+        const result = await pool.query(
+          `SELECT u.id
+           FROM members m
+           JOIN users u ON u.email = m.email
+           WHERE m.cell_id = $1`,
+          [targetValue]
+        );
+        userIds = result.rows.map(r => r.id);
+      } else {
+        return res.status(400).json({ error: "Unsupported target type" });
+      }
     }
 
-    if (!userIds.length) {
+    const uniqueUserIds = Array.from(new Set(userIds.map(id => id?.toString()).filter(Boolean)));
+    if (!uniqueUserIds.length) {
       return res.status(404).json({ error: "No users found for target" });
     }
 
-    for (const userId of userIds) {
+    for (const userId of uniqueUserIds) {
       await createNotification({
         title,
         message,
@@ -1290,7 +1329,7 @@ app.post("/api/notifications/send", requireAuth, requireAdmin, async (req, res) 
       });
     }
 
-    res.json({ ok: true, recipients: userIds.length });
+    res.json({ ok: true, recipients: uniqueUserIds.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to send notification" });
