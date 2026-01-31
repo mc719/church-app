@@ -1225,6 +1225,78 @@ app.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
   }
 });
 
+app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE notifications
+       SET read_at = NOW()
+       WHERE read_at IS NULL
+         AND (user_id IS NULL OR user_id = $1)`,
+      [req.user.userId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to clear notifications" });
+  }
+});
+
+app.post("/api/notifications/send", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { targetType, targetValue, title, message, type } = req.body || {};
+    if (!title || !message || !targetType) {
+      return res.status(400).json({ error: "Target, title, and message are required" });
+    }
+
+    let userIds = [];
+    if (targetType === "individual") {
+      const result = await pool.query("SELECT id FROM users WHERE id = $1", [targetValue]);
+      userIds = result.rows.map(r => r.id);
+    } else if (targetType === "role") {
+      const result = await pool.query("SELECT id FROM users WHERE role = $1", [targetValue]);
+      userIds = result.rows.map(r => r.id);
+    } else if (targetType === "title") {
+      const result = await pool.query(
+        `SELECT u.id
+         FROM members m
+         JOIN users u ON u.email = m.email
+         WHERE m.title = $1`,
+        [targetValue]
+      );
+      userIds = result.rows.map(r => r.id);
+    } else if (targetType === "group") {
+      const result = await pool.query(
+        `SELECT u.id
+         FROM members m
+         JOIN users u ON u.email = m.email
+         WHERE m.cell_id = $1`,
+        [targetValue]
+      );
+      userIds = result.rows.map(r => r.id);
+    } else {
+      return res.status(400).json({ error: "Unsupported target type" });
+    }
+
+    if (!userIds.length) {
+      return res.status(404).json({ error: "No users found for target" });
+    }
+
+    for (const userId of userIds) {
+      await createNotification({
+        title,
+        message,
+        type: type || "info",
+        userId
+      });
+    }
+
+    res.json({ ok: true, recipients: userIds.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to send notification" });
+  }
+});
+
 // DELETE REPORT (PROTECTED)
 app.delete("/api/reports/:id", requireAuth, async (req, res) => {
   try {

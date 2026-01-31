@@ -902,10 +902,6 @@
                 <i class="fas fa-user-check"></i>
                 <span>First-Timers</span>
             </div>
-            <div class="nav-item" data-page="notifications" id="notificationsNav">
-                <i class="fas fa-bell"></i>
-                <span>Notifications</span>
-            </div>
 
             <div class="nav-divider" id="cellGroupsDivider"></div>
             
@@ -919,6 +915,11 @@
             <div class="nav-divider" id="adminDivider"></div>
             
             <div class="nav-section-title" id="adminTitle">Administrator</div>
+
+            <div class="nav-item" data-page="notifications" id="notificationsNav">
+                <i class="fas fa-bell"></i>
+                <span>Notifications</span>
+            </div>
             
             <div class="nav-item" data-page="page-management" id="pageManagementNav">
                 <i class="fas fa-file-alt"></i>
@@ -1124,9 +1125,75 @@
             <div class="page-header">
                 <h1>Notifications</h1>
             </div>
-            <div class="table-container">
-                <div style="padding: 24px; color: var(--gray-color);">
-                    Use the bell to view unread notifications.
+            <div class="cell-tabs" id="notificationsTabs">
+                <button class="cell-tab-btn active" data-tab="list">All Notifications</button>
+                <button class="cell-tab-btn" data-tab="send" id="notificationsSendTabBtn">Send Notification</button>
+            </div>
+
+            <div class="cell-tab-content active" id="notificationsListTab">
+                <div class="page-actions" style="justify-content: flex-end; margin-bottom: 16px;">
+                    <button class="btn btn-secondary" id="clearNotificationsBtn">
+                        <i class="fas fa-broom"></i> Clear All
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table class="mobile-grid-table" id="notificationsTable">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Message</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="notificationsTableBody">
+                            <!-- Notifications list -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="cell-tab-content" id="notificationsSendTab">
+                <div class="table-container" style="padding: 24px;">
+                    <form id="sendNotificationForm">
+                        <div class="form-group">
+                            <label for="notificationTargetType">Send To *</label>
+                            <select id="notificationTargetType" class="form-control" required>
+                                <option value="">Select Target Type</option>
+                                <option value="individual">Individual</option>
+                                <option value="group">Group (Cell)</option>
+                                <option value="title">Title (Member Title)</option>
+                                <option value="role">Role</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="notificationTargetValue">Target *</label>
+                            <select id="notificationTargetValue" class="form-control" required>
+                                <option value="">Select Target</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="notificationTitle">Title *</label>
+                            <input type="text" id="notificationTitle" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="notificationMessage">Message *</label>
+                            <textarea id="notificationMessage" class="form-control" rows="4" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="notificationType">Type</label>
+                            <select id="notificationType" class="form-control">
+                                <option value="info">Info</option>
+                                <option value="success">Success</option>
+                                <option value="warning">Warning</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-paper-plane"></i> Send
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

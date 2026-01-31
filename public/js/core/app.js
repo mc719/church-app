@@ -291,6 +291,7 @@
             updateSidebarMenus();
             updateAllMembersTable();
             updateNotificationsUI();
+            updateNotificationsTable();
             if (typeof updateFirstTimersTable === 'function') {
                 updateFirstTimersTable();
             }
@@ -369,7 +370,7 @@
                 // Show/hide based on role
                 if (currentUser.role === 'member') {
                     // Members can only see dashboard and members page
-                    if (pageId !== 'dashboard' && pageId !== 'members' && !pageId.startsWith('cell-')) {
+                    if (pageId !== 'dashboard' && pageId !== 'members' && pageId !== 'notifications' && !pageId.startsWith('cell-')) {
                         navItem.style.display = 'none';
                     } else {
                         navItem.style.display = 'flex';
@@ -391,6 +392,19 @@
                     page.style.display = '';
                 }
             });
+
+            const sendTabBtn = document.getElementById('notificationsSendTabBtn');
+            const sendTab = document.getElementById('notificationsSendTab');
+            if (currentUser.role === 'superuser' || currentUser.role === 'admin') {
+                if (sendTabBtn) sendTabBtn.style.display = '';
+            } else {
+                if (sendTabBtn) sendTabBtn.style.display = 'none';
+                if (sendTab && sendTab.classList.contains('active')) {
+                    sendTab.classList.remove('active');
+                    document.getElementById('notificationsListTab')?.classList.add('active');
+                    document.querySelector('#notificationsTabs .cell-tab-btn')?.classList.add('active');
+                }
+            }
         }
 
         // Create cell page
@@ -516,12 +530,44 @@
             });
         }
 
+        function updateNotificationsTable() {
+            const tbody = document.getElementById('notificationsTableBody');
+            if (!tbody) return;
+
+            if (!churchData.notifications.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align:center; padding: 24px; color: var(--gray-color);">
+                            No notifications yet.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = '';
+            churchData.notifications.forEach(note => {
+                const created = note.createdAt ? new Date(note.createdAt).toLocaleString() : '';
+                const status = note.readAt ? 'Read' : 'Unread';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td data-label="Title">${note.title || ''}</td>
+                    <td data-label="Message">${note.message || ''}</td>
+                    <td data-label="Status">${status}</td>
+                    <td data-label="Created">${created}</td>
+                `;
+                row.addEventListener('click', () => openNotificationModal(note.id));
+                tbody.appendChild(row);
+            });
+        }
+
         async function fetchNotifications() {
             try {
                 const data = await apiRequest(API_ENDPOINTS.NOTIFICATIONS);
                 churchData.notifications = data;
                 saveNotificationsToStorage();
                 updateNotificationsUI();
+                updateNotificationsTable();
             } catch (error) {
                 console.warn('Failed to load notifications:', error.message);
             }
@@ -530,6 +576,92 @@
         function refreshNotificationsSilently() {
             if (!localStorage.getItem('token')) return;
             fetchNotifications();
+        }
+
+        function updateNotificationsTabs() {
+            const tabs = document.getElementById('notificationsTabs');
+            const listTab = document.getElementById('notificationsListTab');
+            const sendTab = document.getElementById('notificationsSendTab');
+            if (!tabs || !listTab || !sendTab) return;
+
+            const buttons = tabs.querySelectorAll('.cell-tab-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const tab = btn.getAttribute('data-tab');
+                    if (tab === 'send') {
+                        listTab.classList.remove('active');
+                        sendTab.classList.add('active');
+                    } else {
+                        sendTab.classList.remove('active');
+                        listTab.classList.add('active');
+                    }
+                });
+            });
+        }
+
+        function populateNotificationTargets(type) {
+            const targetSelect = document.getElementById('notificationTargetValue');
+            if (!targetSelect) return;
+            targetSelect.innerHTML = '<option value="">Select Target</option>';
+
+            if (type === 'individual') {
+                churchData.users.forEach(user => {
+                    const opt = document.createElement('option');
+                    opt.value = user.id;
+                    opt.textContent = `${user.username} (${user.role})`;
+                    targetSelect.appendChild(opt);
+                });
+            } else if (type === 'role') {
+                const roles = Array.from(new Set(churchData.users.map(u => u.role).filter(Boolean)));
+                roles.forEach(role => {
+                    const opt = document.createElement('option');
+                    opt.value = role;
+                    opt.textContent = role;
+                    targetSelect.appendChild(opt);
+                });
+            } else if (type === 'title') {
+                const titles = Array.from(new Set(churchData.members.map(m => m.title).filter(Boolean)));
+                titles.forEach(title => {
+                    const opt = document.createElement('option');
+                    opt.value = title;
+                    opt.textContent = title;
+                    targetSelect.appendChild(opt);
+                });
+            } else if (type === 'group') {
+                churchData.cells.forEach(cell => {
+                    const opt = document.createElement('option');
+                    opt.value = cell.id;
+                    opt.textContent = cell.name;
+                    targetSelect.appendChild(opt);
+                });
+            }
+        }
+
+        async function sendNotification(e) {
+            e.preventDefault();
+            const targetType = document.getElementById('notificationTargetType').value;
+            const targetValue = document.getElementById('notificationTargetValue').value;
+            const title = document.getElementById('notificationTitle').value.trim();
+            const message = document.getElementById('notificationMessage').value.trim();
+            const type = document.getElementById('notificationType').value;
+
+            if (!targetType || !targetValue || !title || !message) {
+                alert('Please complete all required fields.');
+                return;
+            }
+
+            try {
+                await apiRequest(`${API_ENDPOINTS.NOTIFICATIONS}/send`, {
+                    method: 'POST',
+                    body: JSON.stringify({ targetType, targetValue, title, message, type })
+                });
+                document.getElementById('sendNotificationForm').reset();
+                alert('Notification sent.');
+            } catch (error) {
+                alert('Failed to send notification: ' + error.message);
+            }
         }
 
         function openNotificationModal(id) {
@@ -1079,6 +1211,26 @@
                 const bell = document.getElementById('notificationsBell');
                 if (bell?.contains(e.target) || dropdown.contains(e.target)) return;
                 closeNotificationsDropdown();
+            });
+
+            updateNotificationsTabs();
+            document.getElementById('notificationTargetType')?.addEventListener('change', (e) => {
+                populateNotificationTargets(e.target.value);
+            });
+            document.getElementById('sendNotificationForm')?.addEventListener('submit', sendNotification);
+            document.getElementById('clearNotificationsBtn')?.addEventListener('click', async () => {
+                try {
+                    await apiRequest(`${API_ENDPOINTS.NOTIFICATIONS}/read-all`, { method: 'PUT' });
+                    churchData.notifications = churchData.notifications.map(n => ({
+                        ...n,
+                        readAt: n.readAt || new Date().toISOString()
+                    }));
+                    saveNotificationsToStorage();
+                    updateNotificationsUI();
+                    updateNotificationsTable();
+                } catch (error) {
+                    alert('Failed to clear notifications: ' + error.message);
+                }
             });
 
             // Member highlight toggles
