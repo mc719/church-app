@@ -671,6 +671,66 @@
             text-align: center;
         }
 
+        .birthday-section {
+            margin: 20px 0 40px;
+        }
+
+        .birthday-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .birthday-card {
+            background: #ffffff;
+            border-radius: var(--border-radius);
+            border: 1px solid #eaeaea;
+            padding: 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .dark-theme .birthday-card {
+            background: #1a1a1a;
+            border-color: #333;
+        }
+
+        .birthday-card h3 {
+            margin-bottom: 12px;
+            color: var(--primary-color);
+        }
+
+        .dark-theme .birthday-card h3 {
+            color: #e0e0e0;
+        }
+
+        .birthday-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .birthday-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .dark-theme .birthday-item {
+            color: #e0e0e0;
+        }
+
+        .birthday-item span {
+            color: var(--gray-color);
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+
+        .birthday-empty {
+            color: var(--gray-color);
+            font-size: 0.9rem;
+        }
+
         .member-highlight td {
             background-color: rgba(255, 165, 0, 0.18);
         }

@@ -24,6 +24,7 @@
             sessions: [],
             firstTimers: [],
             followUps: [],
+            birthdays: [],
             notifications: [],
             pageMeta: {},
             currentUser: null,
@@ -184,6 +185,18 @@
                     console.warn('Failed to load notifications:', error.message);
                 }
 
+                // Load birthdays
+                try {
+                    const birthdaysData = await apiRequest(`${API_BASE}/birthdays/summary`);
+                    churchData.birthdays = birthdaysData?.members || [];
+                    if (birthdaysData?.notifications?.length) {
+                        churchData.notifications = birthdaysData.notifications;
+                        saveNotificationsToStorage();
+                    }
+                } catch (error) {
+                    console.warn('Failed to load birthdays:', error.message);
+                }
+
                 // Load sessions (admin only)
                 try {
                     const sessionsData = await apiRequest(API_ENDPOINTS.SESSIONS);
@@ -294,6 +307,7 @@
             updateNotificationsUI();
             updateNotificationsTable();
             populateNotificationRoles();
+            updateBirthdayWidgets();
             if (typeof updateFirstTimersTable === 'function') {
                 updateFirstTimersTable();
             }
@@ -675,11 +689,15 @@
             if (selectedRoles.includes('Cell-Leaders')) {
                 churchData.members.forEach(member => {
                     if (member.role !== 'Cell Leader') return;
-                    if (!member.email) return;
-                    const user = usersByEmail.get(member.email.toLowerCase());
-                    if (!user) return;
                     const cellName = cellMap.get(member.cellId) || 'No Cell';
-                    recipients.set(String(user.id), `${member.name} — ${cellName} (Cell Leader)`);
+                    const label = `${member.name} — ${cellName} (Cell Leader)`;
+                    const emailKey = member.email ? member.email.toLowerCase() : '';
+                    const user = emailKey ? usersByEmail.get(emailKey) : null;
+                    if (user) {
+                        recipients.set(String(user.id), label);
+                    } else {
+                        recipients.set(`disabled-${member.id}`, `${label} (no user)`);
+                    }
                 });
             }
 
@@ -695,12 +713,105 @@
 
             recipients.forEach((label, userId) => {
                 const opt = document.createElement('option');
-                opt.value = userId;
+                const isDisabled = String(userId).startsWith('disabled-');
+                opt.value = isDisabled ? '' : userId;
                 opt.textContent = label;
-                if (selected.has(userId)) opt.selected = true;
+                if (isDisabled) {
+                    opt.disabled = true;
+                } else if (selected.has(userId)) {
+                    opt.selected = true;
+                }
                 targetSelect.appendChild(opt);
             });
             targetSelect.disabled = false;
+        }
+
+        function getBirthdayDateInYear(dateStr, year) {
+            const dt = new Date(dateStr);
+            return new Date(year, dt.getMonth(), dt.getDate());
+        }
+
+        function getUpcomingBirthdays(daysAhead) {
+            const today = new Date();
+            const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const end = new Date(start);
+            end.setDate(end.getDate() + daysAhead);
+
+            return churchData.birthdays
+                .filter(member => member.dateOfBirth)
+                .map(member => {
+                    const next = getBirthdayDateInYear(member.dateOfBirth, start.getFullYear());
+                    if (next < start) {
+                        next.setFullYear(next.getFullYear() + 1);
+                    }
+                    return { member, next };
+                })
+                .filter(item => item.next >= start && item.next <= end)
+                .sort((a, b) => a.next - b.next);
+        }
+
+        function updateBirthdayWidgets() {
+            const today = new Date();
+            const todayKey = today.toDateString();
+            const todayList = churchData.birthdays.filter(member => {
+                if (!member.dateOfBirth) return false;
+                const dt = new Date(member.dateOfBirth);
+                return dt.getDate() === today.getDate() && dt.getMonth() === today.getMonth();
+            });
+
+            const upcomingWeek = getUpcomingBirthdays(7);
+            const upcomingMonth = getUpcomingBirthdays(30);
+
+            const todayEl = document.getElementById('birthdaysTodayList');
+            const weekEl = document.getElementById('birthdaysWeekList');
+            const monthEl = document.getElementById('birthdaysMonthList');
+            const todayPageEl = document.getElementById('birthdaysTodayListPage');
+            const weekPageEl = document.getElementById('birthdaysWeekListPage');
+            const monthPageEl = document.getElementById('birthdaysMonthListPage');
+
+            if (todayEl) {
+                if (!todayList.length) {
+                    todayEl.innerHTML = '<div class="birthday-empty">No birthdays today.</div>';
+                } else {
+                    todayEl.innerHTML = todayList.map(member => {
+                        const cell = churchData.cells.find(c => String(c.id) === String(member.cellId));
+                        return `<div class="birthday-item">${member.name} ${cell ? `— ${cell.name}` : ''}</div>`;
+                    }).join('');
+                }
+            }
+            if (todayPageEl) {
+                todayPageEl.innerHTML = todayEl?.innerHTML || '<div class="birthday-empty">No birthdays today.</div>';
+            }
+
+            if (weekEl) {
+                if (!upcomingWeek.length) {
+                    weekEl.innerHTML = '<div class="birthday-empty">No birthdays this week.</div>';
+                } else {
+                    weekEl.innerHTML = upcomingWeek.map(item => {
+                        const cell = churchData.cells.find(c => String(c.id) === String(item.member.cellId));
+                        const dateLabel = item.next.toLocaleDateString();
+                        return `<div class="birthday-item">${item.member.name} ${cell ? `— ${cell.name}` : ''} <span>${dateLabel}</span></div>`;
+                    }).join('');
+                }
+            }
+            if (weekPageEl) {
+                weekPageEl.innerHTML = weekEl?.innerHTML || '<div class="birthday-empty">No birthdays this week.</div>';
+            }
+
+            if (monthEl) {
+                if (!upcomingMonth.length) {
+                    monthEl.innerHTML = '<div class="birthday-empty">No birthdays this month.</div>';
+                } else {
+                    monthEl.innerHTML = upcomingMonth.map(item => {
+                        const cell = churchData.cells.find(c => String(c.id) === String(item.member.cellId));
+                        const dateLabel = item.next.toLocaleDateString();
+                        return `<div class="birthday-item">${item.member.name} ${cell ? `— ${cell.name}` : ''} <span>${dateLabel}</span></div>`;
+                    }).join('');
+                }
+            }
+            if (monthPageEl) {
+                monthPageEl.innerHTML = monthEl?.innerHTML || '<div class="birthday-empty">No birthdays this month.</div>';
+            }
         }
 
         async function sendNotification(e) {
@@ -1700,6 +1811,7 @@
                 const gender = document.getElementById('memberGender').value;
                 const mobile = document.getElementById('memberMobile').value;
                 const email = document.getElementById('memberEmail').value;
+                const dateOfBirth = document.getElementById('memberDob').value;
                 const role = document.getElementById('memberRole').value;
                 const highlightToggle = document.getElementById('memberHighlightToggle');
                 const highlight = highlightToggle ? highlightToggle.checked : false;
@@ -1711,6 +1823,7 @@
                     gender: gender,
                     mobile: mobile,
                     email: email,
+                    dateOfBirth: dateOfBirth,
                     role: role,
                     isFirstTimer: highlight
                 };

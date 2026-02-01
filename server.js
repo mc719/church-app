@@ -626,6 +626,7 @@ app.get("/api/members", requireAuth, async (req, res) => {
               email,
               role,
               is_first_timer as "isFirstTimer",
+              date_of_birth as "dateOfBirth",
               joined_date as "joinedDate"
        FROM members
        ORDER BY id`
@@ -640,11 +641,11 @@ app.get("/api/members", requireAuth, async (req, res) => {
 // ADD MEMBER (AUTH OR ACCESS CODE)
 app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { cellId, title, name, gender, mobile, email, role, isFirstTimer } = req.body;
+    const { cellId, title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, is_first_timer, joined_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
+      `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, is_first_timer, date_of_birth, joined_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW())
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  title,
@@ -654,8 +655,9 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
                  email,
                  role,
                  is_first_timer as "isFirstTimer",
+                 date_of_birth as "dateOfBirth",
                  joined_date as "joinedDate"`,
-      [cellId, title, name, gender, mobile, email, role, !!isFirstTimer]
+      [cellId, title, name, gender, mobile, email, role, !!isFirstTimer, dateOfBirth || null]
     );
 
     const member = result.rows[0];
@@ -699,7 +701,7 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE MEMBER (PROTECTED)
 app.put("/api/members/:id", requireAuth, async (req, res) => {
   try {
-    const { title, name, gender, mobile, email, role, isFirstTimer } = req.body;
+    const { title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth } = req.body;
     const result = await pool.query(
       `UPDATE members
        SET title = COALESCE($1, title),
@@ -708,8 +710,9 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
            mobile = COALESCE($4, mobile),
            email = COALESCE($5, email),
            role = COALESCE($6, role),
-           is_first_timer = COALESCE($7, is_first_timer)
-       WHERE id = $8
+           is_first_timer = COALESCE($7, is_first_timer),
+           date_of_birth = COALESCE($8, date_of_birth)
+       WHERE id = $9
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  title,
@@ -719,6 +722,7 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
                  email,
                  role,
                  is_first_timer as "isFirstTimer",
+                 date_of_birth as "dateOfBirth",
                  joined_date as "joinedDate"`,
       [
         title ?? null,
@@ -728,6 +732,7 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
         email ?? null,
         role ?? null,
         typeof isFirstTimer === "boolean" ? isFirstTimer : null,
+        dateOfBirth ?? null,
         req.params.id
       ]
     );
@@ -1131,6 +1136,69 @@ app.post("/api/reports", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to add report" });
+  }
+});
+
+// BIRTHDAYS (PROTECTED)
+app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
+  try {
+    const members = await pool.query(
+      `SELECT id::text as id,
+              cell_id::text as "cellId",
+              name,
+              role,
+              date_of_birth as "dateOfBirth"
+       FROM members
+       WHERE date_of_birth IS NOT NULL`
+    );
+
+    const today = new Date();
+    const todayKey = `${today.getMonth() + 1}-${today.getDate()}`;
+    const todaysBirthdays = members.rows.filter(member => {
+      const dob = new Date(member.dateOfBirth);
+      return dob.getDate() === today.getDate() && dob.getMonth() === today.getMonth();
+    });
+
+    const notifyKey = `birthdays_notified_${today.toISOString().slice(0, 10)}`;
+    const notified = await pool.query(
+      "SELECT value FROM app_settings WHERE key = $1",
+      [notifyKey]
+    );
+
+    if (!notified.rows.length && todaysBirthdays.length) {
+      const names = todaysBirthdays.map(m => m.name).join(", ");
+      await createNotification({
+        title: "Birthdays Today",
+        message: `Today is the birthday of: ${names}.`,
+        type: "success"
+      });
+      await pool.query(
+        `INSERT INTO app_settings (key, value)
+         VALUES ($1, $2)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [notifyKey, todayKey]
+      );
+    }
+
+    const notifications = await pool.query(
+      `SELECT id::text as id,
+              user_id::text as "userId",
+              title,
+              message,
+              type,
+              created_at as "createdAt",
+              read_at as "readAt"
+       FROM notifications
+       WHERE user_id IS NULL OR user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [req.user.userId]
+    );
+
+    res.json({ members: members.rows, notifications: notifications.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load birthdays" });
   }
 });
 

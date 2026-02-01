@@ -137,6 +137,7 @@ function showMemberDetails(member, cell) {
                     <div><strong>Gender:</strong> ${member.gender || ''}</div>
                     <div><strong>Mobile:</strong> ${member.mobile || ''}</div>
                     <div><strong>Email:</strong> ${member.email || ''}</div>
+                    <div><strong>Date of Birth:</strong> ${member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : ''}</div>
                     <div><strong>Role:</strong> ${member.role || ''}</div>
                     <div><strong>Cell:</strong> ${cell ? cell.name : 'Unknown Cell'}</div>
                     <div><strong>Venue:</strong> ${cell ? cell.venue : ''}</div>
@@ -170,6 +171,7 @@ function editMember(cellId, memberId) {
                 document.getElementById('editMemberGender').value = member.gender;
                 document.getElementById('editMemberMobile').value = member.mobile;
                 document.getElementById('editMemberEmail').value = member.email || '';
+                document.getElementById('editMemberDob').value = member.dateOfBirth ? String(member.dateOfBirth).split('T')[0] : '';
                 document.getElementById('editMemberRole').value = member.role;
                 const highlightToggle = document.getElementById('editMemberHighlightToggle');
                 if (highlightToggle) {
@@ -196,6 +198,7 @@ async function saveEditedMember() {
                     gender: document.getElementById('editMemberGender').value,
                     mobile: document.getElementById('editMemberMobile').value,
                     email: document.getElementById('editMemberEmail').value,
+                    dateOfBirth: document.getElementById('editMemberDob').value,
                     role: document.getElementById('editMemberRole').value,
                     isFirstTimer: highlight
                 };

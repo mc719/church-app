@@ -338,6 +338,10 @@
                         <input type="email" id="memberEmail" class="form-control">
                     </div>
                     <div class="form-group">
+                        <label for="memberDob">Date of Birth</label>
+                        <input type="date" id="memberDob" class="form-control">
+                    </div>
+                    <div class="form-group">
                         <label for="memberRole">Cell Role *</label>
                         <select id="memberRole" class="form-control" required>
                             <option value="">Select Role</option>
@@ -411,6 +415,10 @@
                     <div class="form-group">
                         <label for="editMemberEmail">Email Address</label>
                         <input type="email" id="editMemberEmail" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="editMemberDob">Date of Birth</label>
+                        <input type="date" id="editMemberDob" class="form-control">
                     </div>
                     <div class="form-group">
                         <label for="editMemberRole">Cell Role *</label>
@@ -902,6 +910,10 @@
                 <i class="fas fa-user-check"></i>
                 <span>First-Timers</span>
             </div>
+            <div class="nav-item" data-page="birthdays" id="birthdaysNav">
+                <i class="fas fa-birthday-cake"></i>
+                <span>Birthdays</span>
+            </div>
 
             <div class="nav-divider" id="cellGroupsDivider"></div>
             
@@ -971,6 +983,26 @@
             <!-- Real-time Stats -->
             <div class="stats-container" id="statsContainer">
                 <!-- Stats will be updated dynamically -->
+            </div>
+
+            <div class="birthday-section">
+                <div class="page-header" style="margin-top: 0;">
+                    <h2>Birthdays</h2>
+                </div>
+                <div class="birthday-cards">
+                    <div class="birthday-card">
+                        <h3>Today</h3>
+                        <div id="birthdaysTodayList" class="birthday-list"></div>
+                    </div>
+                    <div class="birthday-card">
+                        <h3>This Week</h3>
+                        <div id="birthdaysWeekList" class="birthday-list"></div>
+                    </div>
+                    <div class="birthday-card">
+                        <h3>This Month</h3>
+                        <div id="birthdaysMonthList" class="birthday-list"></div>
+                    </div>
+                </div>
             </div>
             
             <div class="page-header">
@@ -1190,6 +1222,30 @@
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Birthdays Page -->
+        <div id="birthdays" class="page-content">
+            <div class="page-header">
+                <h1>Birthdays</h1>
+            </div>
+
+            <div class="birthday-section">
+                <div class="birthday-cards">
+                    <div class="birthday-card">
+                        <h3>Today</h3>
+                        <div id="birthdaysTodayListPage" class="birthday-list"></div>
+                    </div>
+                    <div class="birthday-card">
+                        <h3>This Week</h3>
+                        <div id="birthdaysWeekListPage" class="birthday-list"></div>
+                    </div>
+                    <div class="birthday-card">
+                        <h3>This Month</h3>
+                        <div id="birthdaysMonthListPage" class="birthday-list"></div>
+                    </div>
                 </div>
             </div>
         </div>
