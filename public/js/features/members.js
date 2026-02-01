@@ -65,6 +65,33 @@ function updateCellMembersTable(cellId) {
             });
         }
 
+let membersSearchTerm = '';
+
+function getFilteredMembers() {
+            if (!membersSearchTerm) {
+                return churchData.members;
+            }
+            const term = membersSearchTerm.toLowerCase();
+            return churchData.members.filter(member => {
+                const cell = churchData.cells.find(c => c.id === member.cellId);
+                const dob = member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : '';
+                const parts = [
+                    member.title,
+                    member.name,
+                    member.gender,
+                    member.mobile,
+                    member.email,
+                    member.role,
+                    dob,
+                    cell?.name,
+                    cell?.venue,
+                    cell?.day,
+                    cell?.time
+                ].filter(Boolean).join(' ').toLowerCase();
+                return parts.includes(term);
+            });
+        }
+
 function updateAllMembersTable() {
             const tbody = document.getElementById('allMembersBody');
             const grid = document.getElementById('membersGrid');
@@ -75,10 +102,11 @@ function updateAllMembersTable() {
                 grid.innerHTML = '';
             }
 
-            const totalPages = getTotalPages(churchData.members.length);
+            const filteredMembers = getFilteredMembers();
+            const totalPages = getTotalPages(filteredMembers.length);
             paginationState.members = clampPage(paginationState.members, totalPages);
             const startIndex = (paginationState.members - 1) * PAGE_SIZE;
-            const pageMembers = churchData.members.slice(startIndex, startIndex + PAGE_SIZE);
+            const pageMembers = filteredMembers.slice(startIndex, startIndex + PAGE_SIZE);
             
             pageMembers.forEach(member => {
                 const cell = churchData.cells.find(c => c.id === member.cellId);
@@ -141,7 +169,7 @@ function updateAllMembersTable() {
                 }
             });
             
-            document.getElementById('membersCount').textContent = churchData.members.length;
+            document.getElementById('membersCount').textContent = filteredMembers.length;
 
             renderPagination('membersPagination', paginationState.members, totalPages, (newPage) => {
                 paginationState.members = newPage;
@@ -170,17 +198,9 @@ function showMemberDetails(member, cell) {
         }
 
 function searchMembers() {
-            const searchTerm = document.getElementById('searchMembers').value.toLowerCase();
-            const rows = document.querySelectorAll('#allMembersBody tr');
-            
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchTerm) ? '' : 'none';
-            });
-            
-            // Update count
-            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
-            document.getElementById('membersCount').textContent = visibleRows.length;
+            membersSearchTerm = document.getElementById('searchMembers').value.trim();
+            paginationState.members = 1;
+            updateAllMembersTable();
         }
 
 function editMember(cellId, memberId) {
