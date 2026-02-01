@@ -731,6 +731,87 @@
             font-size: 0.9rem;
         }
 
+        .birthday-calendar {
+            background: #ffffff;
+            border-radius: var(--border-radius);
+            border: 1px solid #eaeaea;
+            box-shadow: var(--shadow);
+            padding: 16px;
+        }
+
+        .dark-theme .birthday-calendar {
+            background: #1a1a1a;
+            border-color: #333;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .calendar-title {
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .calendar-weekday {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--gray-color);
+        }
+
+        .calendar-cell {
+            border: 1px solid #eaeaea;
+            border-radius: 10px;
+            background: #ffffff;
+            padding: 10px 0;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            min-height: 48px;
+        }
+
+        .calendar-cell.muted {
+            background: transparent;
+            border: none;
+            cursor: default;
+        }
+
+        .calendar-cell.has-birthday {
+            border-color: rgba(231, 76, 60, 0.4);
+        }
+
+        .calendar-day {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .calendar-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #e74c3c;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .helper-text {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--gray-color);
+            margin-top: 6px;
+        }
+
         .member-highlight td {
             background-color: rgba(255, 165, 0, 0.18);
         }

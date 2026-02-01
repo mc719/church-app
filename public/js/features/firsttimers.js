@@ -58,7 +58,7 @@ function updateFirstTimersTable() {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td data-label="Name">${ft.name}</td>
-            <td data-label="Mobile">${ft.mobile || ''}</td>
+            <td data-label="Mobile">${formatPhoneLink(ft.mobile)}</td>
             <td data-label="Invited By">${ft.invitedBy || ''}</td>
             <td data-label="Date Joined">${dateJoined}</td>
             <td data-label="Status">${getFirstTimerStatusLabel(ft.status)}</td>

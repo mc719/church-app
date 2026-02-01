@@ -19,7 +19,7 @@ function updateCellMembersTable(cellId) {
                     <td>${member.title}</td>
                     <td>${member.name}</td>
                     <td>${member.gender}</td>
-                    <td>${member.mobile}</td>
+                    <td>${formatPhoneLink(member.mobile)}</td>
                     <td>${member.role}</td>
                     <td>
                         <div class="action-buttons">
@@ -91,15 +91,37 @@ function updateAllMembersTable() {
                     <td>${member.title}</td>
                     <td>${member.name}</td>
                     <td>${member.gender}</td>
-                    <td>${member.mobile}</td>
-                    <td>${member.email || ''}</td>
+                    <td>${formatPhoneLink(member.mobile)}</td>
+                    <td>${formatEmailLink(member.email)}</td>
                     <td>${cell ? cell.name : 'Unknown Cell'}</td>
                     <td>${member.role}</td>
                     <td>${cell ? cell.venue : ''}</td>
                     <td>${cell ? cell.day : ''}</td>
                     <td>${cell ? cell.time : ''}</td>
                     <td>${new Date(member.joinedDate).toLocaleDateString()}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn edit-btn edit-member-btn" data-member-id="${member.id}">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="action-btn delete-btn delete-member-btn" data-member-id="${member.id}" data-member-name="${member.name}">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </td>
                 `;
+                const editBtn = row.querySelector('.edit-member-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => {
+                        editMember(member.cellId, member.id);
+                    });
+                }
+                const deleteBtn = row.querySelector('.delete-member-btn');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', () => {
+                        confirmDeleteMember(member.cellId, member.id, member.name);
+                    });
+                }
                 tbody.appendChild(row);
 
                 if (grid) {
@@ -135,8 +157,8 @@ function showMemberDetails(member, cell) {
                     <div><strong>Name:</strong> ${member.name || ''}</div>
                     <div><strong>Title:</strong> ${member.title || ''}</div>
                     <div><strong>Gender:</strong> ${member.gender || ''}</div>
-                    <div><strong>Mobile:</strong> ${member.mobile || ''}</div>
-                    <div><strong>Email:</strong> ${member.email || ''}</div>
+                    <div><strong>Mobile:</strong> ${formatPhoneLink(member.mobile)}</div>
+                    <div><strong>Email:</strong> ${formatEmailLink(member.email)}</div>
                     <div><strong>Date of Birth:</strong> ${member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : ''}</div>
                     <div><strong>Role:</strong> ${member.role || ''}</div>
                     <div><strong>Cell:</strong> ${cell ? cell.name : 'Unknown Cell'}</div>
@@ -227,6 +249,9 @@ async function saveEditedMember() {
                 alert('Member updated successfully!');
                 if (typeof refreshNotificationsSilently === 'function') {
                     refreshNotificationsSilently();
+                }
+                if (typeof refreshBirthdays === 'function') {
+                    refreshBirthdays();
                 }
             } catch (error) {
                 alert('Failed to update member: ' + error.message);

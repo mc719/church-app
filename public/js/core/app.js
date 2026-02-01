@@ -423,6 +423,18 @@
             }
         }
 
+        function formatPhoneLink(phone) {
+            if (!phone) return '';
+            const cleaned = String(phone).replace(/\s+/g, '');
+            return `<a href="tel:${cleaned}">${phone}</a>`;
+        }
+
+        function formatEmailLink(email) {
+            if (!email) return '';
+            const cleaned = String(email).trim();
+            return `<a href="mailto:${cleaned}">${cleaned}</a>`;
+        }
+
         // Create cell page
         
 
@@ -594,6 +606,22 @@
             fetchNotifications();
         }
 
+        async function refreshBirthdays() {
+            try {
+                const birthdaysData = await apiRequest(`${API_BASE}/birthdays/summary`);
+                churchData.birthdays = birthdaysData?.members || [];
+                if (birthdaysData?.notifications?.length) {
+                    churchData.notifications = birthdaysData.notifications;
+                    saveNotificationsToStorage();
+                }
+                updateNotificationsUI();
+                updateNotificationsTable();
+                updateBirthdayWidgets();
+            } catch (error) {
+                console.warn('Failed to refresh birthdays:', error.message);
+            }
+        }
+
         function updateNotificationsTabs() {
             const tabs = document.getElementById('notificationsTabs');
             const listTab = document.getElementById('notificationsListTab');
@@ -731,87 +759,122 @@
             return new Date(year, dt.getMonth(), dt.getDate());
         }
 
-        function getUpcomingBirthdays(daysAhead) {
-            const today = new Date();
-            const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            const end = new Date(start);
-            end.setDate(end.getDate() + daysAhead);
-
-            return churchData.birthdays
-                .filter(member => member.dateOfBirth)
-                .map(member => {
-                    const next = getBirthdayDateInYear(member.dateOfBirth, start.getFullYear());
-                    if (next < start) {
-                        next.setFullYear(next.getFullYear() + 1);
-                    }
-                    return { member, next };
-                })
-                .filter(item => item.next >= start && item.next <= end)
-                .sort((a, b) => a.next - b.next);
-        }
-
         function updateBirthdayWidgets() {
             const today = new Date();
-            const todayKey = today.toDateString();
-            const todayList = churchData.birthdays.filter(member => {
-                if (!member.dateOfBirth) return false;
+            const calendarEl = document.getElementById('birthdayCalendar');
+            if (calendarEl) {
+                renderBirthdayCalendar(today, calendarEl);
+            }
+
+            updateBirthdaysTable();
+        }
+
+        function renderBirthdayCalendar(currentDate, container) {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const first = new Date(year, month, 1);
+            const last = new Date(year, month + 1, 0);
+            const startDay = first.getDay();
+            const totalDays = last.getDate();
+
+            const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            const birthdaysByDay = new Map();
+            churchData.birthdays.forEach(member => {
+                if (!member.dateOfBirth) return;
                 const dt = new Date(member.dateOfBirth);
-                return dt.getDate() === today.getDate() && dt.getMonth() === today.getMonth();
+                if (dt.getMonth() !== month) return;
+                const day = dt.getDate();
+                if (!birthdaysByDay.has(day)) birthdaysByDay.set(day, []);
+                birthdaysByDay.get(day).push(member);
             });
 
-            const upcomingWeek = getUpcomingBirthdays(7);
-            const upcomingMonth = getUpcomingBirthdays(30);
+            const cells = [];
+            for (let i = 0; i < startDay; i++) {
+                cells.push('<div class="calendar-cell muted"></div>');
+            }
+            for (let d = 1; d <= totalDays; d++) {
+                const hasBirthday = birthdaysByDay.has(d);
+                const dots = hasBirthday ? '<span class="calendar-dot"></span>' : '';
+                cells.push(`
+                    <button class="calendar-cell ${hasBirthday ? 'has-birthday' : ''}" data-day="${d}">
+                        <span class="calendar-day">${d}</span>
+                        ${dots}
+                    </button>
+                `);
+            }
 
-            const todayEl = document.getElementById('birthdaysTodayList');
-            const weekEl = document.getElementById('birthdaysWeekList');
-            const monthEl = document.getElementById('birthdaysMonthList');
-            const todayPageEl = document.getElementById('birthdaysTodayListPage');
-            const weekPageEl = document.getElementById('birthdaysWeekListPage');
-            const monthPageEl = document.getElementById('birthdaysMonthListPage');
+            container.innerHTML = `
+                <div class="calendar-header">
+                    <div class="calendar-title">${monthLabel}</div>
+                </div>
+                <div class="calendar-grid">
+                    ${daysOfWeek.map(d => `<div class="calendar-weekday">${d}</div>`).join('')}
+                    ${cells.join('')}
+                </div>
+            `;
 
-            if (todayEl) {
-                if (!todayList.length) {
-                    todayEl.innerHTML = '<div class="birthday-empty">No birthdays today.</div>';
+            container.querySelectorAll('.calendar-cell.has-birthday').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const day = parseInt(btn.getAttribute('data-day'), 10);
+                    const list = birthdaysByDay.get(day) || [];
+                    openBirthdayModal(day, month, year, list);
+                });
+            });
+        }
+
+        function openBirthdayModal(day, month, year, list) {
+            const titleEl = document.getElementById('birthdayModalTitle');
+            const bodyEl = document.getElementById('birthdayModalBody');
+            const dateLabel = new Date(year, month, day).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short'
+            });
+            if (titleEl) titleEl.textContent = `Birthdays on ${dateLabel}`;
+            if (bodyEl) {
+                if (!list.length) {
+                    bodyEl.innerHTML = '<div class="birthday-empty">No birthdays.</div>';
                 } else {
-                    todayEl.innerHTML = todayList.map(member => {
+                    bodyEl.innerHTML = list.map(member => {
                         const cell = churchData.cells.find(c => String(c.id) === String(member.cellId));
-                        return `<div class="birthday-item">${member.name} ${cell ? `— ${cell.name}` : ''}</div>`;
+                        return `<div class="birthday-item">${member.name} ${cell ? `— ${cell.name}` : ''} <span>${formatPhoneLink(member.mobile)}</span></div>`;
                     }).join('');
                 }
             }
-            if (todayPageEl) {
-                todayPageEl.innerHTML = todayEl?.innerHTML || '<div class="birthday-empty">No birthdays today.</div>';
+            showModal('birthdayModal');
+        }
+
+        function updateBirthdaysTable() {
+            const tbody = document.getElementById('birthdaysTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            if (!churchData.birthdays.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align:center; padding: 24px; color: var(--gray-color);">
+                            No birthdays recorded yet.
+                        </td>
+                    </tr>
+                `;
+                return;
             }
 
-            if (weekEl) {
-                if (!upcomingWeek.length) {
-                    weekEl.innerHTML = '<div class="birthday-empty">No birthdays this week.</div>';
-                } else {
-                    weekEl.innerHTML = upcomingWeek.map(item => {
-                        const cell = churchData.cells.find(c => String(c.id) === String(item.member.cellId));
-                        const dateLabel = item.next.toLocaleDateString();
-                        return `<div class="birthday-item">${item.member.name} ${cell ? `— ${cell.name}` : ''} <span>${dateLabel}</span></div>`;
-                    }).join('');
-                }
-            }
-            if (weekPageEl) {
-                weekPageEl.innerHTML = weekEl?.innerHTML || '<div class="birthday-empty">No birthdays this week.</div>';
-            }
-
-            if (monthEl) {
-                if (!upcomingMonth.length) {
-                    monthEl.innerHTML = '<div class="birthday-empty">No birthdays this month.</div>';
-                } else {
-                    monthEl.innerHTML = upcomingMonth.map(item => {
-                        const cell = churchData.cells.find(c => String(c.id) === String(item.member.cellId));
-                        const dateLabel = item.next.toLocaleDateString();
-                        return `<div class="birthday-item">${item.member.name} ${cell ? `— ${cell.name}` : ''} <span>${dateLabel}</span></div>`;
-                    }).join('');
-                }
-            }
-            if (monthPageEl) {
-                monthPageEl.innerHTML = monthEl?.innerHTML || '<div class="birthday-empty">No birthdays this month.</div>';
-            }
+            churchData.birthdays.forEach(member => {
+                const cell = churchData.cells.find(c => String(c.id) === String(member.cellId));
+                const dateLabel = member.dateOfBirth
+                    ? new Date(member.dateOfBirth).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                    : '';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td data-label="Name">${member.name || ''}</td>
+                    <td data-label="Cell">${cell ? cell.name : ''}</td>
+                    <td data-label="Role">${member.role || ''}</td>
+                    <td data-label="Birthday">${dateLabel}</td>
+                    <td data-label="Mobile">${formatPhoneLink(member.mobile)}</td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
         async function sendNotification(e) {
@@ -965,6 +1028,13 @@
                 if (form) form.reset();
             }
         }
+
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('birthdayModal');
+            if (modal && modal.classList.contains('active') && e.target === modal) {
+                closeModal('birthdayModal');
+            }
+        });
 
         // Close forgot password modal and show login
         function closeForgotPasswordModal() {
@@ -1846,6 +1916,7 @@
                     closeModal('addMemberModal');
                     alert('Member added successfully!');
                     refreshNotificationsSilently();
+                    refreshBirthdays();
                 } catch (error) {
                     alert('Failed to add member: ' + error.message);
                 }

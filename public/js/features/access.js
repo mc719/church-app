@@ -131,7 +131,7 @@ function updateAccessManagementTable() {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td data-label="Username">${user.username}</td>
-                    <td data-label="Email">${user.email || ''}</td>
+                    <td data-label="Email">${formatEmailLink(user.email)}</td>
                     <td data-label="Password">******</td>
                     <td data-label="Role">${user.role}</td>
                     <td data-label="Restricted Menus">${restrictedMenus || '-'}</td>

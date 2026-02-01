@@ -1147,36 +1147,74 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
               cell_id::text as "cellId",
               name,
               role,
+              mobile,
               date_of_birth as "dateOfBirth"
        FROM members
        WHERE date_of_birth IS NOT NULL`
     );
 
     const today = new Date();
-    const todayKey = `${today.getMonth() + 1}-${today.getDate()}`;
     const todaysBirthdays = members.rows.filter(member => {
       const dob = new Date(member.dateOfBirth);
       return dob.getDate() === today.getDate() && dob.getMonth() === today.getMonth();
     });
 
-    const notifyKey = `birthdays_notified_${today.toISOString().slice(0, 10)}`;
-    const notified = await pool.query(
-      "SELECT value FROM app_settings WHERE key = $1",
-      [notifyKey]
-    );
+    if (todaysBirthdays.length) {
+      const notifyKey = `birthdays_today_${today.toISOString().slice(0, 10)}`;
+      const notified = await pool.query(
+        "SELECT value FROM app_settings WHERE key = $1",
+        [notifyKey]
+      );
+      if (!notified.rows.length) {
+        const names = todaysBirthdays.map(m => m.name).join(", ");
+        await createNotification({
+          title: "Birthdays Today",
+          message: `Today is the birthday of: ${names}.`,
+          type: "success"
+        });
+        await pool.query(
+          `INSERT INTO app_settings (key, value)
+           VALUES ($1, $2)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+          [notifyKey, "sent"]
+        );
+      }
+    }
 
-    if (!notified.rows.length && todaysBirthdays.length) {
-      const names = todaysBirthdays.map(m => m.name).join(", ");
+    // Upcoming birthdays (7 days before)
+    const upcoming = members.rows
+      .map(member => {
+        const dob = new Date(member.dateOfBirth);
+        let upcomingDate = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+        if (upcomingDate < today) {
+          upcomingDate.setFullYear(upcomingDate.getFullYear() + 1);
+        }
+        const diffDays = Math.floor((upcomingDate - today) / (1000 * 60 * 60 * 24));
+        return { member, upcomingDate, diffDays };
+      })
+      .filter(item => item.diffDays === 7);
+
+    for (const item of upcoming) {
+      const key = `birthday_upcoming_${item.member.id}_${item.upcomingDate.toISOString().slice(0, 10)}`;
+      const notified = await pool.query(
+        "SELECT value FROM app_settings WHERE key = $1",
+        [key]
+      );
+      if (notified.rows.length) continue;
+      const dateLabel = item.upcomingDate.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short"
+      });
       await createNotification({
-        title: "Birthdays Today",
-        message: `Today is the birthday of: ${names}.`,
-        type: "success"
+        title: "Upcoming Birthday",
+        message: `${item.member.name}'s birthday is on ${dateLabel}.`,
+        type: "info"
       });
       await pool.query(
         `INSERT INTO app_settings (key, value)
          VALUES ($1, $2)
          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-        [notifyKey, todayKey]
+        [key, "sent"]
       );
     }
 

@@ -340,6 +340,7 @@
                     <div class="form-group">
                         <label for="memberDob">Date of Birth</label>
                         <input type="date" id="memberDob" class="form-control">
+                        <small class="helper-text">Stored as day and month for birthdays.</small>
                     </div>
                     <div class="form-group">
                         <label for="memberRole">Cell Role *</label>
@@ -419,6 +420,7 @@
                     <div class="form-group">
                         <label for="editMemberDob">Date of Birth</label>
                         <input type="date" id="editMemberDob" class="form-control">
+                        <small class="helper-text">Stored as day and month for birthdays.</small>
                     </div>
                     <div class="form-group">
                         <label for="editMemberRole">Cell Role *</label>
@@ -863,6 +865,17 @@
         </div>
     </div>
 
+    <!-- Birthday Modal -->
+    <div id="birthdayModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="birthdayModalTitle">Birthdays</h3>
+                <button class="close-modal" onclick="closeModal('birthdayModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="birthdayModalBody"></div>
+        </div>
+    </div>
+
     <!-- Logout Confirmation Modal -->
     <div id="logoutConfirmModal" class="modal-overlay confirmation-modal">
         <div class="modal">
@@ -987,22 +1000,9 @@
 
             <div class="birthday-section">
                 <div class="page-header" style="margin-top: 0;">
-                    <h2>Birthdays</h2>
+                    <h2>Birthdays Calendar</h2>
                 </div>
-                <div class="birthday-cards">
-                    <div class="birthday-card">
-                        <h3>Today</h3>
-                        <div id="birthdaysTodayList" class="birthday-list"></div>
-                    </div>
-                    <div class="birthday-card">
-                        <h3>This Week</h3>
-                        <div id="birthdaysWeekList" class="birthday-list"></div>
-                    </div>
-                    <div class="birthday-card">
-                        <h3>This Month</h3>
-                        <div id="birthdaysMonthList" class="birthday-list"></div>
-                    </div>
-                </div>
+                <div class="birthday-calendar" id="birthdayCalendar"></div>
             </div>
             
             <div class="page-header">
@@ -1062,6 +1062,7 @@
                             <th>Cell Day</th>
                             <th>Cell Time</th>
                             <th>Joined Date</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="allMembersBody">
@@ -1232,21 +1233,19 @@
                 <h1>Birthdays</h1>
             </div>
 
-            <div class="birthday-section">
-                <div class="birthday-cards">
-                    <div class="birthday-card">
-                        <h3>Today</h3>
-                        <div id="birthdaysTodayListPage" class="birthday-list"></div>
-                    </div>
-                    <div class="birthday-card">
-                        <h3>This Week</h3>
-                        <div id="birthdaysWeekListPage" class="birthday-list"></div>
-                    </div>
-                    <div class="birthday-card">
-                        <h3>This Month</h3>
-                        <div id="birthdaysMonthListPage" class="birthday-list"></div>
-                    </div>
-                </div>
+            <div class="table-container">
+                <table class="mobile-grid-table" id="birthdaysTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Cell</th>
+                            <th>Role</th>
+                            <th>Birthday</th>
+                            <th>Mobile</th>
+                        </tr>
+                    </thead>
+                    <tbody id="birthdaysTableBody"></tbody>
+                </table>
             </div>
         </div>
 
