@@ -308,6 +308,7 @@
             updateNotificationsTable();
             populateNotificationRoles();
             updateBirthdayWidgets();
+            updateMemberNameDatalist();
             if (typeof updateFirstTimersTable === 'function') {
                 updateFirstTimersTable();
             }
@@ -875,6 +876,64 @@
                 `;
                 tbody.appendChild(row);
             });
+        }
+
+        function updateMemberNameDatalist() {
+            const dataList = document.getElementById('memberNamesList');
+            if (!dataList) return;
+            dataList.innerHTML = '';
+            churchData.members.forEach(member => {
+                const opt = document.createElement('option');
+                opt.value = member.name;
+                dataList.appendChild(opt);
+            });
+        }
+
+        function populateBirthdayMemberSelect(filterName = '') {
+            const select = document.getElementById('birthdayMemberId');
+            if (!select) return;
+            const term = filterName.trim().toLowerCase();
+            select.innerHTML = '<option value="">Select Member</option>';
+            churchData.members
+                .filter(member => !term || member.name?.toLowerCase().includes(term))
+                .forEach(member => {
+                    const opt = document.createElement('option');
+                    opt.value = member.id;
+                    opt.textContent = `${member.name} (${member.email || 'no email'})`;
+                    select.appendChild(opt);
+                });
+        }
+
+        async function saveBirthday(e) {
+            e.preventDefault();
+            const memberId = document.getElementById('birthdayMemberId').value;
+            const dob = document.getElementById('birthdayDate').value;
+            if (!memberId || !dob) {
+                alert('Please select a member and birthday date.');
+                return;
+            }
+
+            try {
+                const member = churchData.members.find(m => String(m.id) === String(memberId));
+                if (!member) {
+                    alert('Member not found.');
+                    return;
+                }
+                const updated = await apiRequest(`${API_ENDPOINTS.MEMBERS}/${memberId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ dateOfBirth: dob })
+                });
+                const idx = churchData.members.findIndex(m => String(m.id) === String(memberId));
+                if (idx !== -1) {
+                    churchData.members[idx] = { ...churchData.members[idx], ...updated };
+                }
+                closeModal('addBirthdayModal');
+                document.getElementById('addBirthdayForm').reset();
+                refreshBirthdays();
+                alert('Birthday saved.');
+            } catch (error) {
+                alert('Failed to save birthday: ' + error.message);
+            }
         }
 
         async function sendNotification(e) {
@@ -1496,6 +1555,16 @@
 
             setupPageManagementRealtime();
 
+            // Birthday modal
+            document.getElementById('addBirthdayBtn')?.addEventListener('click', () => {
+                populateBirthdayMemberSelect('');
+                showModal('addBirthdayModal');
+            });
+            document.getElementById('birthdayMemberName')?.addEventListener('input', (e) => {
+                populateBirthdayMemberSelect(e.target.value);
+            });
+            document.getElementById('addBirthdayForm')?.addEventListener('submit', saveBirthday);
+
             // First-timers buttons and tabs
             document.getElementById('addFirstTimerBtn')?.addEventListener('click', () => {
                 if (typeof openFirstTimerModal === 'function') {
@@ -1566,6 +1635,10 @@
                 e.preventDefault();
                 saveEditedMember();
             });
+
+            document.getElementById('memberName')?.setAttribute('list', 'memberNamesList');
+            document.getElementById('editMemberName')?.setAttribute('list', 'memberNamesList');
+            document.getElementById('firstTimerName')?.setAttribute('list', 'memberNamesList');
 
             // Edit cell form
             document.getElementById('editCellForm')?.addEventListener('submit', function(e) {

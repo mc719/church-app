@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Church Cell Management System</title>
+    <title>Church Database</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/styles/main.css">
 </head>
@@ -1231,6 +1231,11 @@
         <div id="birthdays" class="page-content">
             <div class="page-header">
                 <h1>Birthdays</h1>
+                <div class="page-actions">
+                    <button class="btn btn-success" id="addBirthdayBtn">
+                        <i class="fas fa-plus"></i> Add Birthday
+                    </button>
+                </div>
             </div>
 
             <div class="table-container">
@@ -1248,6 +1253,38 @@
                 </table>
             </div>
         </div>
+
+        <!-- Add Birthday Modal -->
+        <div id="addBirthdayModal" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Add Birthday</h3>
+                    <button class="close-modal" onclick="closeModal('addBirthdayModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="addBirthdayForm">
+                        <div class="form-group">
+                            <label for="birthdayMemberName">Member Name *</label>
+                            <input type="text" id="birthdayMemberName" class="form-control" list="memberNamesList" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="birthdayMemberId">Member *</label>
+                            <select id="birthdayMemberId" class="form-control" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="birthdayDate">Date of Birth *</label>
+                            <input type="date" id="birthdayDate" class="form-control" required>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn" onclick="closeModal('addBirthdayModal')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <datalist id="memberNamesList"></datalist>
 
         <!-- Cells Template Page (Hidden) -->
         <div id="cells-template" class="page-content" style="display: none;">
