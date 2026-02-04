@@ -38,11 +38,66 @@ function isExpired(ts) {
   return !ts || Date.now() > ts;
 }
 
+function toBooleanOrNull(value) {
+  if (value === true || value === false) return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "yes" || normalized === "true") return true;
+    if (normalized === "no" || normalized === "false") return false;
+  }
+  return null;
+}
+
+function toTextArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) {
+    return [value.trim()];
+  }
+  return [];
+}
+
+function parseMonthDay(value) {
+  if (!value) return { month: null, day: null };
+  const text = String(value).trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const mmdd = /^(\d{2})-(\d{2})$/;
+  const dmy = /^(\d{2})\/(\d{2})$/;
+
+  let month;
+  let day;
+  if (iso.test(text)) {
+    const m = text.match(iso);
+    month = Number(m[2]);
+    day = Number(m[3]);
+  } else if (mmdd.test(text)) {
+    const m = text.match(mmdd);
+    month = Number(m[1]);
+    day = Number(m[2]);
+  } else if (dmy.test(text)) {
+    const m = text.match(dmy);
+    day = Number(m[1]);
+    month = Number(m[2]);
+  } else {
+    return { month: null, day: null };
+  }
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return { month: null, day: null };
+  }
+  return { month, day };
+}
+
 // ===============================
 // 5) AUTH MIDDLEWARE (PASTE HERE)
 // ===============================
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-secret";
 const ACCESS_CODE = process.env.ACCESS_CODE || "";
+
+function normalizeAccessCode(code) {
+  return String(code || "").trim();
+}
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
@@ -63,13 +118,14 @@ function requireAuth(req, res, next) {
 function requireAuthOrAccessCode(req, res, next) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  const accessCode = req.headers["x-access-code"];
+  const accessCode = normalizeAccessCode(req.headers["x-access-code"]);
+  const expectedAccessCode = normalizeAccessCode(ACCESS_CODE);
 
-  if (!ACCESS_CODE) {
+  if (!expectedAccessCode) {
     return res.status(403).json({ error: "Access code not configured" });
   }
 
-  if (accessCode && accessCode === ACCESS_CODE) {
+  if (accessCode && accessCode === expectedAccessCode) {
     return next();
   }
 
@@ -86,14 +142,15 @@ function requireAuthOrAccessCode(req, res, next) {
 }
 
 app.post("/api/access/verify", (req, res) => {
-  const { accessCode } = req.body || {};
-  if (!ACCESS_CODE) {
+  const accessCode = normalizeAccessCode(req.body?.accessCode);
+  const expectedAccessCode = normalizeAccessCode(ACCESS_CODE);
+  if (!expectedAccessCode) {
     return res.status(403).json({ error: "Access code not configured" });
   }
   if (!accessCode) {
     return res.status(400).json({ error: "Access code required" });
   }
-  if (accessCode !== ACCESS_CODE) {
+  if (accessCode !== expectedAccessCode) {
     return res.status(401).json({ error: "Invalid access code" });
   }
   res.json({ ok: true });
@@ -152,6 +209,28 @@ async function createNotification({ title, message, type = "info", userId = null
     [userId, title, message, type]
   );
   return result.rows[0];
+}
+
+async function ensureFirstTimerSchema() {
+  await pool.query(
+    `ALTER TABLE first_timers
+       ADD COLUMN IF NOT EXISTS surname TEXT,
+       ADD COLUMN IF NOT EXISTS gender TEXT,
+       ADD COLUMN IF NOT EXISTS address TEXT,
+       ADD COLUMN IF NOT EXISTS postcode TEXT,
+       ADD COLUMN IF NOT EXISTS email TEXT,
+       ADD COLUMN IF NOT EXISTS birthday_month SMALLINT,
+       ADD COLUMN IF NOT EXISTS birthday_day SMALLINT,
+       ADD COLUMN IF NOT EXISTS age_group TEXT,
+       ADD COLUMN IF NOT EXISTS marital_status TEXT,
+       ADD COLUMN IF NOT EXISTS born_again BOOLEAN,
+       ADD COLUMN IF NOT EXISTS speak_tongues BOOLEAN,
+       ADD COLUMN IF NOT EXISTS find_out JSONB DEFAULT '[]'::jsonb,
+       ADD COLUMN IF NOT EXISTS contact_pref JSONB DEFAULT '[]'::jsonb,
+       ADD COLUMN IF NOT EXISTS visit BOOLEAN,
+       ADD COLUMN IF NOT EXISTS visit_when TEXT,
+       ADD COLUMN IF NOT EXISTS prayer_requests JSONB DEFAULT '[]'::jsonb`
+  );
 }
 
 // ===============================
@@ -841,8 +920,24 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
     const result = await pool.query(
       `SELECT ft.id::text as id,
               ft.name,
+              ft.surname,
+              ft.gender,
               ft.mobile,
+              ft.email,
+              ft.address,
+              ft.postcode,
               ft.date_joined as "dateJoined",
+              ft.birthday_month as "birthdayMonth",
+              ft.birthday_day as "birthdayDay",
+              ft.age_group as "ageGroup",
+              ft.marital_status as "maritalStatus",
+              ft.born_again as "bornAgain",
+              ft.speak_tongues as "speakTongues",
+              COALESCE(ft.find_out, '[]'::jsonb) as "findOut",
+              COALESCE(ft.contact_pref, '[]'::jsonb) as "contactPref",
+              ft.visit,
+              ft.visit_when as "visitWhen",
+              COALESCE(ft.prayer_requests, '[]'::jsonb) as "prayerRequests",
               ft.status,
               ft.foundation_school as "foundationSchool",
               ft.invited_by as "invitedBy",
@@ -862,13 +957,57 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
 // ADD FIRST-TIMER (PROTECTED OR ACCESS CODE)
 app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { name, mobile, dateJoined, status, foundationSchool, cellId, invitedBy } = req.body;
+    const {
+      name,
+      surname,
+      gender,
+      mobile,
+      email,
+      address,
+      postcode,
+      birthday,
+      ageGroup,
+      maritalStatus,
+      bornAgain,
+      speakTongues,
+      findOut,
+      contactPref,
+      visit,
+      visitWhen,
+      prayerRequests,
+      dateJoined,
+      status,
+      foundationSchool,
+      cellId,
+      invitedBy
+    } = req.body || {};
+
+    const parsedBirthday = parseMonthDay(birthday);
+    const safeFindOut = toTextArray(findOut);
+    const safeContactPref = toTextArray(contactPref);
+    const safePrayerRequests = toTextArray(prayerRequests);
 
     const existing = await pool.query(
       `SELECT ft.id::text as id,
               ft.name,
+              ft.surname,
+              ft.gender,
               ft.mobile,
+              ft.email,
+              ft.address,
+              ft.postcode,
               ft.date_joined as "dateJoined",
+              ft.birthday_month as "birthdayMonth",
+              ft.birthday_day as "birthdayDay",
+              ft.age_group as "ageGroup",
+              ft.marital_status as "maritalStatus",
+              ft.born_again as "bornAgain",
+              ft.speak_tongues as "speakTongues",
+              COALESCE(ft.find_out, '[]'::jsonb) as "findOut",
+              COALESCE(ft.contact_pref, '[]'::jsonb) as "contactPref",
+              ft.visit,
+              ft.visit_when as "visitWhen",
+              COALESCE(ft.prayer_requests, '[]'::jsonb) as "prayerRequests",
               ft.status,
               ft.foundation_school as "foundationSchool",
               ft.invited_by as "invitedBy",
@@ -887,19 +1026,56 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id, invited_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO first_timers (
+         name, surname, gender, mobile, email, address, postcode,
+         birthday_month, birthday_day, age_group, marital_status, born_again, speak_tongues,
+         find_out, contact_pref, visit, visit_when, prayer_requests,
+         date_joined, status, foundation_school, cell_id, invited_by
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16,$17,$18::jsonb,$19,$20,$21,$22,$23)
        RETURNING id::text as id,
                  name,
+                 surname,
+                 gender,
                  mobile,
+                 email,
+                 address,
+                 postcode,
                  date_joined as "dateJoined",
+                 birthday_month as "birthdayMonth",
+                 birthday_day as "birthdayDay",
+                 age_group as "ageGroup",
+                 marital_status as "maritalStatus",
+                 born_again as "bornAgain",
+                 speak_tongues as "speakTongues",
+                 COALESCE(find_out, '[]'::jsonb) as "findOut",
+                 COALESCE(contact_pref, '[]'::jsonb) as "contactPref",
+                 visit,
+                 visit_when as "visitWhen",
+                 COALESCE(prayer_requests, '[]'::jsonb) as "prayerRequests",
                  status,
                  foundation_school as "foundationSchool",
                  invited_by as "invitedBy",
                  cell_id::text as "cellId"`,
       [
         name,
-        mobile,
+        surname || null,
+        gender || null,
+        mobile || null,
+        email || null,
+        address || null,
+        postcode || null,
+        parsedBirthday.month,
+        parsedBirthday.day,
+        ageGroup || null,
+        maritalStatus || null,
+        toBooleanOrNull(bornAgain),
+        toBooleanOrNull(speakTongues),
+        JSON.stringify(safeFindOut),
+        JSON.stringify(safeContactPref),
+        toBooleanOrNull(visit),
+        visitWhen || null,
+        JSON.stringify(safePrayerRequests),
         dateJoined || null,
         status || "amber",
         foundationSchool || "Not Yet",
@@ -927,28 +1103,105 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE FIRST-TIMER (PROTECTED)
 app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
   try {
-    const { name, mobile, dateJoined, status, foundationSchool, cellId, invitedBy } = req.body;
+    const {
+      name,
+      surname,
+      gender,
+      mobile,
+      email,
+      address,
+      postcode,
+      birthday,
+      ageGroup,
+      maritalStatus,
+      bornAgain,
+      speakTongues,
+      findOut,
+      contactPref,
+      visit,
+      visitWhen,
+      prayerRequests,
+      dateJoined,
+      status,
+      foundationSchool,
+      cellId,
+      invitedBy
+    } = req.body || {};
+
+    const parsedBirthday = parseMonthDay(birthday);
+    const safeFindOut = toTextArray(findOut);
+    const safeContactPref = toTextArray(contactPref);
+    const safePrayerRequests = toTextArray(prayerRequests);
+
     const result = await pool.query(
       `UPDATE first_timers
        SET name = COALESCE($1, name),
-           mobile = COALESCE($2, mobile),
-           date_joined = COALESCE($3, date_joined),
-           status = COALESCE($4, status),
-           foundation_school = COALESCE($5, foundation_school),
-           cell_id = COALESCE($6, cell_id),
-           invited_by = COALESCE($7, invited_by)
-       WHERE id = $8
+           surname = COALESCE($2, surname),
+           gender = COALESCE($3, gender),
+           mobile = COALESCE($4, mobile),
+           email = COALESCE($5, email),
+           address = COALESCE($6, address),
+           postcode = COALESCE($7, postcode),
+           birthday_month = COALESCE($8, birthday_month),
+           birthday_day = COALESCE($9, birthday_day),
+           age_group = COALESCE($10, age_group),
+           marital_status = COALESCE($11, marital_status),
+           born_again = COALESCE($12, born_again),
+           speak_tongues = COALESCE($13, speak_tongues),
+           find_out = COALESCE($14::jsonb, find_out),
+           contact_pref = COALESCE($15::jsonb, contact_pref),
+           visit = COALESCE($16, visit),
+           visit_when = COALESCE($17, visit_when),
+           prayer_requests = COALESCE($18::jsonb, prayer_requests),
+           date_joined = COALESCE($19, date_joined),
+           status = COALESCE($20, status),
+           foundation_school = COALESCE($21, foundation_school),
+           cell_id = COALESCE($22, cell_id),
+           invited_by = COALESCE($23, invited_by)
+       WHERE id = $24
        RETURNING id::text as id,
                  name,
+                 surname,
+                 gender,
                  mobile,
+                 email,
+                 address,
+                 postcode,
                  date_joined as "dateJoined",
+                 birthday_month as "birthdayMonth",
+                 birthday_day as "birthdayDay",
+                 age_group as "ageGroup",
+                 marital_status as "maritalStatus",
+                 born_again as "bornAgain",
+                 speak_tongues as "speakTongues",
+                 COALESCE(find_out, '[]'::jsonb) as "findOut",
+                 COALESCE(contact_pref, '[]'::jsonb) as "contactPref",
+                 visit,
+                 visit_when as "visitWhen",
+                 COALESCE(prayer_requests, '[]'::jsonb) as "prayerRequests",
                  status,
                  foundation_school as "foundationSchool",
                  invited_by as "invitedBy",
                  cell_id::text as "cellId"`,
       [
         name ?? null,
+        surname ?? null,
+        gender ?? null,
         mobile ?? null,
+        email ?? null,
+        address ?? null,
+        postcode ?? null,
+        parsedBirthday.month,
+        parsedBirthday.day,
+        ageGroup ?? null,
+        maritalStatus ?? null,
+        toBooleanOrNull(bornAgain),
+        toBooleanOrNull(speakTongues),
+        safeFindOut.length ? JSON.stringify(safeFindOut) : null,
+        safeContactPref.length ? JSON.stringify(safeContactPref) : null,
+        toBooleanOrNull(visit),
+        visitWhen ?? null,
+        safePrayerRequests.length ? JSON.stringify(safePrayerRequests) : null,
         dateJoined ?? null,
         status ?? null,
         foundationSchool ?? null,
@@ -1469,6 +1722,13 @@ app.get(/.*/, (req, res) => {
 // ===============================
 // 7) START SERVER (ALWAYS LAST)
 // ===============================
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+ensureFirstTimerSchema()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Startup schema check failed:", err);
+    process.exit(1);
+  });

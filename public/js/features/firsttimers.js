@@ -1,7 +1,26 @@
-﻿function getFirstTimerStatusLabel(status) {
+function getFirstTimerStatusLabel(status) {
     if (status === 'green') return 'Green';
     if (status === 'red') return 'Red';
     return 'Amber';
+}
+
+function yesNo(value) {
+    if (value === true || String(value).toLowerCase() === 'yes' || String(value).toLowerCase() === 'true') return 'Yes';
+    if (value === false || String(value).toLowerCase() === 'no' || String(value).toLowerCase() === 'false') return 'No';
+    return '';
+}
+
+function formatList(value) {
+    if (!value) return '';
+    if (Array.isArray(value)) return value.filter(Boolean).join(', ');
+    return String(value);
+}
+
+function formatMonthDay(month, day) {
+    if (!month || !day) return '';
+    const mm = String(month).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    return `${dd}/${mm}`;
 }
 
 function updateFirstTimerSelects() {
@@ -25,7 +44,7 @@ function updateFirstTimerSelects() {
         churchData.firstTimers.forEach(ft => {
             const opt = document.createElement('option');
             opt.value = ft.id;
-            opt.textContent = ft.name;
+            opt.textContent = [ft.name, ft.surname].filter(Boolean).join(' ').trim() || ft.name;
             if (String(ft.id) === String(current)) opt.selected = true;
             ftSelect.appendChild(opt);
         });
@@ -40,7 +59,7 @@ function updateFirstTimersTable() {
     if (!churchData.firstTimers.length) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" style="text-align: center; padding: 30px; color: var(--gray-color);">
+                <td colspan="23" style="text-align: center; padding: 30px; color: var(--gray-color);">
                     No first-timers yet.
                 </td>
             </tr>
@@ -49,7 +68,9 @@ function updateFirstTimersTable() {
     }
 
     churchData.firstTimers.forEach(ft => {
+        const fullName = [ft.name, ft.surname].filter(Boolean).join(' ').trim();
         const dateJoined = ft.dateJoined ? new Date(ft.dateJoined).toLocaleDateString() : '';
+        const birthday = formatMonthDay(ft.birthdayMonth, ft.birthdayDay);
         const lastFollow = churchData.followUps
             .filter(fu => String(fu.firstTimerId) === String(ft.id))
             .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
@@ -57,8 +78,22 @@ function updateFirstTimersTable() {
 
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td data-label="Name">${ft.name}</td>
+            <td data-label="Name">${fullName || ft.name || ''}</td>
+            <td data-label="Gender">${ft.gender || ''}</td>
             <td data-label="Mobile">${formatPhoneLink(ft.mobile)}</td>
+            <td data-label="Email">${formatEmailLink(ft.email)}</td>
+            <td data-label="Address">${ft.address || ''}</td>
+            <td data-label="Post Code">${ft.postcode || ''}</td>
+            <td data-label="Birthday">${birthday}</td>
+            <td data-label="Age Group">${ft.ageGroup || ''}</td>
+            <td data-label="Marital Status">${ft.maritalStatus || ''}</td>
+            <td data-label="Born Again">${yesNo(ft.bornAgain)}</td>
+            <td data-label="Speak Tongues">${yesNo(ft.speakTongues)}</td>
+            <td data-label="How Found Us">${formatList(ft.findOut)}</td>
+            <td data-label="Contact Pref">${formatList(ft.contactPref)}</td>
+            <td data-label="Visit">${yesNo(ft.visit)}</td>
+            <td data-label="Visit When">${ft.visitWhen || ''}</td>
+            <td data-label="Prayer Requests">${formatList(ft.prayerRequests)}</td>
             <td data-label="Invited By">${ft.invitedBy || ''}</td>
             <td data-label="Date Joined">${dateJoined}</td>
             <td data-label="Status">${getFirstTimerStatusLabel(ft.status)}</td>
@@ -70,7 +105,7 @@ function updateFirstTimersTable() {
                     <button class="action-btn edit-btn" onclick="editFirstTimer('${ft.id}')">
                         <i class="fas fa-edit"></i> Edit
                     </button>
-                    <button class="action-btn delete-btn" onclick="deleteFirstTimer('${ft.id}', '${ft.name}')">
+                    <button class="action-btn delete-btn" onclick="deleteFirstTimer('${ft.id}', '${fullName || ft.name}')">
                         <i class="fas fa-trash"></i> Delete
                     </button>
                 </div>
