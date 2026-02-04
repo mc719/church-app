@@ -138,6 +138,9 @@ function updateAccessManagementTable() {
                     <td data-label="Status">${user.status ? 'Active' : 'Inactive'}</td>
                     <td data-label="Actions">
                         <div class="action-buttons">
+                            <button class="action-btn" onclick="editUserProfile('${user.id}')">
+                                <i class="fas fa-id-card"></i> Profile
+                            </button>
                             <button class="action-btn edit-btn" onclick="editUser('${user.id}')">
                                 <i class="fas fa-edit"></i> Edit
                             </button>
@@ -154,6 +157,67 @@ function updateAccessManagementTable() {
                 paginationState.access = newPage;
                 updateAccessManagementTable();
             });
+        }
+
+window.currentProfilePhotoData = null;
+
+async function editUserProfile(userId) {
+            try {
+                const profile = await apiRequest(`${API_ENDPOINTS.PROFILES}/${userId}`);
+                document.getElementById('profileUserId').value = userId;
+                document.getElementById('profileEmail').value = profile.email || '';
+                document.getElementById('profileFullName').value = profile.fullName || '';
+                document.getElementById('profilePhone').value = profile.phone || '';
+                document.getElementById('profileRoleTitle').value = profile.roleTitle || '';
+                document.getElementById('profileAddress').value = profile.address || '';
+                document.getElementById('profileDobMonth').value = profile.dobMonth ? String(profile.dobMonth) : '';
+                document.getElementById('profileDobDay').value = profile.dobDay ? String(profile.dobDay) : '';
+
+                window.currentProfilePhotoData = profile.photoData || null;
+                const preview = document.getElementById('profilePhotoPreview');
+                const placeholder = document.getElementById('profilePhotoPlaceholder');
+                if (window.currentProfilePhotoData) {
+                    preview.src = window.currentProfilePhotoData;
+                    preview.style.display = 'block';
+                    placeholder.style.display = 'none';
+                } else {
+                    preview.removeAttribute('src');
+                    preview.style.display = 'none';
+                    placeholder.style.display = 'flex';
+                }
+
+                showModal('userProfileModal');
+            } catch (error) {
+                alert('Failed to load profile: ' + error.message);
+            }
+        }
+
+async function saveUserProfile(e) {
+            e.preventDefault();
+            const userId = document.getElementById('profileUserId').value;
+            const day = document.getElementById('profileDobDay').value;
+            const month = document.getElementById('profileDobMonth').value;
+            const dateOfBirth = (day && month) ? `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
+
+            const payload = {
+                fullName: document.getElementById('profileFullName').value.trim(),
+                phone: document.getElementById('profilePhone').value.trim(),
+                roleTitle: document.getElementById('profileRoleTitle').value.trim(),
+                address: document.getElementById('profileAddress').value.trim(),
+                dateOfBirth,
+                photoData: window.currentProfilePhotoData
+            };
+
+            try {
+                await apiRequest(`${API_ENDPOINTS.PROFILES}/${userId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+                closeModal('userProfileModal');
+                alert('Profile updated successfully!');
+            } catch (error) {
+                alert('Failed to save profile: ' + error.message);
+            }
         }
 
 function updatePageManagementTable() {

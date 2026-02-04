@@ -12,7 +12,8 @@
             FIRST_TIMERS: `${API_BASE}/first-timers`,
             FOLLOW_UPS: `${API_BASE}/follow-ups`,
             SETTINGS_LOGO: `${API_BASE}/settings/logo`,
-            NOTIFICATIONS: `${API_BASE}/notifications`
+            NOTIFICATIONS: `${API_BASE}/notifications`,
+            PROFILES: `${API_BASE}/profiles`
         };
 
         // Data storage for frontend cache
@@ -1662,6 +1663,7 @@
             populateDayMonthSelect('memberDobDay', 'memberDobMonth');
             populateDayMonthSelect('editMemberDobDay', 'editMemberDobMonth');
             populateDayMonthSelect('birthdayDateDay', 'birthdayDateMonth');
+            populateDayMonthSelect('profileDobDay', 'profileDobMonth');
 
             setupPageManagementRealtime();
 
@@ -1676,6 +1678,28 @@
                 populateBirthdayMemberSelect(e.target.value);
             });
             document.getElementById('addBirthdayForm')?.addEventListener('submit', saveBirthday);
+
+            document.getElementById('userProfileForm')?.addEventListener('submit', (e) => {
+                if (typeof saveUserProfile === 'function') {
+                    saveUserProfile(e);
+                }
+            });
+            document.getElementById('profilePhotoUpload')?.addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                    window.currentProfilePhotoData = reader.result;
+                    const preview = document.getElementById('profilePhotoPreview');
+                    const placeholder = document.getElementById('profilePhotoPlaceholder');
+                    if (preview && placeholder) {
+                        preview.src = reader.result;
+                        preview.style.display = 'block';
+                        placeholder.style.display = 'none';
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
 
             // First-timers buttons and tabs
             document.getElementById('addFirstTimerBtn')?.addEventListener('click', () => {

@@ -252,6 +252,102 @@ async function ensureFirstTimerSchema() {
   );
 }
 
+async function ensureUserProfilesSchema() {
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS user_profiles (
+       id SERIAL PRIMARY KEY,
+       user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+       email TEXT NOT NULL,
+       username TEXT,
+       full_name TEXT,
+       phone TEXT,
+       role_title TEXT,
+       cell_id INTEGER REFERENCES cells(id) ON DELETE SET NULL,
+       dob_month SMALLINT,
+       dob_day SMALLINT,
+       address TEXT,
+       photo_data TEXT,
+       source TEXT DEFAULT 'system',
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+     )`
+  );
+
+  await pool.query(
+    `ALTER TABLE user_profiles
+       ADD COLUMN IF NOT EXISTS username TEXT,
+       ADD COLUMN IF NOT EXISTS full_name TEXT,
+       ADD COLUMN IF NOT EXISTS phone TEXT,
+       ADD COLUMN IF NOT EXISTS role_title TEXT,
+       ADD COLUMN IF NOT EXISTS cell_id INTEGER REFERENCES cells(id) ON DELETE SET NULL,
+       ADD COLUMN IF NOT EXISTS dob_month SMALLINT,
+       ADD COLUMN IF NOT EXISTS dob_day SMALLINT,
+       ADD COLUMN IF NOT EXISTS address TEXT,
+       ADD COLUMN IF NOT EXISTS photo_data TEXT,
+       ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'system',
+       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`
+  );
+}
+
+async function ensureUserProfileForUser({ userId, email, username = null, role = null }) {
+  if (!userId || !email) return;
+  await pool.query(
+    `INSERT INTO user_profiles (user_id, email, username, role_title, source, updated_at)
+     VALUES ($1,$2,$3,$4,'system', NOW())
+     ON CONFLICT (user_id) DO UPDATE
+       SET email = EXCLUDED.email,
+           username = COALESCE(EXCLUDED.username, user_profiles.username),
+           role_title = COALESCE(EXCLUDED.role_title, user_profiles.role_title),
+           updated_at = NOW()`,
+    [userId, email, username, role]
+  );
+}
+
+async function syncProfileByEmail({ email, fullName = null, phone = null, roleTitle = null, cellId = null, dobMonth = null, dobDay = null, address = null, source = "member-sync" }) {
+  if (!email) return;
+  const normalized = String(email).trim().toLowerCase();
+  const userResult = await pool.query(
+    "SELECT id, username, role FROM users WHERE LOWER(email) = $1 LIMIT 1",
+    [normalized]
+  );
+  const user = userResult.rows[0];
+  if (!user?.id) return;
+
+  await ensureUserProfileForUser({
+    userId: user.id,
+    email: normalized,
+    username: user.username,
+    role: user.role
+  });
+
+  await pool.query(
+    `UPDATE user_profiles
+     SET full_name = COALESCE($1, full_name),
+         phone = COALESCE($2, phone),
+         role_title = COALESCE($3, role_title),
+         cell_id = COALESCE($4, cell_id),
+         dob_month = COALESCE($5, dob_month),
+         dob_day = COALESCE($6, dob_day),
+         address = COALESCE($7, address),
+         source = COALESCE($8, source),
+         updated_at = NOW()
+     WHERE user_id = $9`,
+    [fullName, phone, roleTitle, cellId, dobMonth, dobDay, address, source, user.id]
+  );
+}
+
+async function seedProfilesForExistingUsers() {
+  const users = await pool.query("SELECT id, username, email, role FROM users WHERE email IS NOT NULL");
+  for (const user of users.rows) {
+    await ensureUserProfileForUser({
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role
+    });
+  }
+}
+
 // ===============================
 // 6) ROUTES
 // ===============================
@@ -498,6 +594,13 @@ app.post("/api/users", requireAuth, requireAdmin, async (req, res) => {
       [username, email, passwordHash, role, status ?? true, restrictedMenusJson]
     );
 
+    await ensureUserProfileForUser({
+      userId: result.rows[0].id,
+      email: result.rows[0].email,
+      username: result.rows[0].username,
+      role: result.rows[0].role
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -540,6 +643,13 @@ app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    await ensureUserProfileForUser({
+      userId: result.rows[0].id,
+      email: result.rows[0].email,
+      username: result.rows[0].username,
+      role: result.rows[0].role
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -562,6 +672,131 @@ app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to delete user" });
+  }
+});
+
+// USER PROFILES
+app.get("/api/profile/me", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT up.id::text as id,
+              up.user_id::text as "userId",
+              up.email,
+              up.username,
+              up.full_name as "fullName",
+              up.phone,
+              up.role_title as "roleTitle",
+              up.cell_id::text as "cellId",
+              up.dob_month as "dobMonth",
+              up.dob_day as "dobDay",
+              CASE
+                WHEN up.dob_month IS NOT NULL AND up.dob_day IS NOT NULL
+                  THEN LPAD(up.dob_month::text, 2, '0') || '-' || LPAD(up.dob_day::text, 2, '0')
+                ELSE NULL
+              END as "dateOfBirth",
+              up.address,
+              up.photo_data as "photoData",
+              up.source,
+              up.updated_at as "updatedAt"
+       FROM user_profiles up
+       WHERE up.user_id = $1
+       LIMIT 1`,
+      [req.user.userId]
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+app.get("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT up.id::text as id,
+              up.user_id::text as "userId",
+              up.email,
+              up.username,
+              up.full_name as "fullName",
+              up.phone,
+              up.role_title as "roleTitle",
+              up.cell_id::text as "cellId",
+              up.dob_month as "dobMonth",
+              up.dob_day as "dobDay",
+              CASE
+                WHEN up.dob_month IS NOT NULL AND up.dob_day IS NOT NULL
+                  THEN LPAD(up.dob_month::text, 2, '0') || '-' || LPAD(up.dob_day::text, 2, '0')
+                ELSE NULL
+              END as "dateOfBirth",
+              up.address,
+              up.photo_data as "photoData",
+              up.source,
+              up.updated_at as "updatedAt"
+       FROM user_profiles up
+       WHERE up.user_id = $1
+       LIMIT 1`,
+      [req.params.userId]
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+app.put("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { fullName, phone, roleTitle, cellId, dateOfBirth, address, photoData } = req.body || {};
+    const parsedDob = parseMonthDay(dateOfBirth);
+
+    const result = await pool.query(
+      `UPDATE user_profiles
+       SET full_name = COALESCE($1, full_name),
+           phone = COALESCE($2, phone),
+           role_title = COALESCE($3, role_title),
+           cell_id = COALESCE($4, cell_id),
+           dob_month = COALESCE($5, dob_month),
+           dob_day = COALESCE($6, dob_day),
+           address = COALESCE($7, address),
+           photo_data = COALESCE($8, photo_data),
+           source = 'manual',
+           updated_at = NOW()
+       WHERE user_id = $9
+       RETURNING id::text as id,
+                 user_id::text as "userId",
+                 email,
+                 username,
+                 full_name as "fullName",
+                 phone,
+                 role_title as "roleTitle",
+                 cell_id::text as "cellId",
+                 dob_month as "dobMonth",
+                 dob_day as "dobDay",
+                 CASE
+                   WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
+                     THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
+                   ELSE NULL
+                 END as "dateOfBirth",
+                 address,
+                 photo_data as "photoData",
+                 source,
+                 updated_at as "updatedAt"`,
+      [fullName ?? null, phone ?? null, roleTitle ?? null, cellId ?? null, parsedDob.month, parsedDob.day, address ?? null, photoData ?? null, req.params.userId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update profile" });
   }
 });
 
@@ -775,6 +1010,17 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
 
     const member = result.rows[0];
 
+    await syncProfileByEmail({
+      email: member.email,
+      fullName: member.name,
+      phone: member.mobile,
+      roleTitle: member.role,
+      cellId: member.cellId,
+      dobMonth: member.dobMonth || parseMonthDay(member.dateOfBirth).month,
+      dobDay: member.dobDay || parseMonthDay(member.dateOfBirth).day,
+      source: "member-sync"
+    });
+
     if (isFirstTimer) {
       const existing = await pool.query(
         `SELECT id
@@ -868,6 +1114,17 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
     }
 
     const member = result.rows[0];
+
+    await syncProfileByEmail({
+      email: member.email,
+      fullName: member.name,
+      phone: member.mobile,
+      roleTitle: member.role,
+      cellId: member.cellId,
+      dobMonth: member.dobMonth || parseMonthDay(member.dateOfBirth).month,
+      dobDay: member.dobDay || parseMonthDay(member.dateOfBirth).day,
+      source: "member-sync"
+    });
 
     if (isFirstTimer === true) {
       const existing = await pool.query(
@@ -1140,6 +1397,18 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
       );
     }
 
+    await syncProfileByEmail({
+      email: result.rows[0].email,
+      fullName: [result.rows[0].name, result.rows[0].surname].filter(Boolean).join(" ").trim() || result.rows[0].name,
+      phone: result.rows[0].mobile,
+      roleTitle: "First-Timer",
+      cellId: result.rows[0].cellId,
+      dobMonth: result.rows[0].birthdayMonth || null,
+      dobDay: result.rows[0].birthdayDay || null,
+      address: result.rows[0].address,
+      source: "first-timer-sync"
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -1261,6 +1530,18 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "First-timer not found" });
     }
+
+    await syncProfileByEmail({
+      email: result.rows[0].email,
+      fullName: [result.rows[0].name, result.rows[0].surname].filter(Boolean).join(" ").trim() || result.rows[0].name,
+      phone: result.rows[0].mobile,
+      roleTitle: "First-Timer",
+      cellId: result.rows[0].cellId,
+      dobMonth: result.rows[0].birthdayMonth || null,
+      dobDay: result.rows[0].birthdayDay || null,
+      address: result.rows[0].address,
+      source: "first-timer-sync"
+    });
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -1782,6 +2063,8 @@ app.get(/.*/, (req, res) => {
 // 7) START SERVER (ALWAYS LAST)
 // ===============================
 ensureFirstTimerSchema()
+  .then(() => ensureUserProfilesSchema())
+  .then(() => seedProfilesForExistingUsers())
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
