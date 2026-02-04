@@ -186,7 +186,7 @@ async function openMyProfile() {
                     placeholder.style.display = 'flex';
                 }
 
-                showModal('userProfileModal');
+                navigateToPage('user-profile');
             } catch (error) {
                 alert('Failed to load profile: ' + error.message);
             }
@@ -217,7 +217,7 @@ async function editUserProfile(userId) {
                     placeholder.style.display = 'flex';
                 }
 
-                showModal('userProfileModal');
+                navigateToPage('user-profile');
             } catch (error) {
                 alert('Failed to load profile: ' + error.message);
             }
@@ -245,7 +245,6 @@ async function saveUserProfile(e) {
                     method: 'PUT',
                     body: JSON.stringify(payload)
                 });
-                closeModal('userProfileModal');
                 alert('Profile updated successfully!');
             } catch (error) {
                 alert('Failed to save profile: ' + error.message);

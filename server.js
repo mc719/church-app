@@ -348,6 +348,78 @@ async function seedProfilesForExistingUsers() {
   }
 }
 
+async function refreshProfileFromEmail(userId) {
+  const userResult = await pool.query(
+    "SELECT id, username, email, role FROM users WHERE id = $1 LIMIT 1",
+    [userId]
+  );
+  const user = userResult.rows[0];
+  if (!user?.email) return;
+
+  await ensureUserProfileForUser({
+    userId: user.id,
+    email: user.email,
+    username: user.username,
+    role: user.role
+  });
+
+  const normalizedEmail = String(user.email).trim().toLowerCase();
+
+  const memberResult = await pool.query(
+    `SELECT name, mobile, role, cell_id, dob_month, dob_day
+     FROM members
+     WHERE LOWER(email) = $1
+     ORDER BY joined_date DESC NULLS LAST, id DESC
+     LIMIT 1`,
+    [normalizedEmail]
+  );
+
+  if (memberResult.rows.length) {
+    const member = memberResult.rows[0];
+    await pool.query(
+      `UPDATE user_profiles
+       SET full_name = COALESCE($1, full_name),
+           phone = COALESCE($2, phone),
+           role_title = COALESCE($3, role_title),
+           cell_id = COALESCE($4, cell_id),
+           dob_month = COALESCE($5, dob_month),
+           dob_day = COALESCE($6, dob_day),
+           source = 'email-sync',
+           updated_at = NOW()
+       WHERE user_id = $7`,
+      [member.name, member.mobile, member.role, member.cell_id, member.dob_month, member.dob_day, user.id]
+    );
+    return;
+  }
+
+  const firstTimerResult = await pool.query(
+    `SELECT name, surname, mobile, cell_id, birthday_month, birthday_day, address
+     FROM first_timers
+     WHERE LOWER(email) = $1
+     ORDER BY date_joined DESC NULLS LAST, id DESC
+     LIMIT 1`,
+    [normalizedEmail]
+  );
+
+  if (firstTimerResult.rows.length) {
+    const ft = firstTimerResult.rows[0];
+    await pool.query(
+      `UPDATE user_profiles
+       SET full_name = COALESCE($1, full_name),
+           phone = COALESCE($2, phone),
+           role_title = COALESCE($3, role_title),
+           cell_id = COALESCE($4, cell_id),
+           dob_month = COALESCE($5, dob_month),
+           dob_day = COALESCE($6, dob_day),
+           address = COALESCE($7, address),
+           source = 'email-sync',
+           updated_at = NOW()
+       WHERE user_id = $8`,
+      [[ft.name, ft.surname].filter(Boolean).join(" ").trim() || ft.name, ft.mobile, "First-Timer", ft.cell_id, ft.birthday_month, ft.birthday_day, ft.address, user.id]
+    );
+  }
+}
+
 // ===============================
 // 6) ROUTES
 // ===============================
@@ -692,6 +764,7 @@ app.get("/api/profile/me", requireAuth, async (req, res) => {
       username: me.username,
       role: me.role
     });
+    await refreshProfileFromEmail(me.id);
 
     const result = await pool.query(
       `SELECT up.id::text as id,
@@ -780,6 +853,7 @@ app.put("/api/profile/me", requireAuth, async (req, res) => {
 
 app.get("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => {
   try {
+    await refreshProfileFromEmail(req.params.userId);
     const result = await pool.query(
       `SELECT up.id::text as id,
               up.user_id::text as "userId",
