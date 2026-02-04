@@ -254,6 +254,17 @@ async function ensureFirstTimerSchema() {
 
 async function ensureUserProfilesSchema() {
   await pool.query(
+    `CREATE TABLE IF NOT EXISTS departments (
+       id SERIAL PRIMARY KEY,
+       name TEXT UNIQUE NOT NULL,
+       hod_name TEXT,
+       hod_mobile TEXT,
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+     )`
+  );
+
+  await pool.query(
     `CREATE TABLE IF NOT EXISTS user_profiles (
        id SERIAL PRIMARY KEY,
        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -262,7 +273,10 @@ async function ensureUserProfilesSchema() {
        full_name TEXT,
        phone TEXT,
        role_title TEXT,
+       title TEXT,
        cell_id INTEGER REFERENCES cells(id) ON DELETE SET NULL,
+       postcode TEXT,
+       department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
        dob_month SMALLINT,
        dob_day SMALLINT,
        address TEXT,
@@ -279,13 +293,22 @@ async function ensureUserProfilesSchema() {
        ADD COLUMN IF NOT EXISTS full_name TEXT,
        ADD COLUMN IF NOT EXISTS phone TEXT,
        ADD COLUMN IF NOT EXISTS role_title TEXT,
+       ADD COLUMN IF NOT EXISTS title TEXT,
        ADD COLUMN IF NOT EXISTS cell_id INTEGER REFERENCES cells(id) ON DELETE SET NULL,
+       ADD COLUMN IF NOT EXISTS postcode TEXT,
+       ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
        ADD COLUMN IF NOT EXISTS dob_month SMALLINT,
        ADD COLUMN IF NOT EXISTS dob_day SMALLINT,
        ADD COLUMN IF NOT EXISTS address TEXT,
        ADD COLUMN IF NOT EXISTS photo_data TEXT,
        ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'system',
        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`
+  );
+
+  await pool.query(
+    `ALTER TABLE members
+       ADD COLUMN IF NOT EXISTS address TEXT,
+       ADD COLUMN IF NOT EXISTS postcode TEXT`
   );
 }
 
@@ -366,7 +389,7 @@ async function refreshProfileFromEmail(userId) {
   const normalizedEmail = String(user.email).trim().toLowerCase();
 
   const memberResult = await pool.query(
-    `SELECT name, mobile, role, cell_id, dob_month, dob_day
+    `SELECT title, name, mobile, role, cell_id, dob_month, dob_day, address, postcode
      FROM members
      WHERE LOWER(email) = $1
      ORDER BY joined_date DESC NULLS LAST, id DESC
@@ -378,22 +401,25 @@ async function refreshProfileFromEmail(userId) {
     const member = memberResult.rows[0];
     await pool.query(
       `UPDATE user_profiles
-       SET full_name = COALESCE($1, full_name),
-           phone = COALESCE($2, phone),
-           role_title = COALESCE($3, role_title),
-           cell_id = COALESCE($4, cell_id),
-           dob_month = COALESCE($5, dob_month),
-           dob_day = COALESCE($6, dob_day),
+       SET title = COALESCE($1, title),
+           full_name = COALESCE($2, full_name),
+           phone = COALESCE($3, phone),
+           role_title = COALESCE($4, role_title),
+           cell_id = COALESCE($5, cell_id),
+           dob_month = COALESCE($6, dob_month),
+           dob_day = COALESCE($7, dob_day),
+           address = COALESCE($8, address),
+           postcode = COALESCE($9, postcode),
            source = 'email-sync',
            updated_at = NOW()
-       WHERE user_id = $7`,
-      [member.name, member.mobile, member.role, member.cell_id, member.dob_month, member.dob_day, user.id]
+       WHERE user_id = $10`,
+      [member.title, member.name, member.mobile, member.role, member.cell_id, member.dob_month, member.dob_day, member.address, member.postcode, user.id]
     );
     return;
   }
 
   const firstTimerResult = await pool.query(
-    `SELECT name, surname, mobile, cell_id, birthday_month, birthday_day, address
+    `SELECT name, surname, mobile, cell_id, birthday_month, birthday_day, address, postcode
      FROM first_timers
      WHERE LOWER(email) = $1
      ORDER BY date_joined DESC NULLS LAST, id DESC
@@ -412,11 +438,203 @@ async function refreshProfileFromEmail(userId) {
            dob_month = COALESCE($5, dob_month),
            dob_day = COALESCE($6, dob_day),
            address = COALESCE($7, address),
+           postcode = COALESCE($8, postcode),
            source = 'email-sync',
            updated_at = NOW()
-       WHERE user_id = $8`,
-      [[ft.name, ft.surname].filter(Boolean).join(" ").trim() || ft.name, ft.mobile, "First-Timer", ft.cell_id, ft.birthday_month, ft.birthday_day, ft.address, user.id]
+       WHERE user_id = $9`,
+      [[ft.name, ft.surname].filter(Boolean).join(" ").trim() || ft.name, ft.mobile, "First-Timer", ft.cell_id, ft.birthday_month, ft.birthday_day, ft.address, ft.postcode, user.id]
     );
+  }
+}
+
+async function getProfileView(userId) {
+  const result = await pool.query(
+    `SELECT up.id::text as id,
+            up.user_id::text as "userId",
+            up.email,
+            up.username,
+            up.title,
+            up.full_name as "fullName",
+            up.phone,
+            up.role_title as "roleTitle",
+            up.cell_id::text as "cellId",
+            c.name as "cellName",
+            c.venue as "cellVenue",
+            COALESCE(
+              (
+                SELECT m.name
+                FROM members m
+                WHERE m.cell_id = up.cell_id AND LOWER(m.role) = 'cell leader'
+                ORDER BY m.id
+                LIMIT 1
+              ),
+              ''
+            ) as "cellLeader",
+            COALESCE(
+              (
+                SELECT m.mobile
+                FROM members m
+                WHERE m.cell_id = up.cell_id AND LOWER(m.role) = 'cell leader'
+                ORDER BY m.id
+                LIMIT 1
+              ),
+              ''
+            ) as "cellLeaderMobile",
+            up.department_id::text as "departmentId",
+            d.name as "departmentName",
+            d.hod_name as "hodName",
+            d.hod_mobile as "hodMobile",
+            up.postcode,
+            up.dob_month as "dobMonth",
+            up.dob_day as "dobDay",
+            CASE
+              WHEN up.dob_month IS NOT NULL AND up.dob_day IS NOT NULL
+                THEN LPAD(up.dob_month::text, 2, '0') || '-' || LPAD(up.dob_day::text, 2, '0')
+              ELSE NULL
+            END as "dateOfBirth",
+            up.address,
+            up.photo_data as "photoData",
+            up.source,
+            up.updated_at as "updatedAt"
+     FROM user_profiles up
+     LEFT JOIN cells c ON c.id = up.cell_id
+     LEFT JOIN departments d ON d.id = up.department_id
+     WHERE up.user_id = $1
+     LIMIT 1`,
+    [userId]
+  );
+  return result.rows[0] || null;
+}
+
+async function applyProfileUpdate(userId, payload = {}, source = "manual") {
+  const {
+    title,
+    fullName,
+    phone,
+    roleTitle,
+    cellId,
+    dateOfBirth,
+    address,
+    postcode,
+    photoData,
+    email,
+    cellName,
+    cellVenue,
+    cellLeader,
+    cellLeaderMobile,
+    departmentName,
+    hodName,
+    hodMobile
+  } = payload;
+
+  const parsedDob = parseMonthDay(dateOfBirth);
+  const currentUser = await pool.query("SELECT id, email FROM users WHERE id = $1 LIMIT 1", [userId]);
+  if (!currentUser.rows.length) {
+    throw new Error("User not found");
+  }
+  const currentEmail = String(currentUser.rows[0].email || "").trim().toLowerCase();
+  const newEmail = email ? String(email).trim().toLowerCase() : currentEmail;
+  const targetCellId = cellId || null;
+
+  // Update user/profile base record.
+  await pool.query("UPDATE users SET email = $1 WHERE id = $2", [newEmail, userId]);
+
+  let departmentId = null;
+  if (departmentName && String(departmentName).trim()) {
+    const dept = await pool.query(
+      `INSERT INTO departments (name, hod_name, hod_mobile, updated_at)
+       VALUES ($1,$2,$3,NOW())
+       ON CONFLICT (name) DO UPDATE
+         SET hod_name = COALESCE(EXCLUDED.hod_name, departments.hod_name),
+             hod_mobile = COALESCE(EXCLUDED.hod_mobile, departments.hod_mobile),
+             updated_at = NOW()
+       RETURNING id`,
+      [String(departmentName).trim(), hodName || null, hodMobile || null]
+    );
+    departmentId = dept.rows[0]?.id || null;
+  }
+
+  await pool.query(
+    `UPDATE user_profiles
+     SET email = COALESCE($1, email),
+         title = COALESCE($2, title),
+         full_name = COALESCE($3, full_name),
+         phone = COALESCE($4, phone),
+         role_title = COALESCE($5, role_title),
+         cell_id = COALESCE($6, cell_id),
+         department_id = COALESCE($7, department_id),
+         dob_month = COALESCE($8, dob_month),
+         dob_day = COALESCE($9, dob_day),
+         address = COALESCE($10, address),
+         postcode = COALESCE($11, postcode),
+         photo_data = COALESCE($12, photo_data),
+         source = COALESCE($13, source),
+         updated_at = NOW()
+     WHERE user_id = $14`,
+    [newEmail, title ?? null, fullName ?? null, phone ?? null, roleTitle ?? null, targetCellId, departmentId, parsedDob.month, parsedDob.day, address ?? null, postcode ?? null, photoData ?? null, source, userId]
+  );
+
+  // Keep member/first-timer in sync by email.
+  const emailCandidates = [currentEmail, newEmail].filter(Boolean);
+  await pool.query(
+    `UPDATE members
+     SET title = COALESCE($1, title),
+         name = COALESCE($2, name),
+         mobile = COALESCE($3, mobile),
+         email = COALESCE($4, email),
+         role = COALESCE($5, role),
+         cell_id = COALESCE($6, cell_id),
+         dob_month = COALESCE($7, dob_month),
+         dob_day = COALESCE($8, dob_day),
+         address = COALESCE($9, address),
+         postcode = COALESCE($10, postcode)
+     WHERE LOWER(email) = ANY($11)`,
+    [title ?? null, fullName ?? null, phone ?? null, newEmail ?? null, roleTitle ?? null, targetCellId, parsedDob.month, parsedDob.day, address ?? null, postcode ?? null, emailCandidates]
+  );
+
+  const profileName = fullName ? String(fullName).trim() : null;
+  const [firstName, ...restName] = (profileName || "").split(" ");
+  const surname = restName.join(" ").trim();
+  await pool.query(
+    `UPDATE first_timers
+     SET name = COALESCE($1, name),
+         surname = COALESCE(NULLIF($2, ''), surname),
+         mobile = COALESCE($3, mobile),
+         email = COALESCE($4, email),
+         cell_id = COALESCE($5, cell_id),
+         birthday_month = COALESCE($6, birthday_month),
+         birthday_day = COALESCE($7, birthday_day),
+         address = COALESCE($8, address),
+         postcode = COALESCE($9, postcode)
+     WHERE LOWER(email) = ANY($10)`,
+    [firstName || null, surname || null, phone ?? null, newEmail ?? null, targetCellId, parsedDob.month, parsedDob.day, address ?? null, postcode ?? null, emailCandidates]
+  );
+
+  // Cell section edits.
+  if (targetCellId && (cellName || cellVenue)) {
+    await pool.query(
+      `UPDATE cells
+       SET name = COALESCE($1, name),
+           venue = COALESCE($2, venue)
+       WHERE id = $3`,
+      [cellName ?? null, cellVenue ?? null, targetCellId]
+    );
+  }
+
+  if (targetCellId && (cellLeader || cellLeaderMobile)) {
+    const existingLeader = await pool.query(
+      `SELECT id FROM members WHERE cell_id = $1 AND LOWER(role) = 'cell leader' ORDER BY id LIMIT 1`,
+      [targetCellId]
+    );
+    if (existingLeader.rows.length) {
+      await pool.query(
+        `UPDATE members
+         SET name = COALESCE($1, name),
+             mobile = COALESCE($2, mobile)
+         WHERE id = $3`,
+        [cellLeader ?? null, cellLeaderMobile ?? null, existingLeader.rows[0].id]
+      );
+    }
   }
 }
 
@@ -766,35 +984,11 @@ app.get("/api/profile/me", requireAuth, async (req, res) => {
     });
     await refreshProfileFromEmail(me.id);
 
-    const result = await pool.query(
-      `SELECT up.id::text as id,
-              up.user_id::text as "userId",
-              up.email,
-              up.username,
-              up.full_name as "fullName",
-              up.phone,
-              up.role_title as "roleTitle",
-              up.cell_id::text as "cellId",
-              up.dob_month as "dobMonth",
-              up.dob_day as "dobDay",
-              CASE
-                WHEN up.dob_month IS NOT NULL AND up.dob_day IS NOT NULL
-                  THEN LPAD(up.dob_month::text, 2, '0') || '-' || LPAD(up.dob_day::text, 2, '0')
-                ELSE NULL
-              END as "dateOfBirth",
-              up.address,
-              up.photo_data as "photoData",
-              up.source,
-              up.updated_at as "updatedAt"
-       FROM user_profiles up
-       WHERE up.user_id = $1
-       LIMIT 1`,
-      [req.user.userId]
-    );
-    if (!result.rows.length) {
+    const profile = await getProfileView(req.user.userId);
+    if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
-    res.json(result.rows[0]);
+    res.json(profile);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load profile" });
@@ -803,48 +997,12 @@ app.get("/api/profile/me", requireAuth, async (req, res) => {
 
 app.put("/api/profile/me", requireAuth, async (req, res) => {
   try {
-    const { fullName, phone, roleTitle, cellId, dateOfBirth, address, photoData } = req.body || {};
-    const parsedDob = parseMonthDay(dateOfBirth);
-
-    const result = await pool.query(
-      `UPDATE user_profiles
-       SET full_name = COALESCE($1, full_name),
-           phone = COALESCE($2, phone),
-           role_title = COALESCE($3, role_title),
-           cell_id = COALESCE($4, cell_id),
-           dob_month = COALESCE($5, dob_month),
-           dob_day = COALESCE($6, dob_day),
-           address = COALESCE($7, address),
-           photo_data = COALESCE($8, photo_data),
-           source = 'self',
-           updated_at = NOW()
-       WHERE user_id = $9
-       RETURNING id::text as id,
-                 user_id::text as "userId",
-                 email,
-                 username,
-                 full_name as "fullName",
-                 phone,
-                 role_title as "roleTitle",
-                 cell_id::text as "cellId",
-                 dob_month as "dobMonth",
-                 dob_day as "dobDay",
-                 CASE
-                   WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
-                     THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
-                   ELSE NULL
-                 END as "dateOfBirth",
-                 address,
-                 photo_data as "photoData",
-                 source,
-                 updated_at as "updatedAt"`,
-      [fullName ?? null, phone ?? null, roleTitle ?? null, cellId ?? null, parsedDob.month, parsedDob.day, address ?? null, photoData ?? null, req.user.userId]
-    );
-
-    if (!result.rows.length) {
+    await applyProfileUpdate(req.user.userId, req.body || {}, "self");
+    const profile = await getProfileView(req.user.userId);
+    if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
-    res.json(result.rows[0]);
+    res.json(profile);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update profile" });
@@ -854,35 +1012,11 @@ app.put("/api/profile/me", requireAuth, async (req, res) => {
 app.get("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => {
   try {
     await refreshProfileFromEmail(req.params.userId);
-    const result = await pool.query(
-      `SELECT up.id::text as id,
-              up.user_id::text as "userId",
-              up.email,
-              up.username,
-              up.full_name as "fullName",
-              up.phone,
-              up.role_title as "roleTitle",
-              up.cell_id::text as "cellId",
-              up.dob_month as "dobMonth",
-              up.dob_day as "dobDay",
-              CASE
-                WHEN up.dob_month IS NOT NULL AND up.dob_day IS NOT NULL
-                  THEN LPAD(up.dob_month::text, 2, '0') || '-' || LPAD(up.dob_day::text, 2, '0')
-                ELSE NULL
-              END as "dateOfBirth",
-              up.address,
-              up.photo_data as "photoData",
-              up.source,
-              up.updated_at as "updatedAt"
-       FROM user_profiles up
-       WHERE up.user_id = $1
-       LIMIT 1`,
-      [req.params.userId]
-    );
-    if (!result.rows.length) {
+    const profile = await getProfileView(req.params.userId);
+    if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
-    res.json(result.rows[0]);
+    res.json(profile);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load profile" });
@@ -891,48 +1025,12 @@ app.get("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => 
 
 app.put("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { fullName, phone, roleTitle, cellId, dateOfBirth, address, photoData } = req.body || {};
-    const parsedDob = parseMonthDay(dateOfBirth);
-
-    const result = await pool.query(
-      `UPDATE user_profiles
-       SET full_name = COALESCE($1, full_name),
-           phone = COALESCE($2, phone),
-           role_title = COALESCE($3, role_title),
-           cell_id = COALESCE($4, cell_id),
-           dob_month = COALESCE($5, dob_month),
-           dob_day = COALESCE($6, dob_day),
-           address = COALESCE($7, address),
-           photo_data = COALESCE($8, photo_data),
-           source = 'manual',
-           updated_at = NOW()
-       WHERE user_id = $9
-       RETURNING id::text as id,
-                 user_id::text as "userId",
-                 email,
-                 username,
-                 full_name as "fullName",
-                 phone,
-                 role_title as "roleTitle",
-                 cell_id::text as "cellId",
-                 dob_month as "dobMonth",
-                 dob_day as "dobDay",
-                 CASE
-                   WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
-                     THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
-                   ELSE NULL
-                 END as "dateOfBirth",
-                 address,
-                 photo_data as "photoData",
-                 source,
-                 updated_at as "updatedAt"`,
-      [fullName ?? null, phone ?? null, roleTitle ?? null, cellId ?? null, parsedDob.month, parsedDob.day, address ?? null, photoData ?? null, req.params.userId]
-    );
-
-    if (!result.rows.length) {
+    await applyProfileUpdate(req.params.userId, req.body || {}, "manual");
+    const profile = await getProfileView(req.params.userId);
+    if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
-    res.json(result.rows[0]);
+    res.json(profile);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update profile" });

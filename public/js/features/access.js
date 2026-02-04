@@ -161,17 +161,46 @@ function updateAccessManagementTable() {
 
 window.currentProfilePhotoData = null;
 
+function populateProfileCellOptions(selectedCellId = '') {
+            const select = document.getElementById('profileCellId');
+            if (!select) return;
+            select.innerHTML = '<option value="">Select Cell</option>';
+            churchData.cells.forEach(cell => {
+                const opt = document.createElement('option');
+                opt.value = cell.id;
+                opt.textContent = cell.name;
+                if (String(cell.id) === String(selectedCellId)) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+        }
+
+function bindProfileData(profile, userIdValue) {
+            document.getElementById('profileUserId').value = userIdValue;
+            document.getElementById('profileTitle').value = profile.title || '';
+            document.getElementById('profileEmail').value = profile.email || '';
+            document.getElementById('profileFullName').value = profile.fullName || '';
+            document.getElementById('profileMobile').value = profile.phone || '';
+            document.getElementById('profileRoleTitle').value = profile.roleTitle || '';
+            document.getElementById('profileAddress').value = profile.address || '';
+            document.getElementById('profilePostcode').value = profile.postcode || '';
+            document.getElementById('profileDobMonth').value = profile.dobMonth ? String(profile.dobMonth) : '';
+            document.getElementById('profileDobDay').value = profile.dobDay ? String(profile.dobDay) : '';
+            document.getElementById('profileCellName').value = profile.cellName || '';
+            document.getElementById('profileCellVenue').value = profile.cellVenue || '';
+            document.getElementById('profileCellLeader').value = profile.cellLeader || '';
+            document.getElementById('profileCellLeaderMobile').value = profile.cellLeaderMobile || '';
+            document.getElementById('profileDepartmentName').value = profile.departmentName || '';
+            document.getElementById('profileHodName').value = profile.hodName || '';
+            document.getElementById('profileHodMobile').value = profile.hodMobile || '';
+            populateProfileCellOptions(profile.cellId || '');
+        }
+
 async function openMyProfile() {
             try {
                 const profile = await apiRequest('/api/profile/me');
-                document.getElementById('profileUserId').value = 'me';
-                document.getElementById('profileEmail').value = profile.email || '';
-                document.getElementById('profileFullName').value = profile.fullName || '';
-                document.getElementById('profilePhone').value = profile.phone || '';
-                document.getElementById('profileRoleTitle').value = profile.roleTitle || '';
-                document.getElementById('profileAddress').value = profile.address || '';
-                document.getElementById('profileDobMonth').value = profile.dobMonth ? String(profile.dobMonth) : '';
-                document.getElementById('profileDobDay').value = profile.dobDay ? String(profile.dobDay) : '';
+                bindProfileData(profile, 'me');
 
                 window.currentProfilePhotoData = profile.photoData || null;
                 const preview = document.getElementById('profilePhotoPreview');
@@ -195,14 +224,7 @@ async function openMyProfile() {
 async function editUserProfile(userId) {
             try {
                 const profile = await apiRequest(`${API_ENDPOINTS.PROFILES}/${userId}`);
-                document.getElementById('profileUserId').value = userId;
-                document.getElementById('profileEmail').value = profile.email || '';
-                document.getElementById('profileFullName').value = profile.fullName || '';
-                document.getElementById('profilePhone').value = profile.phone || '';
-                document.getElementById('profileRoleTitle').value = profile.roleTitle || '';
-                document.getElementById('profileAddress').value = profile.address || '';
-                document.getElementById('profileDobMonth').value = profile.dobMonth ? String(profile.dobMonth) : '';
-                document.getElementById('profileDobDay').value = profile.dobDay ? String(profile.dobDay) : '';
+                bindProfileData(profile, userId);
 
                 window.currentProfilePhotoData = profile.photoData || null;
                 const preview = document.getElementById('profilePhotoPreview');
@@ -231,10 +253,21 @@ async function saveUserProfile(e) {
             const dateOfBirth = (day && month) ? `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
 
             const payload = {
+                title: document.getElementById('profileTitle').value.trim(),
                 fullName: document.getElementById('profileFullName').value.trim(),
-                phone: document.getElementById('profilePhone').value.trim(),
+                phone: document.getElementById('profileMobile').value.trim(),
+                email: document.getElementById('profileEmail').value.trim(),
                 roleTitle: document.getElementById('profileRoleTitle').value.trim(),
                 address: document.getElementById('profileAddress').value.trim(),
+                postcode: document.getElementById('profilePostcode').value.trim(),
+                cellId: document.getElementById('profileCellId').value || null,
+                cellName: document.getElementById('profileCellName').value.trim(),
+                cellVenue: document.getElementById('profileCellVenue').value.trim(),
+                cellLeader: document.getElementById('profileCellLeader').value.trim(),
+                cellLeaderMobile: document.getElementById('profileCellLeaderMobile').value.trim(),
+                departmentName: document.getElementById('profileDepartmentName').value.trim(),
+                hodName: document.getElementById('profileHodName').value.trim(),
+                hodMobile: document.getElementById('profileHodMobile').value.trim(),
                 dateOfBirth,
                 photoData: window.currentProfilePhotoData
             };
