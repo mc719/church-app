@@ -546,11 +546,14 @@
             align-items: center;
         }
 
-        .global-notification-bell {
+        .global-header-actions {
             position: fixed;
             top: 22px;
             right: 28px;
             z-index: 1300;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .notification-bell-icon {

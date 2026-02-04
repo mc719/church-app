@@ -1622,6 +1622,14 @@
                     }
                 });
             }
+            const headerUserBtn = document.getElementById('headerUserButton');
+            if (headerUserBtn) {
+                headerUserBtn.addEventListener('click', () => {
+                    if (typeof openMyProfile === 'function') {
+                        openMyProfile();
+                    }
+                });
+            }
             document.addEventListener('click', (e) => {
                 const dropdown = document.getElementById('notificationsDropdown');
                 if (!dropdown || !dropdown.classList.contains('open')) return;

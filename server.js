@@ -678,6 +678,21 @@ app.delete("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
 // USER PROFILES
 app.get("/api/profile/me", requireAuth, async (req, res) => {
   try {
+    const userLookup = await pool.query(
+      "SELECT id, username, email, role FROM users WHERE id = $1 LIMIT 1",
+      [req.user.userId]
+    );
+    const me = userLookup.rows[0];
+    if (!me) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    await ensureUserProfileForUser({
+      userId: me.id,
+      email: me.email,
+      username: me.username,
+      role: me.role
+    });
+
     const result = await pool.query(
       `SELECT up.id::text as id,
               up.user_id::text as "userId",
@@ -710,6 +725,56 @@ app.get("/api/profile/me", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+app.put("/api/profile/me", requireAuth, async (req, res) => {
+  try {
+    const { fullName, phone, roleTitle, cellId, dateOfBirth, address, photoData } = req.body || {};
+    const parsedDob = parseMonthDay(dateOfBirth);
+
+    const result = await pool.query(
+      `UPDATE user_profiles
+       SET full_name = COALESCE($1, full_name),
+           phone = COALESCE($2, phone),
+           role_title = COALESCE($3, role_title),
+           cell_id = COALESCE($4, cell_id),
+           dob_month = COALESCE($5, dob_month),
+           dob_day = COALESCE($6, dob_day),
+           address = COALESCE($7, address),
+           photo_data = COALESCE($8, photo_data),
+           source = 'self',
+           updated_at = NOW()
+       WHERE user_id = $9
+       RETURNING id::text as id,
+                 user_id::text as "userId",
+                 email,
+                 username,
+                 full_name as "fullName",
+                 phone,
+                 role_title as "roleTitle",
+                 cell_id::text as "cellId",
+                 dob_month as "dobMonth",
+                 dob_day as "dobDay",
+                 CASE
+                   WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
+                     THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
+                   ELSE NULL
+                 END as "dateOfBirth",
+                 address,
+                 photo_data as "photoData",
+                 source,
+                 updated_at as "updatedAt"`,
+      [fullName ?? null, phone ?? null, roleTitle ?? null, cellId ?? null, parsedDob.month, parsedDob.day, address ?? null, photoData ?? null, req.user.userId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update profile" });
   }
 });
 

@@ -1139,14 +1139,19 @@
     
     <!-- Main Content Area -->
     <div class="main-content">
-        <div class="notification-bell global-notification-bell">
-            <div class="notification-bell-icon" id="notificationsBell" role="button" aria-label="Notifications" tabindex="0">
-                <i class="fas fa-bell"></i>
-                <span class="notification-badge" id="notificationsBadge">0</span>
-            </div>
-            <div class="notifications-dropdown" id="notificationsDropdown">
-                <div class="notifications-header">Unread Notifications</div>
-                <div class="notifications-list" id="notificationsList"></div>
+        <div class="global-header-actions">
+            <button class="notification-bell-icon" id="headerUserButton" aria-label="Profile">
+                <i class="fas fa-user"></i>
+            </button>
+            <div class="notification-bell">
+                <div class="notification-bell-icon" id="notificationsBell" role="button" aria-label="Notifications" tabindex="0">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge" id="notificationsBadge">0</span>
+                </div>
+                <div class="notifications-dropdown" id="notificationsDropdown">
+                    <div class="notifications-header">Unread Notifications</div>
+                    <div class="notifications-list" id="notificationsList"></div>
+                </div>
             </div>
         </div>
         <!-- Dashboard Page (Default) -->

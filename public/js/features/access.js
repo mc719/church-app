@@ -161,6 +161,37 @@ function updateAccessManagementTable() {
 
 window.currentProfilePhotoData = null;
 
+async function openMyProfile() {
+            try {
+                const profile = await apiRequest('/api/profile/me');
+                document.getElementById('profileUserId').value = 'me';
+                document.getElementById('profileEmail').value = profile.email || '';
+                document.getElementById('profileFullName').value = profile.fullName || '';
+                document.getElementById('profilePhone').value = profile.phone || '';
+                document.getElementById('profileRoleTitle').value = profile.roleTitle || '';
+                document.getElementById('profileAddress').value = profile.address || '';
+                document.getElementById('profileDobMonth').value = profile.dobMonth ? String(profile.dobMonth) : '';
+                document.getElementById('profileDobDay').value = profile.dobDay ? String(profile.dobDay) : '';
+
+                window.currentProfilePhotoData = profile.photoData || null;
+                const preview = document.getElementById('profilePhotoPreview');
+                const placeholder = document.getElementById('profilePhotoPlaceholder');
+                if (window.currentProfilePhotoData) {
+                    preview.src = window.currentProfilePhotoData;
+                    preview.style.display = 'block';
+                    placeholder.style.display = 'none';
+                } else {
+                    preview.removeAttribute('src');
+                    preview.style.display = 'none';
+                    placeholder.style.display = 'flex';
+                }
+
+                showModal('userProfileModal');
+            } catch (error) {
+                alert('Failed to load profile: ' + error.message);
+            }
+        }
+
 async function editUserProfile(userId) {
             try {
                 const profile = await apiRequest(`${API_ENDPOINTS.PROFILES}/${userId}`);
@@ -209,7 +240,8 @@ async function saveUserProfile(e) {
             };
 
             try {
-                await apiRequest(`${API_ENDPOINTS.PROFILES}/${userId}`, {
+                const endpoint = userId === 'me' ? '/api/profile/me' : `${API_ENDPOINTS.PROFILES}/${userId}`;
+                await apiRequest(endpoint, {
                     method: 'PUT',
                     body: JSON.stringify(payload)
                 });
