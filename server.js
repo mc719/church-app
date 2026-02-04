@@ -536,8 +536,8 @@ app.put("/api/sessions/:id/metrics", requireAuth, async (req, res) => {
   }
 });
 
-// GET CELLS (PROTECTED)
-app.get("/api/cells", requireAuth, async (req, res) => {
+// GET CELLS (PROTECTED OR ACCESS CODE)
+app.get("/api/cells", requireAuthOrAccessCode, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT id::text as id, name, venue, day, time, description FROM cells ORDER BY id"
@@ -859,8 +859,8 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
   }
 });
 
-// ADD FIRST-TIMER (PROTECTED)
-app.post("/api/first-timers", requireAuth, async (req, res) => {
+// ADD FIRST-TIMER (PROTECTED OR ACCESS CODE)
+app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
   try {
     const { name, mobile, dateJoined, status, foundationSchool, cellId, invitedBy } = req.body;
 

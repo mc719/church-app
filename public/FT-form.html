@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>First-Timer Form</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #fff;
+      color: #1e1e1e;
+    }
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+    .bg-logo {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 180px;
+      height: 180px;
+      opacity: 0.08;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      z-index: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 6rem;
+      color: #1e3a5f;
+    }
+    h1 {
+      margin: 0 0 24px;
+      font-size: 2rem;
+      color: #1e3a5f;
+    }
+    form {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 16px;
+    }
+    label {
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: block;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #dcdcdc;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-primary { background: #1e3a5f; color: white; }
+    .btn-secondary { background: #e0e0e0; }
+    .helper {
+      color: #7a7a7a;
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    .modal {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      width: min(420px, 90vw);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .modal h2 {
+      margin: 0 0 12px;
+      color: #1e3a5f;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      justify-content: flex-end;
+    }
+  </style>
+</head>
+<body>
+  <div id="bgLogo" class="bg-logo"><i class="fas fa-church"></i></div>
+
+  <div class="page">
+    <h1>First-Timer Form</h1>
+    <form id="ftForm">
+      <div>
+        <label for="ftName">Name *</label>
+        <input type="text" id="ftName" required>
+      </div>
+      <div>
+        <label for="ftMobile">Mobile *</label>
+        <input type="tel" id="ftMobile" required>
+      </div>
+      <div>
+        <label for="ftDateJoined">Date Joined</label>
+        <input type="date" id="ftDateJoined">
+      </div>
+      <div>
+        <label for="ftFoundation">Foundation School</label>
+        <select id="ftFoundation">
+          <option value="Not Yet">Not Yet</option>
+          <option value="Yes">Yes</option>
+        </select>
+      </div>
+      <div>
+        <label for="ftCell">Cell</label>
+        <select id="ftCell">
+          <option value="">Select Cell</option>
+        </select>
+      </div>
+      <div>
+        <label for="ftInvitedBy">Invited By</label>
+        <input type="text" id="ftInvitedBy">
+      </div>
+      <div class="helper">Status defaults to amber.</div>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Submit First-Timer</button>
+        <button type="button" class="btn btn-secondary" onclick="window.location.href='/'">Back</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="accessModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Access Code</h2>
+      <label for="accessCodeInput">Enter access code to continue</label>
+      <input type="password" id="accessCodeInput" autocomplete="one-time-code">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="accessCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="accessSubmitBtn">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_LOGO_URL = '/images/logo.png';
+    let accessCode = '';
+
+    async function applyLogo(logo) {
+      if (!logo) return;
+      const bg = document.getElementById('bgLogo');
+      bg.style.backgroundImage = `url(${logo})`;
+      bg.innerHTML = '';
+    }
+
+    async function loadLogo() {
+      const cached = localStorage.getItem('logoImage');
+      if (cached) {
+        applyLogo(cached);
+      } else {
+        applyLogo(DEFAULT_LOGO_URL);
+      }
+      try {
+        const response = await fetch('/api/settings/logo');
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data?.logo) {
+          localStorage.setItem('logoImage', data.logo);
+          applyLogo(data.logo);
+        }
+      } catch {}
+    }
+
+    async function loadCells() {
+      try {
+        const response = await fetch('/api/cells', {
+          headers: { 'X-ACCESS-CODE': accessCode }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to load cells');
+        const select = document.getElementById('ftCell');
+        select.innerHTML = '<option value="">Select Cell</option>';
+        data.forEach(cell => {
+          const opt = document.createElement('option');
+          opt.value = cell.id;
+          opt.textContent = cell.name;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function closeAccessModal() {
+      document.getElementById('accessModal').style.display = 'none';
+    }
+
+    document.getElementById('accessSubmitBtn').addEventListener('click', async () => {
+      const input = document.getElementById('accessCodeInput').value.trim();
+      if (!input) {
+        alert('Access code is required.');
+        return;
+      }
+      try {
+        const response = await fetch('/api/access/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessCode: input })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Invalid access code');
+        accessCode = input;
+        closeAccessModal();
+        loadCells();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('accessCancelBtn').addEventListener('click', () => {
+      if (window.history.length > 1) window.history.back();
+      else window.close();
+    });
+
+    document.getElementById('ftForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!accessCode) {
+        alert('Access code is required.');
+        document.getElementById('accessModal').style.display = 'flex';
+        return;
+      }
+      const payload = {
+        name: document.getElementById('ftName').value.trim(),
+        mobile: document.getElementById('ftMobile').value.trim(),
+        dateJoined: document.getElementById('ftDateJoined').value,
+        foundationSchool: document.getElementById('ftFoundation').value,
+        cellId: document.getElementById('ftCell').value,
+        invitedBy: document.getElementById('ftInvitedBy').value.trim(),
+        status: 'amber'
+      };
+
+      try {
+        const response = await fetch('/api/first-timers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-ACCESS-CODE': accessCode
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to submit first-timer');
+        alert('First-timer submitted successfully.');
+        e.target.reset();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    loadLogo();
+  </script>
+</body>
+</html>
