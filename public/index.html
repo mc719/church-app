@@ -1705,21 +1705,26 @@
         <div id="user-profile" class="page-content">
             <div class="page-header">
                 <h1>User Profile</h1>
+                <div class="page-actions">
+                    <button type="button" class="btn" id="profileEditToggleBtn">
+                        <i class="fas fa-pen"></i> Edit
+                    </button>
+                </div>
             </div>
             <div class="profile-layout">
-                <form id="userProfileForm">
+                <form id="userProfileForm" class="profile-form view-mode">
                     <input type="hidden" id="profileUserId">
                     <div class="profile-card">
                         <h3>Personal Information</h3>
-                        <div class="form-group">
+                        <div class="form-group profile-photo-wrap">
                             <label>Profile Photo</label>
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                <img id="profilePhotoPreview" alt="Profile Photo" style="width:72px; height:72px; border-radius:50%; object-fit:cover; border:1px solid #ddd; display:none;">
-                                <div id="profilePhotoPlaceholder" style="width:72px; height:72px; border-radius:50%; border:1px dashed #bbb; display:flex; align-items:center; justify-content:center;">
+                            <div class="profile-photo-row">
+                                <img id="profilePhotoPreview" alt="Profile Photo" class="profile-photo-lg" style="display:none;">
+                                <div id="profilePhotoPlaceholder" class="profile-photo-lg profile-photo-placeholder">
                                     <i class="fas fa-user"></i>
                                 </div>
                             </div>
-                            <input type="file" id="profilePhotoUpload" class="form-control" accept="image/*">
+                            <input type="file" id="profilePhotoUpload" class="form-control profile-edit-only" accept="image/*">
                         </div>
                         <div class="form-group">
                             <label for="profileTitle">Title</label>
@@ -1803,7 +1808,7 @@
                             <input type="text" id="profileHodMobile" class="form-control">
                         </div>
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-success">Save Profile</button>
+                            <button type="submit" class="btn btn-success profile-edit-only">Save Profile</button>
                         </div>
                     </div>
                 </form>

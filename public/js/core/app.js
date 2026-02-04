@@ -1692,6 +1692,18 @@
                     saveUserProfile(e);
                 }
             });
+            document.getElementById('profileEditToggleBtn')?.addEventListener('click', () => {
+                const form = document.getElementById('userProfileForm');
+                const isView = form?.classList.contains('view-mode');
+                if (typeof setProfileEditMode === 'function') {
+                    setProfileEditMode(!!isView);
+                }
+            });
+            document.getElementById('profileEmail')?.addEventListener('change', () => {
+                if (typeof lookupProfileByEmail === 'function') {
+                    lookupProfileByEmail();
+                }
+            });
             document.getElementById('profilePhotoUpload')?.addEventListener('change', (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;

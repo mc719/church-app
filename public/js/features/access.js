@@ -161,6 +161,16 @@ function updateAccessManagementTable() {
 
 window.currentProfilePhotoData = null;
 
+function setProfileEditMode(isEdit) {
+            const form = document.getElementById('userProfileForm');
+            const btn = document.getElementById('profileEditToggleBtn');
+            if (!form || !btn) return;
+            form.classList.toggle('view-mode', !isEdit);
+            btn.innerHTML = isEdit
+                ? '<i class="fas fa-eye"></i> View'
+                : '<i class="fas fa-pen"></i> Edit';
+        }
+
 function populateProfileCellOptions(selectedCellId = '') {
             const select = document.getElementById('profileCellId');
             if (!select) return;
@@ -197,6 +207,29 @@ function bindProfileData(profile, userIdValue) {
             populateProfileCellOptions(profile.cellId || '');
         }
 
+async function lookupProfileByEmail() {
+            const email = document.getElementById('profileEmail').value.trim();
+            if (!email) return;
+            try {
+                const profile = await apiRequest(`/api/profile/by-email?email=${encodeURIComponent(email)}`);
+                bindProfileData(profile, profile.userId || document.getElementById('profileUserId').value || 'me');
+                window.currentProfilePhotoData = profile.photoData || null;
+                const preview = document.getElementById('profilePhotoPreview');
+                const placeholder = document.getElementById('profilePhotoPlaceholder');
+                if (window.currentProfilePhotoData) {
+                    preview.src = window.currentProfilePhotoData;
+                    preview.style.display = 'block';
+                    placeholder.style.display = 'none';
+                } else {
+                    preview.removeAttribute('src');
+                    preview.style.display = 'none';
+                    placeholder.style.display = 'flex';
+                }
+            } catch (error) {
+                alert('No user/member record found for this email yet.');
+            }
+        }
+
 async function openMyProfile() {
             try {
                 const profile = await apiRequest('/api/profile/me');
@@ -215,6 +248,7 @@ async function openMyProfile() {
                     placeholder.style.display = 'flex';
                 }
 
+                setProfileEditMode(false);
                 navigateToPage('user-profile');
             } catch (error) {
                 alert('Failed to load profile: ' + error.message);
@@ -239,6 +273,7 @@ async function editUserProfile(userId) {
                     placeholder.style.display = 'flex';
                 }
 
+                setProfileEditMode(false);
                 navigateToPage('user-profile');
             } catch (error) {
                 alert('Failed to load profile: ' + error.message);
@@ -279,6 +314,7 @@ async function saveUserProfile(e) {
                     body: JSON.stringify(payload)
                 });
                 alert('Profile updated successfully!');
+                setProfileEditMode(false);
             } catch (error) {
                 alert('Failed to save profile: ' + error.message);
             }

@@ -506,6 +506,119 @@ async function getProfileView(userId) {
   return result.rows[0] || null;
 }
 
+async function getProfileByEmail(email) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const userResult = await pool.query(
+    "SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1",
+    [normalizedEmail]
+  );
+  if (userResult.rows.length) {
+    const userId = userResult.rows[0].id;
+    await refreshProfileFromEmail(userId);
+    return await getProfileView(userId);
+  }
+
+  const memberResult = await pool.query(
+    `SELECT
+        NULL::text as id,
+        NULL::text as "userId",
+        $1::text as email,
+        NULL::text as username,
+        m.title,
+        m.name as "fullName",
+        m.mobile as phone,
+        m.role as "roleTitle",
+        m.cell_id::text as "cellId",
+        c.name as "cellName",
+        c.venue as "cellVenue",
+        COALESCE(
+          (
+            SELECT m2.name
+            FROM members m2
+            WHERE m2.cell_id = m.cell_id AND LOWER(m2.role) = 'cell leader'
+            ORDER BY m2.id
+            LIMIT 1
+          ),
+          ''
+        ) as "cellLeader",
+        COALESCE(
+          (
+            SELECT m2.mobile
+            FROM members m2
+            WHERE m2.cell_id = m.cell_id AND LOWER(m2.role) = 'cell leader'
+            ORDER BY m2.id
+            LIMIT 1
+          ),
+          ''
+        ) as "cellLeaderMobile",
+        NULL::text as "departmentId",
+        NULL::text as "departmentName",
+        NULL::text as "hodName",
+        NULL::text as "hodMobile",
+        m.postcode,
+        m.dob_month as "dobMonth",
+        m.dob_day as "dobDay",
+        CASE
+          WHEN m.dob_month IS NOT NULL AND m.dob_day IS NOT NULL
+            THEN LPAD(m.dob_month::text, 2, '0') || '-' || LPAD(m.dob_day::text, 2, '0')
+          ELSE NULL
+        END as "dateOfBirth",
+        m.address,
+        NULL::text as "photoData",
+        'email-member'::text as source,
+        NOW() as "updatedAt"
+     FROM members m
+     LEFT JOIN cells c ON c.id = m.cell_id
+     WHERE LOWER(m.email) = $1
+     ORDER BY m.joined_date DESC NULLS LAST, m.id DESC
+     LIMIT 1`,
+    [normalizedEmail]
+  );
+  if (memberResult.rows.length) return memberResult.rows[0];
+
+  const firstTimerResult = await pool.query(
+    `SELECT
+        NULL::text as id,
+        NULL::text as "userId",
+        $1::text as email,
+        NULL::text as username,
+        NULL::text as title,
+        CONCAT_WS(' ', ft.name, ft.surname) as "fullName",
+        ft.mobile as phone,
+        'First-Timer'::text as "roleTitle",
+        ft.cell_id::text as "cellId",
+        c.name as "cellName",
+        c.venue as "cellVenue",
+        ''::text as "cellLeader",
+        ''::text as "cellLeaderMobile",
+        NULL::text as "departmentId",
+        NULL::text as "departmentName",
+        NULL::text as "hodName",
+        NULL::text as "hodMobile",
+        ft.postcode,
+        ft.birthday_month as "dobMonth",
+        ft.birthday_day as "dobDay",
+        CASE
+          WHEN ft.birthday_month IS NOT NULL AND ft.birthday_day IS NOT NULL
+            THEN LPAD(ft.birthday_month::text, 2, '0') || '-' || LPAD(ft.birthday_day::text, 2, '0')
+          ELSE NULL
+        END as "dateOfBirth",
+        ft.address,
+        NULL::text as "photoData",
+        'email-first-timer'::text as source,
+        NOW() as "updatedAt"
+     FROM first_timers ft
+     LEFT JOIN cells c ON c.id = ft.cell_id
+     WHERE LOWER(ft.email) = $1
+     ORDER BY ft.date_joined DESC NULLS LAST, ft.id DESC
+     LIMIT 1`,
+    [normalizedEmail]
+  );
+  return firstTimerResult.rows[0] || null;
+}
+
 async function applyProfileUpdate(userId, payload = {}, source = "manual") {
   const {
     title,
@@ -1034,6 +1147,23 @@ app.put("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+app.get("/api/profile/by-email", requireAuth, async (req, res) => {
+  try {
+    const email = String(req.query.email || "").trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+    const profile = await getProfileByEmail(email);
+    if (!profile) {
+      return res.status(404).json({ error: "No profile data found for this email" });
+    }
+    res.json(profile);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to lookup profile by email" });
   }
 });
 

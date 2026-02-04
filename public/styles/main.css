@@ -638,13 +638,64 @@
             box-shadow: var(--shadow);
         }
 
+        .profile-form.view-mode .form-control {
+            pointer-events: none;
+            background: #f7f9fc;
+            border-color: #e8edf5;
+        }
+
+        .profile-form.view-mode #profileEmail {
+            pointer-events: auto;
+            background: #fff;
+            border-color: #d8dfea;
+        }
+
+        .profile-form.view-mode .profile-edit-only {
+            display: none;
+        }
+
         .dark-theme .profile-card {
             background: #1f1f1f;
+        }
+
+        .profile-card:first-child {
+            background: linear-gradient(160deg, #eef5ff 0%, #fdf3ff 55%, #fff8ef 100%);
+        }
+
+        .dark-theme .profile-card:first-child {
+            background: linear-gradient(160deg, #1f2430 0%, #2a2335 55%, #2c2a24 100%);
         }
 
         .profile-card h3 {
             margin-bottom: 12px;
             color: var(--primary-color);
+        }
+
+        .profile-photo-wrap {
+            text-align: center;
+        }
+
+        .profile-photo-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .profile-photo-lg {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #fff;
+            box-shadow: 0 8px 24px rgba(0,0,0,.16);
+        }
+
+        .profile-photo-placeholder {
+            border: 1px dashed #bbb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
         }
 
         .notifications-header {
