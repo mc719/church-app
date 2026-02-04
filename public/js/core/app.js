@@ -37,6 +37,62 @@
             currentYear: new Date().getFullYear()
         };
 
+        function parseMonthDayValue(value) {
+            if (!value) return null;
+            const text = String(value).trim();
+            const mmdd = /^(\d{2})-(\d{2})$/;
+            const iso = /^(\d{4})-(\d{2})-(\d{2})$/;
+            let month;
+            let day;
+            if (mmdd.test(text)) {
+                const m = text.match(mmdd);
+                month = Number(m[1]);
+                day = Number(m[2]);
+            } else if (iso.test(text)) {
+                const m = text.match(iso);
+                month = Number(m[2]);
+                day = Number(m[3]);
+            } else {
+                return null;
+            }
+            if (!month || !day) return null;
+            return { month, day };
+        }
+
+        function monthDayToIso(mmdd) {
+            const parsed = parseMonthDayValue(mmdd);
+            if (!parsed) return '';
+            return `2000-${String(parsed.month).padStart(2, '0')}-${String(parsed.day).padStart(2, '0')}`;
+        }
+
+        function populateDayMonthSelect(dayId, monthId) {
+            const daySelect = document.getElementById(dayId);
+            const monthSelect = document.getElementById(monthId);
+            if (!daySelect || !monthSelect) return;
+
+            if (daySelect.options.length <= 1) {
+                for (let d = 1; d <= 31; d += 1) {
+                    const opt = document.createElement('option');
+                    opt.value = String(d);
+                    opt.textContent = String(d);
+                    daySelect.appendChild(opt);
+                }
+            }
+
+            if (monthSelect.options.length <= 1) {
+                const months = [
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                ];
+                months.forEach((name, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = String(idx + 1);
+                    opt.textContent = name;
+                    monthSelect.appendChild(opt);
+                });
+            }
+        }
+
 
         const PAGE_SIZE = 20;
         const paginationState = {
@@ -756,8 +812,9 @@
         }
 
         function getBirthdayDateInYear(dateStr, year) {
-            const dt = new Date(dateStr);
-            return new Date(year, dt.getMonth(), dt.getDate());
+            const parsed = parseMonthDayValue(dateStr);
+            if (!parsed) return null;
+            return new Date(year, parsed.month - 1, parsed.day);
         }
 
         function updateBirthdayWidgets() {
@@ -784,9 +841,10 @@
             const birthdaysByDay = new Map();
             churchData.birthdays.forEach(member => {
                 if (!member.dateOfBirth) return;
-                const dt = new Date(member.dateOfBirth);
-                if (dt.getMonth() !== month) return;
-                const day = dt.getDate();
+                const parsed = parseMonthDayValue(member.dateOfBirth);
+                if (!parsed) return;
+                if ((parsed.month - 1) !== month) return;
+                const day = parsed.day;
                 if (!birthdaysByDay.has(day)) birthdaysByDay.set(day, []);
                 birthdaysByDay.get(day).push(member);
             });
@@ -852,7 +910,7 @@
                                     ${list.map(member => {
                                         const cell = churchData.cells.find(c => String(c.id) === String(member.cellId));
                                         const birthdayText = member.dateOfBirth
-                                            ? new Date(member.dateOfBirth).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                                            ? new Date(monthDayToIso(member.dateOfBirth)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
                                             : '';
                                         return `
                                             <tr>
@@ -890,7 +948,7 @@
             churchData.birthdays.forEach(member => {
                 const cell = churchData.cells.find(c => String(c.id) === String(member.cellId));
                 const dateLabel = member.dateOfBirth
-                    ? new Date(member.dateOfBirth).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                    ? new Date(monthDayToIso(member.dateOfBirth)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
                     : '';
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -916,7 +974,9 @@
             document.getElementById('birthdayMemberName').value = member.name || '';
             populateBirthdayMemberSelect(member.name || '');
             document.getElementById('birthdayMemberId').value = member.id;
-            document.getElementById('birthdayDate').value = member.dateOfBirth ? String(member.dateOfBirth).slice(0, 10) : '';
+            const parsed = parseMonthDayValue(member.dateOfBirth);
+            document.getElementById('birthdayDateMonth').value = parsed ? String(parsed.month) : '';
+            document.getElementById('birthdayDateDay').value = parsed ? String(parsed.day) : '';
             showModal('addBirthdayModal');
         };
 
@@ -950,7 +1010,9 @@
             e.preventDefault();
             const editMemberId = document.getElementById('birthdayEditMemberId').value;
             const memberId = editMemberId || document.getElementById('birthdayMemberId').value;
-            const dob = document.getElementById('birthdayDate').value;
+            const dobDay = document.getElementById('birthdayDateDay').value;
+            const dobMonth = document.getElementById('birthdayDateMonth').value;
+            const dob = (dobDay && dobMonth) ? `${String(dobMonth).padStart(2, '0')}-${String(dobDay).padStart(2, '0')}` : '';
             if (!memberId || !dob) {
                 alert('Please select a member and birthday date.');
                 return;
@@ -964,7 +1026,7 @@
                 }
                 const updated = await apiRequest(`${API_ENDPOINTS.MEMBERS}/${memberId}`, {
                     method: 'PUT',
-                    body: JSON.stringify({ dateOfBirth: dob })
+                    body: JSON.stringify({ dateOfBirth: dob, dobMonth, dobDay })
                 });
                 const idx = churchData.members.findIndex(m => String(m.id) === String(memberId));
                 if (idx !== -1) {
@@ -1597,6 +1659,9 @@
             });
             updateHighlightLabel('memberHighlightToggle', 'memberHighlightText');
             updateHighlightLabel('editMemberHighlightToggle', 'editMemberHighlightText');
+            populateDayMonthSelect('memberDobDay', 'memberDobMonth');
+            populateDayMonthSelect('editMemberDobDay', 'editMemberDobMonth');
+            populateDayMonthSelect('birthdayDateDay', 'birthdayDateMonth');
 
             setupPageManagementRealtime();
 
@@ -2001,7 +2066,9 @@
                 const gender = document.getElementById('memberGender').value;
                 const mobile = document.getElementById('memberMobile').value;
                 const email = document.getElementById('memberEmail').value;
-                const dateOfBirth = document.getElementById('memberDob').value;
+                const dobDay = document.getElementById('memberDobDay').value;
+                const dobMonth = document.getElementById('memberDobMonth').value;
+                const dateOfBirth = (dobDay && dobMonth) ? `${String(dobMonth).padStart(2, '0')}-${String(dobDay).padStart(2, '0')}` : '';
                 const role = document.getElementById('memberRole').value;
                 const highlightToggle = document.getElementById('memberHighlightToggle');
                 const highlight = highlightToggle ? highlightToggle.checked : false;
@@ -2014,6 +2081,8 @@
                     mobile: mobile,
                     email: email,
                     dateOfBirth: dateOfBirth,
+                    dobMonth: dobMonth,
+                    dobDay: dobDay,
                     role: role,
                     isFirstTimer: highlight
                 };

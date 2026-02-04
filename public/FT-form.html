@@ -335,7 +335,12 @@
 
           <div class="row" style="grid-column:1 / -1;">
             <div class="label">Birthday</div>
-            <input class="line" name="birthday" />
+            <select class="line" name="birthday_day" style="max-width:120px; min-width:120px;">
+              <option value="">Day</option>
+            </select>
+            <select class="line" name="birthday_month" style="max-width:220px; min-width:220px;">
+              <option value="">Month</option>
+            </select>
           </div>
         </div>
 
@@ -486,7 +491,9 @@
         email: data.email || '',
         address: data.address || '',
         postcode: data.postcode || '',
-        birthday: data.birthday || '',
+        birthday: (data.birthday_month && data.birthday_day)
+          ? `${String(data.birthday_month).padStart(2, '0')}-${String(data.birthday_day).padStart(2, '0')}`
+          : '',
         ageGroup: data.age_group || '',
         maritalStatus: data.marital_status || '',
         bornAgain: data.born_again || null,
@@ -527,6 +534,29 @@
       if (confirm("Cancel and clear the form?")) form.reset();
     });
 
+    function populateBirthdaySelectors() {
+      const daySelect = form.querySelector('[name="birthday_day"]');
+      const monthSelect = form.querySelector('[name="birthday_month"]');
+      if (daySelect && daySelect.options.length <= 1) {
+        for (let d = 1; d <= 31; d += 1) {
+          const opt = document.createElement('option');
+          opt.value = String(d);
+          opt.textContent = String(d);
+          daySelect.appendChild(opt);
+        }
+      }
+      if (monthSelect && monthSelect.options.length <= 1) {
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        months.forEach((name, index) => {
+          const opt = document.createElement('option');
+          opt.value = String(index + 1);
+          opt.textContent = name;
+          monthSelect.appendChild(opt);
+        });
+      }
+    }
+
+    populateBirthdaySelectors();
     verifyAccessCode();
   </script>
 </body>

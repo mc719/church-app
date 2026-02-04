@@ -67,6 +67,34 @@ function updateCellMembersTable(cellId) {
 
 let membersSearchTerm = '';
 
+function parseMonthDayValue(value) {
+            if (!value) return null;
+            const text = String(value).trim();
+            const mmdd = /^(\d{2})-(\d{2})$/;
+            const iso = /^(\d{4})-(\d{2})-(\d{2})$/;
+            let month;
+            let day;
+            if (mmdd.test(text)) {
+                const m = text.match(mmdd);
+                month = Number(m[1]);
+                day = Number(m[2]);
+            } else if (iso.test(text)) {
+                const m = text.match(iso);
+                month = Number(m[2]);
+                day = Number(m[3]);
+            } else {
+                return null;
+            }
+            if (!month || !day) return null;
+            return { month, day };
+        }
+
+function formatMonthDayLabel(value) {
+            const parsed = parseMonthDayValue(value);
+            if (!parsed) return '';
+            return `${String(parsed.day).padStart(2, '0')}/${String(parsed.month).padStart(2, '0')}`;
+        }
+
 function getFilteredMembers() {
             if (!membersSearchTerm) {
                 return churchData.members;
@@ -74,7 +102,7 @@ function getFilteredMembers() {
             const term = membersSearchTerm.toLowerCase();
             return churchData.members.filter(member => {
                 const cell = churchData.cells.find(c => c.id === member.cellId);
-                const dob = member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : '';
+                const dob = formatMonthDayLabel(member.dateOfBirth);
                 const parts = [
                     member.title,
                     member.name,
@@ -187,7 +215,7 @@ function showMemberDetails(member, cell) {
                     <div><strong>Gender:</strong> ${member.gender || ''}</div>
                     <div><strong>Mobile:</strong> ${formatPhoneLink(member.mobile)}</div>
                     <div><strong>Email:</strong> ${formatEmailLink(member.email)}</div>
-                    <div><strong>Date of Birth:</strong> ${member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : ''}</div>
+                    <div><strong>Date of Birth:</strong> ${formatMonthDayLabel(member.dateOfBirth)}</div>
                     <div><strong>Role:</strong> ${member.role || ''}</div>
                     <div><strong>Cell:</strong> ${cell ? cell.name : 'Unknown Cell'}</div>
                     <div><strong>Venue:</strong> ${cell ? cell.venue : ''}</div>
@@ -213,7 +241,9 @@ function editMember(cellId, memberId) {
                 document.getElementById('editMemberGender').value = member.gender;
                 document.getElementById('editMemberMobile').value = member.mobile;
                 document.getElementById('editMemberEmail').value = member.email || '';
-                document.getElementById('editMemberDob').value = member.dateOfBirth ? String(member.dateOfBirth).split('T')[0] : '';
+                const dob = parseMonthDayValue(member.dateOfBirth);
+                document.getElementById('editMemberDobMonth').value = dob ? String(dob.month) : '';
+                document.getElementById('editMemberDobDay').value = dob ? String(dob.day) : '';
                 document.getElementById('editMemberRole').value = member.role;
                 const highlightToggle = document.getElementById('editMemberHighlightToggle');
                 if (highlightToggle) {
@@ -234,13 +264,15 @@ async function saveEditedMember() {
                 const highlightToggle = document.getElementById('editMemberHighlightToggle');
                 const highlight = highlightToggle ? highlightToggle.checked : false;
 
+                const dobDay = document.getElementById('editMemberDobDay').value;
+                const dobMonth = document.getElementById('editMemberDobMonth').value;
                 const payload = {
                     title: document.getElementById('editMemberTitle').value,
                     name: document.getElementById('editMemberName').value,
                     gender: document.getElementById('editMemberGender').value,
                     mobile: document.getElementById('editMemberMobile').value,
                     email: document.getElementById('editMemberEmail').value,
-                    dateOfBirth: document.getElementById('editMemberDob').value,
+                    dateOfBirth: dobDay && dobMonth ? `${String(dobMonth).padStart(2, '0')}-${String(dobDay).padStart(2, '0')}` : '',
                     role: document.getElementById('editMemberRole').value,
                     isFirstTimer: highlight
                 };

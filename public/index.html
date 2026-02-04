@@ -338,8 +338,15 @@
                         <input type="email" id="memberEmail" class="form-control">
                     </div>
                     <div class="form-group">
-                        <label for="memberDob">Date of Birth</label>
-                        <input type="date" id="memberDob" class="form-control">
+                        <label for="memberDobDay">Date of Birth</label>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <select id="memberDobDay" class="form-control">
+                                <option value="">Day</option>
+                            </select>
+                            <select id="memberDobMonth" class="form-control">
+                                <option value="">Month</option>
+                            </select>
+                        </div>
                         <small class="helper-text">Stored as day and month for birthdays.</small>
                     </div>
                     <div class="form-group">
@@ -418,8 +425,15 @@
                         <input type="email" id="editMemberEmail" class="form-control">
                     </div>
                     <div class="form-group">
-                        <label for="editMemberDob">Date of Birth</label>
-                        <input type="date" id="editMemberDob" class="form-control">
+                        <label for="editMemberDobDay">Date of Birth</label>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <select id="editMemberDobDay" class="form-control">
+                                <option value="">Day</option>
+                            </select>
+                            <select id="editMemberDobMonth" class="form-control">
+                                <option value="">Month</option>
+                            </select>
+                        </div>
                         <small class="helper-text">Stored as day and month for birthdays.</small>
                     </div>
                     <div class="form-group">
@@ -1362,8 +1376,15 @@
                             <select id="birthdayMemberId" class="form-control" required></select>
                         </div>
                         <div class="form-group">
-                            <label for="birthdayDate">Date of Birth *</label>
-                            <input type="date" id="birthdayDate" class="form-control" required>
+                            <label for="birthdayDateDay">Date of Birth *</label>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <select id="birthdayDateDay" class="form-control" required>
+                                    <option value="">Day</option>
+                                </select>
+                                <select id="birthdayDateMonth" class="form-control" required>
+                                    <option value="">Month</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="form-actions">
                             <button type="button" class="btn" onclick="closeModal('addBirthdayModal')">Cancel</button>

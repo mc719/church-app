@@ -89,6 +89,11 @@ function parseMonthDay(value) {
   return { month, day };
 }
 
+function monthDayString(month, day) {
+  if (!month || !day) return null;
+  return `${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 // ===============================
 // 5) AUTH MIDDLEWARE (PASTE HERE)
 // ===============================
@@ -230,6 +235,20 @@ async function ensureFirstTimerSchema() {
        ADD COLUMN IF NOT EXISTS visit BOOLEAN,
        ADD COLUMN IF NOT EXISTS visit_when TEXT,
        ADD COLUMN IF NOT EXISTS prayer_requests JSONB DEFAULT '[]'::jsonb`
+  );
+
+  await pool.query(
+    `ALTER TABLE members
+       ADD COLUMN IF NOT EXISTS dob_month SMALLINT,
+       ADD COLUMN IF NOT EXISTS dob_day SMALLINT`
+  );
+
+  await pool.query(
+    `UPDATE members
+     SET dob_month = EXTRACT(MONTH FROM date_of_birth)::smallint,
+         dob_day = EXTRACT(DAY FROM date_of_birth)::smallint
+     WHERE date_of_birth IS NOT NULL
+       AND (dob_month IS NULL OR dob_day IS NULL)`
   );
 }
 
@@ -705,7 +724,15 @@ app.get("/api/members", requireAuth, async (req, res) => {
               email,
               role,
               is_first_timer as "isFirstTimer",
-              date_of_birth as "dateOfBirth",
+              dob_month as "dobMonth",
+              dob_day as "dobDay",
+              CASE
+                WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
+                  THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
+                WHEN date_of_birth IS NOT NULL
+                  THEN TO_CHAR(date_of_birth, 'MM-DD')
+                ELSE NULL
+              END as "dateOfBirth",
               joined_date as "joinedDate"
        FROM members
        ORDER BY id`
@@ -720,11 +747,12 @@ app.get("/api/members", requireAuth, async (req, res) => {
 // ADD MEMBER (AUTH OR ACCESS CODE)
 app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { cellId, title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth } = req.body;
+    const { cellId, title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth, dobMonth, dobDay } = req.body;
+    const parsedDob = parseMonthDay(dateOfBirth || (dobMonth && dobDay ? `${dobMonth}-${dobDay}` : ""));
 
     const result = await pool.query(
-      `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, is_first_timer, date_of_birth, joined_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW())
+      `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, is_first_timer, dob_month, dob_day, date_of_birth, joined_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL, NOW())
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  title,
@@ -734,9 +762,15 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
                  email,
                  role,
                  is_first_timer as "isFirstTimer",
-                 date_of_birth as "dateOfBirth",
+                 dob_month as "dobMonth",
+                 dob_day as "dobDay",
+                 CASE
+                   WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
+                     THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
+                   ELSE NULL
+                 END as "dateOfBirth",
                  joined_date as "joinedDate"`,
-      [cellId, title, name, gender, mobile, email, role, !!isFirstTimer, dateOfBirth || null]
+      [cellId, title, name, gender, mobile, email, role, !!isFirstTimer, parsedDob.month, parsedDob.day]
     );
 
     const member = result.rows[0];
@@ -780,7 +814,11 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE MEMBER (PROTECTED)
 app.put("/api/members/:id", requireAuth, async (req, res) => {
   try {
-    const { title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth } = req.body;
+    const { title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth, dobMonth, dobDay } = req.body;
+    const parsedDob = parseMonthDay(dateOfBirth || (dobMonth && dobDay ? `${dobMonth}-${dobDay}` : ""));
+    const hasDobInput = Object.prototype.hasOwnProperty.call(req.body || {}, "dateOfBirth")
+      || Object.prototype.hasOwnProperty.call(req.body || {}, "dobMonth")
+      || Object.prototype.hasOwnProperty.call(req.body || {}, "dobDay");
     const result = await pool.query(
       `UPDATE members
        SET title = COALESCE($1, title),
@@ -790,8 +828,10 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
            email = COALESCE($5, email),
            role = COALESCE($6, role),
            is_first_timer = COALESCE($7, is_first_timer),
-           date_of_birth = COALESCE($8, date_of_birth)
-       WHERE id = $9
+           dob_month = COALESCE($8, dob_month),
+           dob_day = COALESCE($9, dob_day),
+           date_of_birth = NULL
+       WHERE id = $10
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  title,
@@ -801,7 +841,13 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
                  email,
                  role,
                  is_first_timer as "isFirstTimer",
-                 date_of_birth as "dateOfBirth",
+                 dob_month as "dobMonth",
+                 dob_day as "dobDay",
+                 CASE
+                   WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
+                     THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
+                   ELSE NULL
+                 END as "dateOfBirth",
                  joined_date as "joinedDate"`,
       [
         title ?? null,
@@ -811,7 +857,8 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
         email ?? null,
         role ?? null,
         typeof isFirstTimer === "boolean" ? isFirstTimer : null,
-        dateOfBirth ?? null,
+        hasDobInput ? parsedDob.month : null,
+        hasDobInput ? parsedDob.day : null,
         req.params.id
       ]
     );
@@ -1401,15 +1448,26 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
               name,
               role,
               mobile,
-              date_of_birth as "dateOfBirth"
+              dob_month as "dobMonth",
+              dob_day as "dobDay",
+              CASE
+                WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
+                  THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
+                WHEN date_of_birth IS NOT NULL
+                  THEN TO_CHAR(date_of_birth, 'MM-DD')
+                ELSE NULL
+              END as "dateOfBirth"
        FROM members
-       WHERE date_of_birth IS NOT NULL`
+       WHERE (dob_month IS NOT NULL AND dob_day IS NOT NULL)
+          OR date_of_birth IS NOT NULL`
     );
 
     const today = new Date();
+    const todayDay = today.getDate();
+    const todayMonth = today.getMonth() + 1;
     const todaysBirthdays = members.rows.filter(member => {
-      const dob = new Date(member.dateOfBirth);
-      return dob.getDate() === today.getDate() && dob.getMonth() === today.getMonth();
+      const parsed = parseMonthDay(member.dateOfBirth);
+      return parsed.day === todayDay && parsed.month === todayMonth;
     });
 
     if (todaysBirthdays.length) {
@@ -1437,15 +1495,16 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
     // Upcoming birthdays (7 days before)
     const upcoming = members.rows
       .map(member => {
-        const dob = new Date(member.dateOfBirth);
-        let upcomingDate = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+        const parsed = parseMonthDay(member.dateOfBirth);
+        if (!parsed.month || !parsed.day) return null;
+        let upcomingDate = new Date(today.getFullYear(), parsed.month - 1, parsed.day);
         if (upcomingDate < today) {
           upcomingDate.setFullYear(upcomingDate.getFullYear() + 1);
         }
         const diffDays = Math.floor((upcomingDate - today) / (1000 * 60 * 60 * 24));
         return { member, upcomingDate, diffDays };
       })
-      .filter(item => item.diffDays === 7);
+      .filter(item => item && item.diffDays === 7);
 
     for (const item of upcoming) {
       const key = `birthday_upcoming_${item.member.id}_${item.upcomingDate.toISOString().slice(0, 10)}`;
