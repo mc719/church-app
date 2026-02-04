@@ -195,12 +195,67 @@
        Small screens: scale (no reflow)
        ========================= */
     @media (max-width: 860px){
-      .sheet{
-        transform: scale(calc((100vw - 36px) / 794));
-        transform-origin: top left;
-        height: calc(1123px * ( (100vw - 36px) / 794 ));
+      body{
+        display:block;
+        padding:10px;
+        background:#e7eef8;
       }
-      body{place-items:start;}
+      .sheet{
+        width:100%;
+        height:auto;
+        min-height:100vh;
+      }
+      .content{
+        position:relative;
+        inset:auto;
+        padding:48px 18px 72px;
+      }
+      .border-outer,
+      .border-inner,
+      .border-line{
+        inset:8px;
+      }
+      .zig{
+        left:14px;
+        right:14px;
+      }
+      .zig.top{ top:14px; }
+      .zig.bottom{ bottom:14px; }
+      .header{
+        grid-template-columns: 72px 1fr;
+      }
+      .headtext .h1{font-size:24px;}
+      .headtext .h2{font-size:18px;}
+      .headtext .p,
+      .note,
+      .prompt{font-size:12px;}
+      .logo{
+        width:62px;
+        height:62px;
+      }
+      .logo img{
+        width:56px;
+        height:56px;
+      }
+      .two{
+        grid-template-columns: 1fr;
+      }
+      .row{
+        gap:8px;
+      }
+      .line{
+        min-width:100%;
+      }
+      .checks{
+        gap:14px;
+        flex-wrap:wrap;
+      }
+      .actions{
+        flex-direction:column;
+      }
+      button{
+        width:100%;
+      }
     }
   </style>
 </head>
