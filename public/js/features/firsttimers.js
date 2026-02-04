@@ -23,6 +23,13 @@ function formatMonthDay(month, day) {
     return `${dd}/${mm}`;
 }
 
+function csvToArray(text) {
+    return String(text || '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
 function updateFirstTimerSelects() {
     const cellSelect = document.getElementById('firstTimerCell');
     if (cellSelect) {
@@ -59,7 +66,7 @@ function updateFirstTimersTable() {
     if (!churchData.firstTimers.length) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="23" style="text-align: center; padding: 30px; color: var(--gray-color);">
+                <td colspan="5" style="text-align: center; padding: 30px; color: var(--gray-color);">
                     No first-timers yet.
                 </td>
             </tr>
@@ -77,35 +84,19 @@ function updateFirstTimersTable() {
         const lastFollowText = lastFollow?.date ? new Date(lastFollow.date).toLocaleDateString() : '-';
 
         const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.onclick = () => editFirstTimer(ft.id);
         row.innerHTML = `
             <td data-label="Name">${fullName || ft.name || ''}</td>
-            <td data-label="Gender">${ft.gender || ''}</td>
             <td data-label="Mobile">${formatPhoneLink(ft.mobile)}</td>
-            <td data-label="Email">${formatEmailLink(ft.email)}</td>
-            <td data-label="Address">${ft.address || ''}</td>
-            <td data-label="Post Code">${ft.postcode || ''}</td>
-            <td data-label="Birthday">${birthday}</td>
-            <td data-label="Age Group">${ft.ageGroup || ''}</td>
-            <td data-label="Marital Status">${ft.maritalStatus || ''}</td>
-            <td data-label="Born Again">${yesNo(ft.bornAgain)}</td>
-            <td data-label="Speak Tongues">${yesNo(ft.speakTongues)}</td>
-            <td data-label="How Found Us">${formatList(ft.findOut)}</td>
-            <td data-label="Contact Pref">${formatList(ft.contactPref)}</td>
-            <td data-label="Visit">${yesNo(ft.visit)}</td>
-            <td data-label="Visit When">${ft.visitWhen || ''}</td>
-            <td data-label="Prayer Requests">${formatList(ft.prayerRequests)}</td>
-            <td data-label="Invited By">${ft.invitedBy || ''}</td>
             <td data-label="Date Joined">${dateJoined}</td>
             <td data-label="Status">${getFirstTimerStatusLabel(ft.status)}</td>
-            <td data-label="Foundation School">${ft.foundationSchool || ''}</td>
-            <td data-label="Cell">${ft.cellName || ''}</td>
-            <td data-label="Last Follow-up">${lastFollowText}</td>
             <td data-label="Actions">
                 <div class="action-buttons">
-                    <button class="action-btn edit-btn" onclick="editFirstTimer('${ft.id}')">
+                    <button class="action-btn edit-btn" onclick="event.stopPropagation(); editFirstTimer('${ft.id}')">
                         <i class="fas fa-edit"></i> Edit
                     </button>
-                    <button class="action-btn delete-btn" onclick="deleteFirstTimer('${ft.id}', '${fullName || ft.name}')">
+                    <button class="action-btn delete-btn" onclick="event.stopPropagation(); deleteFirstTimer('${ft.id}', '${fullName || ft.name}')">
                         <i class="fas fa-trash"></i> Delete
                     </button>
                 </div>
@@ -165,8 +156,26 @@ function openFirstTimerModal(ft = null) {
     document.getElementById('firstTimerModalTitle').textContent = ft ? 'Edit First-Timer' : 'Add First-Timer';
     document.getElementById('firstTimerId').value = ft?.id || '';
     document.getElementById('firstTimerName').value = ft?.name || '';
+    document.getElementById('firstTimerSurname').value = ft?.surname || '';
+    document.getElementById('firstTimerGender').value = ft?.gender || '';
     document.getElementById('firstTimerMobile').value = ft?.mobile || '';
+    document.getElementById('firstTimerEmail').value = ft?.email || '';
+    document.getElementById('firstTimerAddress').value = ft?.address || '';
+    document.getElementById('firstTimerPostcode').value = ft?.postcode || '';
+    document.getElementById('firstTimerBirthdayMonth').value = ft?.birthdayMonth || '';
+    document.getElementById('firstTimerBirthdayDay').value = ft?.birthdayDay || '';
+    document.getElementById('firstTimerAgeGroup').value = ft?.ageGroup || '';
+    document.getElementById('firstTimerMaritalStatus').value = ft?.maritalStatus || '';
+    document.getElementById('firstTimerBornAgain').value = yesNo(ft?.bornAgain) || '';
+    document.getElementById('firstTimerSpeakTongues').value = yesNo(ft?.speakTongues) || '';
+    document.getElementById('firstTimerFindOut').value = formatList(ft?.findOut);
     document.getElementById('firstTimerInvitedBy').value = ft?.invitedBy || '';
+    document.getElementById('firstTimerContactPref').value = formatList(ft?.contactPref);
+    document.getElementById('firstTimerVisit').value = yesNo(ft?.visit) || '';
+    document.getElementById('firstTimerVisitWhen').value = ft?.visitWhen || '';
+    document.getElementById('firstTimerPrayerRequests').value = Array.isArray(ft?.prayerRequests)
+        ? ft.prayerRequests.join('\n')
+        : (ft?.prayerRequests || '');
     document.getElementById('firstTimerDateJoined').value = ft?.dateJoined ? ft.dateJoined.split('T')[0] : '';
     document.getElementById('firstTimerStatus').value = ft?.status || 'amber';
     document.getElementById('firstTimerFoundation').value = ft?.foundationSchool || 'Not Yet';
@@ -183,10 +192,31 @@ function editFirstTimer(id) {
 async function saveFirstTimer(e) {
     e.preventDefault();
     const id = document.getElementById('firstTimerId').value;
+    const bMonth = document.getElementById('firstTimerBirthdayMonth').value;
+    const bDay = document.getElementById('firstTimerBirthdayDay').value;
+    const birthday = (bMonth && bDay) ? `${String(bMonth).padStart(2, '0')}-${String(bDay).padStart(2, '0')}` : '';
     const payload = {
         name: document.getElementById('firstTimerName').value.trim(),
+        surname: document.getElementById('firstTimerSurname').value.trim(),
+        gender: document.getElementById('firstTimerGender').value,
         mobile: document.getElementById('firstTimerMobile').value.trim(),
+        email: document.getElementById('firstTimerEmail').value.trim(),
+        address: document.getElementById('firstTimerAddress').value.trim(),
+        postcode: document.getElementById('firstTimerPostcode').value.trim(),
+        birthday,
+        ageGroup: document.getElementById('firstTimerAgeGroup').value,
+        maritalStatus: document.getElementById('firstTimerMaritalStatus').value,
+        bornAgain: document.getElementById('firstTimerBornAgain').value,
+        speakTongues: document.getElementById('firstTimerSpeakTongues').value,
+        findOut: csvToArray(document.getElementById('firstTimerFindOut').value),
         invitedBy: document.getElementById('firstTimerInvitedBy').value.trim(),
+        contactPref: csvToArray(document.getElementById('firstTimerContactPref').value),
+        visit: document.getElementById('firstTimerVisit').value,
+        visitWhen: document.getElementById('firstTimerVisitWhen').value.trim(),
+        prayerRequests: document.getElementById('firstTimerPrayerRequests').value
+            .split('\n')
+            .map(v => v.trim())
+            .filter(Boolean),
         dateJoined: document.getElementById('firstTimerDateJoined').value,
         status: document.getElementById('firstTimerStatus').value,
         foundationSchool: document.getElementById('firstTimerFoundation').value,
@@ -337,3 +367,26 @@ if (document.getElementById('firstTimerForm')) {
 if (document.getElementById('followUpForm')) {
     document.getElementById('followUpForm').addEventListener('submit', saveFollowUp);
 }
+
+(() => {
+    const daySelect = document.getElementById('firstTimerBirthdayDay');
+    const monthSelect = document.getElementById('firstTimerBirthdayMonth');
+    if (daySelect && monthSelect) {
+        for (let d = 1; d <= 31; d += 1) {
+            const opt = document.createElement('option');
+            opt.value = String(d);
+            opt.textContent = String(d);
+            daySelect.appendChild(opt);
+        }
+        const months = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        months.forEach((name, index) => {
+            const opt = document.createElement('option');
+            opt.value = String(index + 1);
+            opt.textContent = name;
+            monthSelect.appendChild(opt);
+        });
+    }
+})();

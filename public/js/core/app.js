@@ -837,10 +837,36 @@
                 if (!list.length) {
                     bodyEl.innerHTML = '<div class="birthday-empty">No birthdays.</div>';
                 } else {
-                    bodyEl.innerHTML = list.map(member => {
-                        const cell = churchData.cells.find(c => String(c.id) === String(member.cellId));
-                        return `<div class="birthday-item">${member.name} ${cell ? `— ${cell.name}` : ''} <span>${formatPhoneLink(member.mobile)}</span></div>`;
-                    }).join('');
+                    bodyEl.innerHTML = `
+                        <div class="table-container">
+                            <table class="mobile-grid-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Cell</th>
+                                        <th>Birthday</th>
+                                        <th>Mobile</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${list.map(member => {
+                                        const cell = churchData.cells.find(c => String(c.id) === String(member.cellId));
+                                        const birthdayText = member.dateOfBirth
+                                            ? new Date(member.dateOfBirth).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                                            : '';
+                                        return `
+                                            <tr>
+                                                <td data-label="Name">${member.name || ''}</td>
+                                                <td data-label="Cell">${cell ? cell.name : ''}</td>
+                                                <td data-label="Birthday">${birthdayText}</td>
+                                                <td data-label="Mobile">${formatPhoneLink(member.mobile)}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
                 }
             }
             showModal('birthdayModal');
@@ -870,13 +896,29 @@
                 row.innerHTML = `
                     <td data-label="Name">${member.name || ''}</td>
                     <td data-label="Cell">${cell ? cell.name : ''}</td>
-                    <td data-label="Role">${member.role || ''}</td>
                     <td data-label="Birthday">${dateLabel}</td>
                     <td data-label="Mobile">${formatPhoneLink(member.mobile)}</td>
+                    <td data-label="Actions">
+                        <button class="action-btn edit-btn" onclick="openBirthdayEdit('${member.id}')">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                    </td>
                 `;
                 tbody.appendChild(row);
             });
         }
+
+        window.openBirthdayEdit = function openBirthdayEdit(memberId) {
+            const member = churchData.members.find(m => String(m.id) === String(memberId));
+            if (!member) return;
+            document.getElementById('addBirthdayModalTitle').textContent = 'Edit Birthday';
+            document.getElementById('birthdayEditMemberId').value = member.id;
+            document.getElementById('birthdayMemberName').value = member.name || '';
+            populateBirthdayMemberSelect(member.name || '');
+            document.getElementById('birthdayMemberId').value = member.id;
+            document.getElementById('birthdayDate').value = member.dateOfBirth ? String(member.dateOfBirth).slice(0, 10) : '';
+            showModal('addBirthdayModal');
+        };
 
         function updateMemberNameDatalist() {
             const dataList = document.getElementById('memberNamesList');
@@ -906,7 +948,8 @@
 
         async function saveBirthday(e) {
             e.preventDefault();
-            const memberId = document.getElementById('birthdayMemberId').value;
+            const editMemberId = document.getElementById('birthdayEditMemberId').value;
+            const memberId = editMemberId || document.getElementById('birthdayMemberId').value;
             const dob = document.getElementById('birthdayDate').value;
             if (!memberId || !dob) {
                 alert('Please select a member and birthday date.');
@@ -929,6 +972,8 @@
                 }
                 closeModal('addBirthdayModal');
                 document.getElementById('addBirthdayForm').reset();
+                document.getElementById('birthdayEditMemberId').value = '';
+                document.getElementById('addBirthdayModalTitle').textContent = 'Add Birthday';
                 refreshBirthdays();
                 alert('Birthday saved.');
             } catch (error) {
@@ -1557,6 +1602,8 @@
 
             // Birthday modal
             document.getElementById('addBirthdayBtn')?.addEventListener('click', () => {
+                document.getElementById('birthdayEditMemberId').value = '';
+                document.getElementById('addBirthdayModalTitle').textContent = 'Add Birthday';
                 populateBirthdayMemberSelect('');
                 showModal('addBirthdayModal');
             });

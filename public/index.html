@@ -466,12 +466,105 @@
                         <input type="text" id="firstTimerName" class="form-control" required>
                     </div>
                     <div class="form-group">
+                        <label for="firstTimerSurname">Surname</label>
+                        <input type="text" id="firstTimerSurname" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerGender">Gender</label>
+                        <select id="firstTimerGender" class="form-control">
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="firstTimerMobile">Mobile *</label>
                         <input type="tel" id="firstTimerMobile" class="form-control" required>
                     </div>
                     <div class="form-group">
+                        <label for="firstTimerEmail">Email</label>
+                        <input type="email" id="firstTimerEmail" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerAddress">Address</label>
+                        <input type="text" id="firstTimerAddress" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerPostcode">Post Code</label>
+                        <input type="text" id="firstTimerPostcode" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Birth (Day / Month)</label>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <select id="firstTimerBirthdayDay" class="form-control">
+                                <option value="">Day</option>
+                            </select>
+                            <select id="firstTimerBirthdayMonth" class="form-control">
+                                <option value="">Month</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerAgeGroup">Age Group</label>
+                        <select id="firstTimerAgeGroup" class="form-control">
+                            <option value="">Select</option>
+                            <option value="13-19">13-19</option>
+                            <option value="20-35">20-35</option>
+                            <option value="36-45">36-45</option>
+                            <option value="46&above">46&above</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerMaritalStatus">Marital Status</label>
+                        <select id="firstTimerMaritalStatus" class="form-control">
+                            <option value="">Select</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerBornAgain">Born Again?</label>
+                        <select id="firstTimerBornAgain" class="form-control">
+                            <option value="">Select</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerSpeakTongues">Speak in Tongues?</label>
+                        <select id="firstTimerSpeakTongues" class="form-control">
+                            <option value="">Select</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerFindOut">How Found Us (comma separated)</label>
+                        <input type="text" id="firstTimerFindOut" class="form-control" placeholder="TV, SOCIAL MEDIA">
+                    </div>
+                    <div class="form-group">
                         <label for="firstTimerInvitedBy">Invited By</label>
                         <input type="text" id="firstTimerInvitedBy" class="form-control" placeholder="Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerContactPref">Contact Preferences (comma separated)</label>
+                        <input type="text" id="firstTimerContactPref" class="form-control" placeholder="Telephone, SMS, Email">
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerVisit">Would you like a visit?</label>
+                        <select id="firstTimerVisit" class="form-control">
+                            <option value="">Select</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerVisitWhen">If yes, when is convenient?</label>
+                        <input type="text" id="firstTimerVisitWhen" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="firstTimerPrayerRequests">Prayer Requests (one per line)</label>
+                        <textarea id="firstTimerPrayerRequests" class="form-control" rows="3"></textarea>
                     </div>
                     <div class="form-group">
                         <label for="firstTimerDateJoined">Date Joined</label>
@@ -1106,27 +1199,9 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>Gender</th>
                                 <th>Mobile</th>
-                                <th>Email</th>
-                                <th>Address</th>
-                                <th>Post Code</th>
-                                <th>Birthday</th>
-                                <th>Age Group</th>
-                                <th>Marital Status</th>
-                                <th>Born Again</th>
-                                <th>Speak Tongues</th>
-                                <th>How Found Us</th>
-                                <th>Contact Pref</th>
-                                <th>Visit</th>
-                                <th>Visit When</th>
-                                <th>Prayer Requests</th>
-                                <th>Invited By</th>
                                 <th>Date Joined</th>
                                 <th>Status</th>
-                                <th>Foundation School</th>
-                                <th>Cell</th>
-                                <th>Last Follow-up</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -1258,9 +1333,9 @@
                         <tr>
                             <th>Name</th>
                             <th>Cell</th>
-                            <th>Role</th>
                             <th>Birthday</th>
                             <th>Mobile</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="birthdaysTableBody"></tbody>
@@ -1271,12 +1346,13 @@
         <!-- Add Birthday Modal -->
         <div id="addBirthdayModal" class="modal-overlay">
             <div class="modal">
-                <div class="modal-header">
-                    <h3>Add Birthday</h3>
-                    <button class="close-modal" onclick="closeModal('addBirthdayModal')">&times;</button>
-                </div>
+            <div class="modal-header">
+                <h3 id="addBirthdayModalTitle">Add Birthday</h3>
+                <button class="close-modal" onclick="closeModal('addBirthdayModal')">&times;</button>
+            </div>
                 <div class="modal-body">
                     <form id="addBirthdayForm">
+                        <input type="hidden" id="birthdayEditMemberId">
                         <div class="form-group">
                             <label for="birthdayMemberName">Member Name *</label>
                             <input type="text" id="birthdayMemberName" class="form-control" list="memberNamesList" required>
