@@ -1212,16 +1212,16 @@
         <div id="first-timers" class="page-content">
             <div class="page-header">
                 <h1>First-Timers</h1>
-                <div class="page-actions">
-                    <button class="btn btn-success" id="addFirstTimerBtn">
-                        <i class="fas fa-user-plus"></i> Add New First-Timer
-                    </button>
-                </div>
             </div>
 
             <div class="cell-tabs" id="firstTimersTabs">
                 <button class="cell-tab-btn active" data-tab="list">First-Timers List</button>
                 <button class="cell-tab-btn" data-tab="followups">Follow-up Records</button>
+                <div class="page-actions">
+                    <button class="btn btn-success" id="addFirstTimerBtn">
+                        <i class="fas fa-user-plus"></i> Add New First-Timer
+                    </button>
+
             </div>
 
             <div class="cell-tab-content active" id="firstTimersListTab">
@@ -1281,13 +1281,13 @@
             <div class="cell-tabs" id="notificationsTabs">
                 <button class="cell-tab-btn active" data-tab="list">All Notifications</button>
                 <button class="cell-tab-btn" data-tab="send" id="notificationsSendTabBtn">Send Notification</button>
+                <button class="btn btn-danger" id="deleteNotificationsBtn">
+                        <i class="fas fa-trash"></i> Delete Selected
+                    </button>
             </div>
 
             <div class="cell-tab-content active" id="notificationsListTab">
                 <div class="page-actions" style="justify-content: flex-end; margin-bottom: 16px;">
-                    <button class="btn btn-danger" id="deleteNotificationsBtn">
-                        <i class="fas fa-trash"></i> Delete Selected
-                    </button>
                 </div>
                 <div class="table-container">
                     <table class="mobile-grid-table" id="notificationsTable">
@@ -1636,27 +1636,10 @@
                     <div class="page-header" style="margin-top: 0;">
                         <h2>Appearance & Theme</h2>
                     </div>
-                    
-                    <div class="theme-options">
-                        <div class="theme-option theme-light active" data-theme="light">
-                            <div class="theme-icon">
-                                <i class="fas fa-sun"></i>
-                            </div>
-                            <div class="theme-name">Light</div>
-                        </div>
-                        <div class="theme-option theme-dark" data-theme="dark">
-                            <div class="theme-icon">
-                                <i class="fas fa-moon"></i>
-                            </div>
-                            <div class="theme-name">Dark</div>
-                        </div>
-                        <div class="theme-option theme-auto" data-theme="auto">
-                            <div class="theme-icon">
-                                <i class="fas fa-adjust"></i>
-                            </div>
-                            <div class="theme-name">Auto</div>
-                        </div>
-                    </div>
+
+                    <p class="settings-note">
+                        Use the floating theme button on the bottom-right to switch between light and dark mode.
+                    </p>
                 </div>
                 
                 <div class="settings-card">
@@ -1832,10 +1815,14 @@
         <!-- Footer -->
         <div class="footer">
             <div class="footer-left">
-                © <span id="currentYear"></span> Christ Embassy Church Cell Management System
+                © <span id="currentYear"></span> Christ Embassy Reading Church Management System
             </div>
         </div>
     </div>
+
+    <button class="theme-fab" id="themeToggleFab" type="button" aria-label="Toggle dark mode">
+        <i class="fas fa-moon" aria-hidden="true"></i>
+    </button>
 
     <script src="/js/core/app.js"></script>
     <script src="/js/features/cells.js"></script>
