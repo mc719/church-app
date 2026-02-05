@@ -160,6 +160,7 @@
         const cellGroupsContainer = document.getElementById('cellGroupsContainer');
         const dynamicCellPages = document.getElementById('dynamicCellPages');
         let currentDeleteCallback = null;
+        const isMobileView = () => window.matchMedia('(max-width: 768px)').matches;
 
         // Get authorization headers
         function getAuthHeaders() {
@@ -1719,6 +1720,17 @@
                     }
                 };
                 reader.readAsDataURL(file);
+            });
+
+            const accordionToggles = document.querySelectorAll('.accordion-toggle');
+            accordionToggles.forEach(toggle => {
+                toggle.addEventListener('click', () => {
+                    if (!isMobileView()) return;
+                    const section = toggle.closest('.accordion-section');
+                    if (section) {
+                        section.classList.toggle('open');
+                    }
+                });
             });
 
             // First-timers buttons and tabs

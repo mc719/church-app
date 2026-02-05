@@ -173,10 +173,49 @@
             color: rgba(255, 255, 255, 0.6);
             letter-spacing: 1px;
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         
         .nav-section-title.hidden {
             display: none;
+        }
+
+        .accordion-section {
+            position: relative;
+        }
+
+        .accordion-toggle {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .accordion-caret {
+            font-size: 0.8rem;
+            transition: transform 0.2s ease;
+        }
+
+        .accordion-content {
+            display: none;
+        }
+
+        .accordion-section:hover .accordion-content {
+            display: block;
+        }
+
+        .accordion-section.open .accordion-content {
+            display: block;
+        }
+
+        .accordion-section.open .accordion-caret {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 768px) {
+            .accordion-section:hover .accordion-content {
+                display: none;
+            }
         }
         
         .logout-btn {

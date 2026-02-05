@@ -1036,38 +1036,50 @@
             </div>
 
             <div class="nav-divider" id="cellGroupsDivider"></div>
-            
-            <div class="nav-section-title" id="cellGroupsTitle">Cell Groups</div>
-            
-            <!-- Cell groups will be added here dynamically -->
-            <div id="cellGroupsContainer">
-                <!-- Cells Template will be added here dynamically -->
+
+            <div class="accordion-section" id="cellGroupsSection">
+                <div class="nav-section-title accordion-toggle" id="cellGroupsTitle">
+                    <span>Cell Groups</span>
+                    <i class="fas fa-chevron-down accordion-caret"></i>
+                </div>
+                
+                <!-- Cell groups will be added here dynamically -->
+                <div id="cellGroupsContainer" class="accordion-content">
+                    <!-- Cells Template will be added here dynamically -->
+                </div>
             </div>
             
             <div class="nav-divider" id="adminDivider"></div>
-            
-            <div class="nav-section-title" id="adminTitle">Administrator</div>
 
-            <div class="nav-item" data-page="notifications" id="notificationsNav">
-                <i class="fas fa-bell"></i>
-                <span>Notifications</span>
-            </div>
-            
-            <div class="nav-item" data-page="page-management" id="pageManagementNav">
-                <i class="fas fa-file-alt"></i>
-                <span>Page Management</span>
-            </div>
-            <div class="nav-item" data-page="access-management" id="accessManagementNav">
-                <i class="fas fa-user-shield"></i>
-                <span>Access Management</span>
-            </div>
-            <div class="nav-item" data-page="sessions" id="sessionsNav">
-                <i class="fas fa-history"></i>
-                <span>Sessions</span>
-            </div>
-            <div class="nav-item" data-page="settings" id="settingsNav">
-                <i class="fas fa-cog"></i>
-                <span>Settings</span>
+            <div class="accordion-section" id="adminSection">
+                <div class="nav-section-title accordion-toggle" id="adminTitle">
+                    <span>Administrator</span>
+                    <i class="fas fa-chevron-down accordion-caret"></i>
+                </div>
+
+                <div class="accordion-content" id="adminMenu">
+                    <div class="nav-item" data-page="notifications" id="notificationsNav">
+                        <i class="fas fa-bell"></i>
+                        <span>Notifications</span>
+                    </div>
+                    
+                    <div class="nav-item" data-page="page-management" id="pageManagementNav">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Page Management</span>
+                    </div>
+                    <div class="nav-item" data-page="access-management" id="accessManagementNav">
+                        <i class="fas fa-user-shield"></i>
+                        <span>Access Management</span>
+                    </div>
+                    <div class="nav-item" data-page="sessions" id="sessionsNav">
+                        <i class="fas fa-history"></i>
+                        <span>Sessions</span>
+                    </div>
+                    <div class="nav-item" data-page="settings" id="settingsNav">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </div>
+                </div>
             </div>
         </div>
         
