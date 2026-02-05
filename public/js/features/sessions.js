@@ -4,7 +4,7 @@ function updateSessionsTable() {
             if (!churchData.sessions.length) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="11" style="text-align: center; padding: 40px; color: var(--gray-color);">
+                        <td colspan="8" style="text-align: center; padding: 40px; color: var(--gray-color);">
                             No sessions recorded yet.
                         </td>
                     </tr>
@@ -40,12 +40,6 @@ function updateSessionsTable() {
             pageSessions.forEach(session => {
                 const loginTime = session.loginTime ? new Date(session.loginTime) : null;
                 const logoutTime = session.logoutTime ? new Date(session.logoutTime) : null;
-                const activeMs = typeof session.activeMs === 'number' ? session.activeMs : 0;
-                const idleMs = typeof session.idleMs === 'number' ? session.idleMs : 0;
-                const totalMs = activeMs + idleMs;
-                const activeTime = totalMs ? Math.round(activeMs / 60000) + ' min' : '-';
-                const idleTime = totalMs ? Math.round(idleMs / 60000) + ' min' : '-';
-                const totalTime = totalMs ? Math.round(totalMs / 60000) + ' min' : '-';
                 const status = logoutTime ? 'Ended' : 'Active';
                 const ua = parseUserAgent(session.userAgent || '');
                 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -59,9 +53,6 @@ function updateSessionsTable() {
                     <td data-label="Browser">${ua.browser}</td>
                     <td data-label="OS">${ua.os}</td>
                     <td data-label="Timezone">${timezone}</td>
-                    <td data-label="Active Time">${activeTime}</td>
-                    <td data-label="Idle Time">${idleTime}</td>
-                    <td data-label="Total Time">${totalTime}</td>
                     <td data-label="Status">${status}</td>
                 `;
                 tbody.appendChild(row);

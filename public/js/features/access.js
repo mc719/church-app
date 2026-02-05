@@ -89,6 +89,13 @@ function populateRestrictedMenusOptions(containerId) {
             container.innerHTML = '';
 
             const menus = getMenuOptions();
+            const allOption = document.createElement('label');
+            allOption.className = 'multiselect-option';
+            allOption.innerHTML = `
+                    <input type="checkbox" value="__all__">
+                    <span>All</span>
+                `;
+            container.appendChild(allOption);
             menus.forEach(menu => {
                 const option = document.createElement('label');
                 option.className = 'multiselect-option';
@@ -98,21 +105,70 @@ function populateRestrictedMenusOptions(containerId) {
                 `;
                 container.appendChild(option);
             });
+
+            container.onchange = () => syncAllowedMenusSelection(containerId);
+            syncAllowedMenusSelection(containerId);
         }
 
 function getRestrictedMenusSelection(containerId) {
-            const selected = [];
-            document.querySelectorAll(`#${containerId} input:checked`).forEach(input => {
-                selected.push(input.value);
+            const container = document.getElementById(containerId);
+            if (!container) return [];
+            const allInput = container.querySelector('input[value="__all__"]');
+            if (allInput?.checked) {
+                return [];
+            }
+            const allowed = [];
+            container.querySelectorAll('input:checked').forEach(input => {
+                if (input.value !== '__all__') {
+                    allowed.push(input.value);
+                }
             });
-            return selected;
+            const allMenus = getMenuOptions().map(menu => menu.id);
+            return allMenus.filter(id => !allowed.includes(id));
         }
 
 function setRestrictedMenusSelection(containerId, values) {
-            const valueSet = new Set(values || []);
-            document.querySelectorAll(`#${containerId} input`).forEach(input => {
-                input.checked = valueSet.has(input.value);
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const restrictedSet = new Set(values || []);
+            const allMenus = getMenuOptions().map(menu => menu.id);
+            const allowedSet = new Set(allMenus.filter(id => !restrictedSet.has(id)));
+            const allInput = container.querySelector('input[value="__all__"]');
+            if (allInput) {
+                allInput.checked = restrictedSet.size === 0;
+            }
+            container.querySelectorAll('input').forEach(input => {
+                if (input.value === '__all__') return;
+                input.checked = allowedSet.has(input.value);
             });
+            syncAllowedMenusSelection(containerId);
+        }
+
+function syncAllowedMenusSelection(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const allInput = container.querySelector('input[value="__all__"]');
+            const otherInputs = Array.from(container.querySelectorAll('input')).filter(input => input.value !== '__all__');
+            if (allInput?.checked) {
+                otherInputs.forEach(input => {
+                    input.checked = false;
+                    input.disabled = true;
+                });
+            } else {
+                otherInputs.forEach(input => {
+                    input.disabled = false;
+                });
+            }
+        }
+
+function formatAllowedMenus(restrictedMenus) {
+            const menus = getMenuOptions();
+            if (!restrictedMenus || restrictedMenus.length === 0) {
+                return 'All';
+            }
+            const restrictedSet = new Set(restrictedMenus);
+            const allowed = menus.filter(menu => !restrictedSet.has(menu.id)).map(menu => menu.label);
+            return allowed.length ? allowed.join(', ') : '-';
         }
 
 function updateAccessManagementTable() {
@@ -127,14 +183,14 @@ function updateAccessManagementTable() {
             const pageUsers = churchData.users.slice(startIndex, startIndex + PAGE_SIZE);
 
             pageUsers.forEach(user => {
-                const restrictedMenus = (user.restrictedMenus || []).join(', ');
+                const allowedMenus = formatAllowedMenus(user.restrictedMenus || []);
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td data-label="Username">${user.username}</td>
                     <td data-label="Email">${formatEmailLink(user.email)}</td>
                     <td data-label="Password">******</td>
                     <td data-label="Role">${user.role}</td>
-                    <td data-label="Restricted Menus">${restrictedMenus || '-'}</td>
+                    <td data-label="Allowed Menus">${allowedMenus}</td>
                     <td data-label="Status">${user.status ? 'Active' : 'Inactive'}</td>
                     <td data-label="Actions">
                         <div class="action-buttons">

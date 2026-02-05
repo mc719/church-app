@@ -736,7 +736,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Restricted Menus</label>
+                        <label>Allowed Menus</label>
                         <div class="multiselect-dropdown">
                             <div class="multiselect-selected" onclick="toggleDropdown('editRestrictedMenusOptions')">
                                 <span>Select menus</span>
@@ -931,7 +931,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Restricted Menus</label>
+                        <label>Allowed Menus</label>
                         <div class="multiselect-dropdown">
                             <div class="multiselect-selected" onclick="toggleDropdown('restrictedMenusOptions')">
                                 <span>Select menus</span>
@@ -1212,16 +1212,16 @@
         <div id="first-timers" class="page-content">
             <div class="page-header">
                 <h1>First-Timers</h1>
-                <div class="page-actions">
-                    <button class="btn btn-success" id="addFirstTimerBtn">
-                        <i class="fas fa-user-plus"></i> Add New First-Timer
-                    </button>
-                </div>
             </div>
 
             <div class="cell-tabs" id="firstTimersTabs">
                 <button class="cell-tab-btn active" data-tab="list">First-Timers List</button>
                 <button class="cell-tab-btn" data-tab="followups">Follow-up Records</button>
+                <div class="cell-tabs-actions">
+                    <button class="btn btn-success" id="addFirstTimerBtn">
+                        <i class="fas fa-user-plus"></i> Add New First-Timer
+                    </button>
+                </div>
             </div>
 
             <div class="cell-tab-content active" id="firstTimersListTab">
@@ -1281,14 +1281,14 @@
             <div class="cell-tabs" id="notificationsTabs">
                 <button class="cell-tab-btn active" data-tab="list">All Notifications</button>
                 <button class="cell-tab-btn" data-tab="send" id="notificationsSendTabBtn">Send Notification</button>
-            </div>
-
-            <div class="cell-tab-content active" id="notificationsListTab">
-                <div class="page-actions" style="justify-content: flex-end; margin-bottom: 16px;">
+                <div class="cell-tabs-actions">
                     <button class="btn btn-danger" id="deleteNotificationsBtn">
                         <i class="fas fa-trash"></i> Delete Selected
                     </button>
                 </div>
+            </div>
+
+            <div class="cell-tab-content active" id="notificationsListTab">
                 <div class="table-container">
                     <table class="mobile-grid-table" id="notificationsTable">
                         <thead>
@@ -1387,12 +1387,12 @@
                     <form id="addBirthdayForm">
                         <input type="hidden" id="birthdayEditMemberId">
                         <div class="form-group">
-                            <label for="birthdayMemberName">Member Name *</label>
-                            <input type="text" id="birthdayMemberName" class="form-control" list="memberNamesList" required>
+                            <label for="birthdayMemberName">Member Name</label>
+                            <input type="text" id="birthdayMemberName" class="form-control" list="memberNamesList">
                         </div>
                         <div class="form-group">
-                            <label for="birthdayMemberId">Member *</label>
-                            <select id="birthdayMemberId" class="form-control" required></select>
+                            <label for="birthdayMemberId">Member</label>
+                            <select id="birthdayMemberId" class="form-control"></select>
                         </div>
                         <div class="form-group">
                             <label for="birthdayDateDay">Date of Birth *</label>
@@ -1581,7 +1581,7 @@
                             <th>Email</th>
                             <th>Password</th>
                             <th>Role</th>
-                            <th>Restricted Menus</th>
+                            <th>Allowed Menus</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -1611,9 +1611,6 @@
                             <th>Browser</th>
                             <th>OS</th>
                             <th>Timezone</th>
-                            <th>Active Time</th>
-                            <th>Idle Time</th>
-                            <th>Total Time</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -1636,27 +1633,9 @@
                     <div class="page-header" style="margin-top: 0;">
                         <h2>Appearance & Theme</h2>
                     </div>
-                    
-                    <div class="theme-options">
-                        <div class="theme-option theme-light active" data-theme="light">
-                            <div class="theme-icon">
-                                <i class="fas fa-sun"></i>
-                            </div>
-                            <div class="theme-name">Light</div>
-                        </div>
-                        <div class="theme-option theme-dark" data-theme="dark">
-                            <div class="theme-icon">
-                                <i class="fas fa-moon"></i>
-                            </div>
-                            <div class="theme-name">Dark</div>
-                        </div>
-                        <div class="theme-option theme-auto" data-theme="auto">
-                            <div class="theme-icon">
-                                <i class="fas fa-adjust"></i>
-                            </div>
-                            <div class="theme-name">Auto</div>
-                        </div>
-                    </div>
+                    <p class="settings-note">
+                        Use the floating theme button on the bottom-right to switch between light and dark mode.
+                    </p>
                 </div>
                 
                 <div class="settings-card">
@@ -1836,6 +1815,10 @@
             </div>
         </div>
     </div>
+
+    <button class="theme-fab" id="themeToggleFab" type="button" aria-label="Toggle dark mode">
+        <i class="fas fa-moon" aria-hidden="true"></i>
+    </button>
 
     <script src="/js/core/app.js"></script>
     <script src="/js/features/cells.js"></script>
