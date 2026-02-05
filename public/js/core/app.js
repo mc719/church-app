@@ -1434,19 +1434,6 @@
             
             localStorage.setItem('theme', theme);
             churchData.settings.theme = theme;
-            updateThemeFab();
-        }
-
-        function updateThemeFab() {
-            const button = document.getElementById('themeToggleFab');
-            if (!button) return;
-            const icon = button.querySelector('i');
-            const current = localStorage.getItem('theme') || 'light';
-            const isDark = current === 'dark';
-            if (icon) {
-                icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-            }
-            button.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
         }
 
         // Apply theme from localStorage
@@ -1658,14 +1645,6 @@
                     setTheme(theme);
                 });
             });
-
-            const themeFab = document.getElementById('themeToggleFab');
-            if (themeFab) {
-                themeFab.addEventListener('click', () => {
-                    const current = localStorage.getItem('theme') || 'light';
-                    setTheme(current === 'dark' ? 'light' : 'dark');
-                });
-            }
 
             // Logo upload
             document.getElementById('logoUpload').addEventListener('change', handleLogoUpload);
