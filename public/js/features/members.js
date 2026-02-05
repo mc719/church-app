@@ -189,10 +189,33 @@ function updateAllMembersTable() {
                         <div style="margin-top: 8px; font-size: 0.9rem;">
                             ${cell ? cell.name : 'Unknown Cell'}
                         </div>
+                        <div class="action-buttons" style="margin-top: 12px;">
+                            <button class="action-btn edit-btn">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="action-btn delete-btn">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
                     `;
-                    card.addEventListener('click', () => {
+                    card.addEventListener('click', (e) => {
+                        if (e.target.closest('.action-btn')) return;
                         showMemberDetails(member, cell);
                     });
+                    const editBtn = card.querySelector('.edit-btn');
+                    if (editBtn) {
+                        editBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            editMember(member.cellId, member.id);
+                        });
+                    }
+                    const deleteBtn = card.querySelector('.delete-btn');
+                    if (deleteBtn) {
+                        deleteBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            confirmDeleteMember(member.cellId, member.id, member.name);
+                        });
+                    }
                     grid.appendChild(card);
                 }
             });

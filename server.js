@@ -2307,6 +2307,27 @@ app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
   }
 });
 
+app.delete("/api/notifications", requireAuth, async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    const list = Array.isArray(ids) ? ids.map(id => String(id)) : [];
+    if (!list.length) {
+      return res.status(400).json({ error: "No notifications selected" });
+    }
+    const result = await pool.query(
+      `DELETE FROM notifications
+       WHERE id::text = ANY($1)
+         AND (user_id IS NULL OR user_id = $2)
+       RETURNING id::text as id`,
+      [list, req.user.userId]
+    );
+    res.json({ deleted: result.rows.map(r => r.id) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete notifications" });
+  }
+});
+
 app.post("/api/notifications/send", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { targetType, targetValue, title, message, type, roles, targetIds } = req.body || {};

@@ -1285,18 +1285,20 @@
 
             <div class="cell-tab-content active" id="notificationsListTab">
                 <div class="page-actions" style="justify-content: flex-end; margin-bottom: 16px;">
-                    <button class="btn btn-secondary" id="clearNotificationsBtn">
-                        <i class="fas fa-broom"></i> Clear All
+                    <button class="btn btn-danger" id="deleteNotificationsBtn">
+                        <i class="fas fa-trash"></i> Delete Selected
                     </button>
                 </div>
                 <div class="table-container">
                     <table class="mobile-grid-table" id="notificationsTable">
                         <thead>
                             <tr>
+                                <th><input type="checkbox" id="notificationsSelectAll"></th>
                                 <th>Title</th>
                                 <th>Message</th>
                                 <th>Status</th>
                                 <th>Created</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="notificationsTableBody">

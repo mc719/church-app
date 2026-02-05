@@ -624,7 +624,7 @@
             if (!churchData.notifications.length) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="4" style="text-align:center; padding: 24px; color: var(--gray-color);">
+                        <td colspan="6" style="text-align:center; padding: 24px; color: var(--gray-color);">
                             No notifications yet.
                         </td>
                     </tr>
@@ -636,14 +636,28 @@
             churchData.notifications.forEach(note => {
                 const created = note.createdAt ? new Date(note.createdAt).toLocaleString() : '';
                 const status = note.readAt ? 'Read' : 'Unread';
+                const checked = note.selected ? 'checked' : '';
                 const row = document.createElement('tr');
                 row.innerHTML = `
+                    <td data-label="Select">
+                        <input type="checkbox" class="notification-select" data-id="${note.id}" ${checked}>
+                    </td>
                     <td data-label="Title">${note.title || ''}</td>
                     <td data-label="Message">${note.message || ''}</td>
                     <td data-label="Status">${status}</td>
                     <td data-label="Created">${created}</td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="action-btn" data-action="toggle" data-id="${note.id}">
+                                ${note.readAt ? '<i class="fas fa-envelope"></i> Unread' : '<i class="fas fa-envelope-open"></i> Read'}
+                            </button>
+                        </div>
+                    </td>
                 `;
-                row.addEventListener('click', () => openNotificationModal(note.id));
+                row.querySelectorAll('td').forEach(td => {
+                    if (td.querySelector('input') || td.querySelector('button')) return;
+                    td.addEventListener('click', () => openNotificationModal(note.id));
+                });
                 tbody.appendChild(row);
             });
         }
@@ -1336,6 +1350,32 @@
             navigateToPage(defaultPage);
         }
 
+        function attachGlobalHeaderActions(page) {
+            const header = page?.querySelector('.page-header');
+            const actions = document.querySelector('.global-header-actions');
+            if (!header || !actions) return;
+            if (actions.parentElement !== header) {
+                header.appendChild(actions);
+            }
+        }
+
+        function movePageActionsBelow(page) {
+            const header = page?.querySelector('.page-header');
+            if (!header) return;
+            const existingBelow = page.querySelector('.page-actions-below');
+            if (existingBelow) return;
+            const headerActions = header.querySelector('.page-actions');
+            if (!headerActions) return;
+
+            const below = document.createElement('div');
+            below.className = 'page-actions page-actions-below';
+            while (headerActions.firstChild) {
+                below.appendChild(headerActions.firstChild);
+            }
+            headerActions.remove();
+            header.insertAdjacentElement('afterend', below);
+        }
+
         // Navigation function
         function navigateToPage(pageId) {
             document.querySelectorAll('.page-content').forEach(page => {
@@ -1355,12 +1395,15 @@
             const targetPage = document.getElementById(pageId);
             if (targetPage) {
                 targetPage.classList.add('active');
-                
+
                 const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
                 if (navItem) {
                     navItem.classList.add('active');
                 }
-                
+
+                movePageActionsBelow(targetPage);
+                attachGlobalHeaderActions(targetPage);
+
                 if (window.innerWidth <= 1024) {
                     sidebar.classList.remove('open');
                 }
@@ -1645,18 +1688,60 @@
                 populateNotificationTargets(roles);
             });
             document.getElementById('sendNotificationForm')?.addEventListener('submit', sendNotification);
-            document.getElementById('clearNotificationsBtn')?.addEventListener('click', async () => {
+
+            document.getElementById('notificationsSelectAll')?.addEventListener('change', (e) => {
+                const checked = e.target.checked;
+                churchData.notifications = churchData.notifications.map(n => ({ ...n, selected: checked }));
+                updateNotificationsTable();
+            });
+
+            document.getElementById('notificationsTableBody')?.addEventListener('change', (e) => {
+                if (!e.target.classList.contains('notification-select')) return;
+                const id = e.target.getAttribute('data-id');
+                const note = churchData.notifications.find(n => String(n.id) === String(id));
+                if (note) {
+                    note.selected = e.target.checked;
+                }
+            });
+
+            document.getElementById('notificationsTableBody')?.addEventListener('click', async (e) => {
+                const btn = e.target.closest('[data-action="toggle"]');
+                if (!btn) return;
+                const id = btn.getAttribute('data-id');
+                const note = churchData.notifications.find(n => String(n.id) === String(id));
+                if (!note) return;
                 try {
-                    await apiRequest(`${API_ENDPOINTS.NOTIFICATIONS}/read-all`, { method: 'PUT' });
-                    churchData.notifications = churchData.notifications.map(n => ({
-                        ...n,
-                        readAt: n.readAt || new Date().toISOString()
-                    }));
+                    if (note.readAt) {
+                        note.readAt = null;
+                    } else {
+                        await apiRequest(`${API_ENDPOINTS.NOTIFICATIONS}/${id}/read`, { method: 'PUT' });
+                        note.readAt = new Date().toISOString();
+                    }
                     saveNotificationsToStorage();
                     updateNotificationsUI();
                     updateNotificationsTable();
                 } catch (error) {
-                    alert('Failed to clear notifications: ' + error.message);
+                    alert('Failed to update notification: ' + error.message);
+                }
+            });
+
+            document.getElementById('deleteNotificationsBtn')?.addEventListener('click', async () => {
+                const ids = churchData.notifications.filter(n => n.selected).map(n => n.id);
+                if (!ids.length) {
+                    alert('Select at least one notification.');
+                    return;
+                }
+                try {
+                    await apiRequest(`${API_ENDPOINTS.NOTIFICATIONS}`, {
+                        method: 'DELETE',
+                        body: JSON.stringify({ ids })
+                    });
+                    churchData.notifications = churchData.notifications.filter(n => !n.selected);
+                    saveNotificationsToStorage();
+                    updateNotificationsUI();
+                    updateNotificationsTable();
+                } catch (error) {
+                    alert('Failed to delete notifications: ' + error.message);
                 }
             });
 

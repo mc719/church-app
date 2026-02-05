@@ -281,10 +281,16 @@
             margin-bottom: 30px;
             padding-bottom: 20px;
             border-bottom: 1px solid #eaeaea;
+            position: sticky;
+            top: 0;
+            background: #f5f7fb;
+            z-index: 20;
+            gap: 12px;
         }
         
         .dark-theme .page-header {
             border-bottom-color: #333;
+            background: #121212;
         }
         
         .page-header h1 {
@@ -292,7 +298,7 @@
             font-size: 2.2rem;
             font-weight: 700;
         }
-        
+
         .dark-theme .page-header h1 {
             color: #e0e0e0;
         }
@@ -311,6 +317,12 @@
         .page-actions {
             display: flex;
             gap: 12px;
+        }
+
+        .page-actions.page-actions-below {
+            margin: 12px 0 24px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
         }
         
         .btn {
@@ -586,13 +598,12 @@
         }
 
         .global-header-actions {
-            position: fixed;
-            top: 22px;
-            right: 28px;
-            z-index: 1300;
+            position: static;
+            z-index: 10;
             display: inline-flex;
             align-items: center;
             gap: 10px;
+            margin-left: auto;
         }
 
         .notification-bell-icon {
