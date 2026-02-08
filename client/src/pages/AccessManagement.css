@@ -1,0 +1,25 @@
+.access-page .table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.access-page .pagination-label {
+  font-weight: 600;
+  color: var(--gray-color);
+}
+
+.access-page .allowed-menus {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.access-page .allowed-menu-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.9rem;
+}

@@ -1,0 +1,47 @@
+.sessions-page .table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sessions-page .pagination-label {
+  font-weight: 600;
+  color: var(--gray-color);
+}
+
+.sessions-page .search-box {
+  flex: 1;
+  min-width: 240px;
+  background: #fff;
+  border-radius: 999px;
+  padding: 10px 16px;
+  box-shadow: var(--shadow);
+}
+
+.sessions-page .search-box input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.status-active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.status-ended {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}

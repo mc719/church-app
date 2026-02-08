@@ -1,0 +1,11 @@
+.page-management-page .table-container {
+  margin-top: 12px;
+}
+
+.page-management-page .section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--gray-color);
+}

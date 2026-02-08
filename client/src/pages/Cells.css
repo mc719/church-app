@@ -1,0 +1,48 @@
+.cells-page .cells-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.cell-selector-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cell-selector-btn.active {
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+}
+
+.cell-summary-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+
+.cell-summary-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.cell-summary-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--gray-color);
+  margin-bottom: 6px;
+}
+
+.cell-summary-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--primary-color);
+}

@@ -1,0 +1,28 @@
+.reports-page .search-box {
+  flex: 1;
+  min-width: 240px;
+  background: #fff;
+  border-radius: 999px;
+  padding: 10px 16px;
+  box-shadow: var(--shadow);
+}
+
+.reports-page .search-box input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.reports-filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.reports-filters select {
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+}
