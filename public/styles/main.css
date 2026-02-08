@@ -402,6 +402,11 @@
         .dark-theme .chart-card {
             background: #1a1a1a;
         }
+
+        .chart-card canvas {
+            width: 100% !important;
+            height: 160px !important;
+        }
         
         .stat-card {
             background-color: white;

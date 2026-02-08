@@ -391,10 +391,11 @@
 
             const members = churchData.members || [];
             const genderCounts = members.reduce((acc, member) => {
-                const key = (member.gender || 'Unknown').trim() || 'Unknown';
-                acc[key] = (acc[key] || 0) + 1;
+                const raw = String(member.gender || '').trim().toLowerCase();
+                if (raw.includes('female')) acc.female += 1;
+                else if (raw.includes('male')) acc.male += 1;
                 return acc;
-            }, {});
+            }, { male: 0, female: 0 });
 
             const roleCounts = members.reduce((acc, member) => {
                 const key = (member.role || 'Unassigned').trim() || 'Unassigned';
@@ -402,8 +403,8 @@
                 return acc;
             }, {});
 
-            const genderLabels = Object.keys(genderCounts);
-            const genderValues = genderLabels.map(label => genderCounts[label]);
+            const genderLabels = ['Male', 'Female'];
+            const genderValues = [genderCounts.male, genderCounts.female];
             const roleLabels = Object.keys(roleCounts);
             const roleValues = roleLabels.map(label => roleCounts[label]);
 
@@ -418,10 +419,14 @@
                         labels: genderLabels,
                         datasets: [{
                             data: genderValues,
-                            backgroundColor: ['#2c5282', '#f59e0b', '#94a3b8', '#10b981']
+                            backgroundColor: ['#2563eb', '#f97316'],
+                            radius: '70%'
                         }]
                     },
                     options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: { padding: 4 },
                         plugins: {
                             legend: {
                                 position: 'bottom'
@@ -455,6 +460,7 @@
                     },
                     options: {
                         responsive: true,
+                        maintainAspectRatio: false,
                         scales: {
                             y: {
                                 beginAtZero: true,
