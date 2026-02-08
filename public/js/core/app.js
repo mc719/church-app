@@ -431,9 +431,16 @@
                 });
             }
 
+            const rolePalette = [
+                '#2563eb', '#f97316', '#10b981', '#a855f7', '#facc15',
+                '#06b6d4', '#ef4444', '#22c55e', '#e11d48', '#64748b'
+            ];
+            const roleColors = roleLabels.map((_, idx) => rolePalette[idx % rolePalette.length]);
+
             if (rolesChartInstance) {
                 rolesChartInstance.data.labels = roleLabels;
                 rolesChartInstance.data.datasets[0].data = roleValues;
+                rolesChartInstance.data.datasets[0].backgroundColor = roleColors;
                 rolesChartInstance.update();
             } else {
                 rolesChartInstance = new Chart(rolesCanvas, {
@@ -443,7 +450,7 @@
                         datasets: [{
                             label: 'Members',
                             data: roleValues,
-                            backgroundColor: '#2c5282'
+                            backgroundColor: roleColors
                         }]
                     },
                     options: {

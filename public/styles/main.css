@@ -387,7 +387,7 @@
 
         .dashboard-charts {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 24px;
             margin-bottom: 40px;
         }
@@ -395,7 +395,7 @@
         .chart-card {
             background: #ffffff;
             border-radius: 16px;
-            padding: 20px;
+            padding: 16px;
             box-shadow: var(--shadow);
         }
 
