@@ -105,6 +105,9 @@
             cellMembers: {}
         };
 
+        let genderChartInstance = null;
+        let rolesChartInstance = null;
+
         function getTotalPages(totalItems) {
             return Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
         }
@@ -367,6 +370,7 @@
             populateNotificationRoles();
             updateBirthdayWidgets();
             updateMemberNameDatalist();
+            updateDashboardCharts();
             if (typeof updateFirstTimersTable === 'function') {
                 updateFirstTimersTable();
             }
@@ -379,6 +383,81 @@
         }
 
         // Update statistics
+
+        function updateDashboardCharts() {
+            const genderCanvas = document.getElementById('genderChart');
+            const rolesCanvas = document.getElementById('rolesChart');
+            if (!genderCanvas || !rolesCanvas || typeof Chart === 'undefined') return;
+
+            const members = churchData.members || [];
+            const genderCounts = members.reduce((acc, member) => {
+                const key = (member.gender || 'Unknown').trim() || 'Unknown';
+                acc[key] = (acc[key] || 0) + 1;
+                return acc;
+            }, {});
+
+            const roleCounts = members.reduce((acc, member) => {
+                const key = (member.role || 'Unassigned').trim() || 'Unassigned';
+                acc[key] = (acc[key] || 0) + 1;
+                return acc;
+            }, {});
+
+            const genderLabels = Object.keys(genderCounts);
+            const genderValues = genderLabels.map(label => genderCounts[label]);
+            const roleLabels = Object.keys(roleCounts);
+            const roleValues = roleLabels.map(label => roleCounts[label]);
+
+            if (genderChartInstance) {
+                genderChartInstance.data.labels = genderLabels;
+                genderChartInstance.data.datasets[0].data = genderValues;
+                genderChartInstance.update();
+            } else {
+                genderChartInstance = new Chart(genderCanvas, {
+                    type: 'pie',
+                    data: {
+                        labels: genderLabels,
+                        datasets: [{
+                            data: genderValues,
+                            backgroundColor: ['#2c5282', '#f59e0b', '#94a3b8', '#10b981']
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (rolesChartInstance) {
+                rolesChartInstance.data.labels = roleLabels;
+                rolesChartInstance.data.datasets[0].data = roleValues;
+                rolesChartInstance.update();
+            } else {
+                rolesChartInstance = new Chart(rolesCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: roleLabels,
+                        datasets: [{
+                            label: 'Members',
+                            data: roleValues,
+                            backgroundColor: '#2c5282'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { precision: 0 }
+                            }
+                        }
+                    }
+                });
+            }
+        }
         
 
         // View active cells
