@@ -19,6 +19,8 @@ const PORT = process.env.PORT || 5050;
 // ===============================
 app.use(express.json());
 app.use(express.static("public"));
+const clientDistPath = path.join(__dirname, "client", "dist");
+app.use("/app", express.static(clientDistPath));
 
 // ===============================
 // 4) DATABASE CONNECTION
@@ -2088,6 +2090,63 @@ app.post("/api/reports", requireAuth, async (req, res) => {
 });
 
 // BIRTHDAYS (PROTECTED)
+app.put("/api/birthdays/:id", requireAuth, async (req, res) => {
+  try {
+    const { birthday } = req.body || {};
+    const parsed = parseMonthDay(birthday || "");
+    if (!parsed.month || !parsed.day) {
+      return res.status(400).json({ error: "Invalid birthday" });
+    }
+
+    const result = await pool.query(
+      `UPDATE members
+       SET dob_month = $1,
+           dob_day = $2,
+           date_of_birth = NULL
+       WHERE id = $3
+       RETURNING id::text as id,
+                 name,
+                 mobile,
+                 dob_month as "dobMonth",
+                 dob_day as "dobDay",
+                 LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0') as "dateOfBirth"`,
+      [parsed.month, parsed.day, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Member not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update birthday" });
+  }
+});
+
+app.delete("/api/birthdays/:id", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE members
+       SET dob_month = NULL,
+           dob_day = NULL,
+           date_of_birth = NULL
+       WHERE id = $1
+       RETURNING id::text as id`,
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Member not found" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete birthday" });
+  }
+});
+
 app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
   try {
     const members = await pool.query(
@@ -2291,6 +2350,28 @@ app.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
   }
 });
 
+app.put("/api/notifications/:id/unread", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE notifications
+       SET read_at = NULL
+       WHERE id = $1
+         AND (user_id IS NULL OR user_id = $2)
+       RETURNING id::text as id`,
+      [req.params.id, req.user.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to mark notification unread" });
+  }
+});
+
 app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
   try {
     await pool.query(
@@ -2440,6 +2521,11 @@ app.delete("/api/reports/:id", requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Failed to delete report" });
   }
+});
+
+// React app (served at /app)
+app.get(/^\/app(\/.*)?$/, (req, res) => {
+  res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
 // Serve HTML LAST
