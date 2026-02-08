@@ -405,7 +405,7 @@
 
         .chart-card canvas {
             width: 100% !important;
-            height: 160px !important;
+            height: 200px !important;
         }
         
         .stat-card {
