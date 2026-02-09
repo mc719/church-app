@@ -2320,6 +2320,16 @@
             th, td {
                 padding: 12px;
             }
+
+            .table-container .full-table-mobile {
+                display: table;
+                width: max-content;
+            }
+
+            .table-container .full-table-mobile th,
+            .table-container .full-table-mobile td {
+                white-space: nowrap;
+            }
             
             .action-buttons {
                 flex-direction: column;

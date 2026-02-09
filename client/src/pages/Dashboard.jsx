@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './Dashboard.css'
 
 const API_BASE = '/api'
 
-function Dashboard({ onAddCell }) {
+function Dashboard() {
+  const navigate = useNavigate()
   const [stats, setStats] = useState({
     members: 0,
     cells: 0,
@@ -39,6 +41,12 @@ function Dashboard({ onAddCell }) {
     ]).then(([members, cellsData, reports, birthdays]) => {
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const memberCountByCell = (members || []).reduce((acc, member) => {
+        const cellKey = String(member.cellId ?? member.cell_id ?? '')
+        if (!cellKey) return acc
+        acc[cellKey] = (acc[cellKey] || 0) + 1
+        return acc
+      }, {})
 
       const activeCellIds = new Set(
         (reports || [])
@@ -69,6 +77,7 @@ function Dashboard({ onAddCell }) {
       setMembers(members)
       setCells(cellsData.map((cell) => ({
         ...cell,
+        member_count: memberCountByCell[String(cell.id)] || 0,
         computedStatus: activeCellIds.has(String(cell.id)) ? 'Active' : 'Inactive'
       })))
 
@@ -298,16 +307,6 @@ function Dashboard({ onAddCell }) {
 
   return (
     <div className="dashboard-page">
-      <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end' }}>
-        <button
-          className="btn btn-success"
-          type="button"
-          onClick={() => (onAddCell ? onAddCell() : window.dispatchEvent(new Event('open-add-cell')))}
-        >
-          <i className="fas fa-plus"></i> Add New Cell
-        </button>
-      </div>
-
       <div className="stats-container" id="statsContainer">
         <div className="stat-card">
           <div className="stat-icon">
@@ -409,12 +408,15 @@ function Dashboard({ onAddCell }) {
         </div>
       </div>
 
-      <div className="section-header">
+      <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>All Cell Groups</h2>
+        <button className="btn btn-success" type="button" onClick={() => navigate('/new-cell')}>
+          <i className="fas fa-plus"></i> Add New Cell
+        </button>
       </div>
 
       <div className="table-container">
-        <table id="cellsTable">
+        <table id="cellsTable" className="full-table-mobile">
           <thead>
             <tr>
               <th>Cell Name</th>

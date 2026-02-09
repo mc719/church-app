@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './FirstTimers.css'
 
 const API_BASE = '/api'
 
 function FirstTimers() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('list')
   const [firstTimers, setFirstTimers] = useState([])
   const [followUps, setFollowUps] = useState([])
@@ -241,9 +243,9 @@ function FirstTimers() {
           Follow-up Records
         </button>
         <div className="cell-tabs-actions">
-          <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
-            <i className="fas fa-user-plus"></i> Add New First-Timer
-          </button>
+            <button className="btn btn-success" type="button" onClick={() => navigate('/ft-form')}>
+              <i className="fas fa-user-plus"></i> Add New First-Timer
+            </button>
         </div>
       </div>
 

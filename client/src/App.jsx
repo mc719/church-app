@@ -1,9 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import AppLayout from './layout/AppLayout.jsx'
 import Dashboard from './pages/Dashboard.jsx'
-import AddCellModal from './components/AddCellModal.jsx'
 import Login from './pages/Login.jsx'
 import Reports from './pages/Reports.jsx'
 import Cells from './pages/Cells.jsx'
@@ -17,15 +16,11 @@ import Settings from './pages/Settings.jsx'
 import Profile from './pages/Profile.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import Members from './pages/Members.jsx'
+import NewCellForm from './pages/NewCellForm.jsx'
+import FirstTimerForm from './pages/FirstTimerForm.jsx'
 
 function App() {
-  const [showAddCell, setShowAddCell] = useState(false)
   const [hasToken, setHasToken] = useState(Boolean(localStorage.getItem('token')))
-
-  const modalContext = useMemo(() => ({
-    openAddCell: () => setShowAddCell(true),
-    closeAddCell: () => setShowAddCell(false)
-  }), [])
 
   useEffect(() => {
     const syncToken = () => {
@@ -40,18 +35,14 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    const handleOpenAddCell = () => setShowAddCell(true)
-    window.addEventListener('open-add-cell', handleOpenAddCell)
-    return () => window.removeEventListener('open-add-cell', handleOpenAddCell)
-  }, [])
-
   return (
     <>
       <Routes>
+        <Route path="new-cell" element={<NewCellForm />} />
+        <Route path="ft-form" element={<FirstTimerForm />} />
         <Route path="login" element={hasToken ? <Navigate to="/" replace /> : <Login />} />
         <Route element={hasToken ? <AppLayout /> : <Navigate to="/login" replace />}>
-          <Route index element={<Dashboard onAddCell={modalContext.openAddCell} />} />
+          <Route index element={<Dashboard />} />
           <Route path="members" element={<Members />} />
           <Route path="cells" element={<Cells />} />
           <Route path="reports" element={<Reports />} />
@@ -66,7 +57,6 @@ function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <AddCellModal open={showAddCell} onClose={modalContext.closeAddCell} />
     </>
   )
 }

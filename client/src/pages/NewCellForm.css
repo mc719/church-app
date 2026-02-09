@@ -1,0 +1,137 @@
+.new-cell-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+  position: relative;
+  color: #1e1e1e;
+}
+
+.new-cell-bg-logo {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px;
+  height: 180px;
+  opacity: 0.08;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 6rem;
+  color: #1e3a5f;
+}
+
+.new-cell-page h1 {
+  margin: 0 0 24px;
+  font-size: 2rem;
+  color: #1e3a5f;
+}
+
+.new-cell-form {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 16px;
+}
+
+.new-cell-form label {
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.new-cell-form input,
+.new-cell-form select,
+.new-cell-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.new-cell-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.new-cell-member-group {
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.new-cell-member-group + .new-cell-member-group {
+  margin-top: 12px;
+}
+
+.new-cell-member-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.new-cell-btn-link {
+  background: transparent;
+  border: none;
+  color: #1e3a5f;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+}
+
+.new-cell-btn {
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.new-cell-btn-primary {
+  background: #1e3a5f;
+  color: #fff;
+}
+
+.new-cell-btn-secondary {
+  background: #e0e0e0;
+}
+
+.new-cell-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.new-cell-modal {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  width: min(420px, 90vw);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.new-cell-modal h2 {
+  margin: 0 0 12px;
+  color: #1e3a5f;
+}
+
+.new-cell-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  justify-content: flex-end;
+}
