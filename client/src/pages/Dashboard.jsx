@@ -408,7 +408,11 @@ function Dashboard({ onAddCell }) {
 
       <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>All Cell Groups</h2>
-        <button className="btn btn-success" type="button" onClick={() => (onAddCell ? onAddCell() : null)}>
+        <button
+          className="btn btn-success"
+          type="button"
+          onClick={() => (onAddCell ? onAddCell() : window.dispatchEvent(new Event('open-add-cell')))}
+        >
           <i className="fas fa-plus"></i> Add New Cell
         </button>
       </div>

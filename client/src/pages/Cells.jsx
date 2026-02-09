@@ -271,50 +271,65 @@ function Cells() {
     event.preventDefault()
     if (!editingReport) return
     const token = localStorage.getItem('token')
-    if (!token) return
-    const res = await fetch(`${API_BASE}/reports/${editingReport.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        date: editingReport.date,
-        venue: editingReport.venue,
-        meetingType: editingReport.meetingType || editingReport.meeting_type,
-        description: editingReport.description,
-        attendees: editingReport.attendees || []
+    if (!token) {
+      alert('Please log in again to save this report.')
+      return
+    }
+    try {
+      const res = await fetch(`${API_BASE}/reports/${editingReport.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          date: editingReport.date,
+          venue: editingReport.venue,
+          meetingType: editingReport.meetingType || editingReport.meeting_type,
+          description: editingReport.description,
+          attendees: editingReport.attendees || []
+        })
       })
-    })
-    if (!res.ok) return
-    const updated = await res.json()
-    setReports((prev) => prev.map((r) => (String(r.id) === String(updated.id) ? updated : r)))
-    setEditingReport(null)
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(payload.error || 'Failed to save report')
+      }
+      setReports((prev) => prev.map((r) => (String(r.id) === String(payload.id) ? payload : r)))
+      setEditingReport(null)
+    } catch (err) {
+      alert(err.message || 'Failed to save report')
+    }
   }
 
   const handleAddReport = async (event) => {
     event.preventDefault()
     if (!activeCellId) return
     const token = localStorage.getItem('token')
-    if (!token) return
-    const res = await fetch(`${API_BASE}/reports`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        cellId: activeCellId,
-        date: reportForm.date,
-        venue: reportForm.venue,
-        meetingType: reportForm.meetingType,
-        description: reportForm.description,
-        attendees: reportForm.attendees || []
+    if (!token) {
+      alert('Please log in again to add a report.')
+      return
+    }
+    try {
+      const res = await fetch(`${API_BASE}/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          cellId: activeCellId,
+          date: reportForm.date,
+          venue: reportForm.venue,
+          meetingType: reportForm.meetingType,
+          description: reportForm.description,
+          attendees: reportForm.attendees || []
+        })
       })
-    })
-    if (!res.ok) return
-    const created = await res.json()
-    setReports((prev) => [created, ...prev])
+      const created = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(created.error || 'Failed to add report')
+      }
+      setReports((prev) => [created, ...prev])
       setReportForm({
         date: '',
         venue: '',
@@ -322,7 +337,10 @@ function Cells() {
         description: '',
         attendees: []
       })
-    setShowAddReport(false)
+      setShowAddReport(false)
+    } catch (err) {
+      alert(err.message || 'Failed to add report')
+    }
   }
 
   return (
@@ -866,6 +884,7 @@ function Cells() {
                     className="form-control"
                     value={reportForm.meetingType}
                     onChange={(e) => setReportForm((prev) => ({ ...prev, meetingType: e.target.value }))}
+                    required
                   >
                     <option value="">Select Meeting Type</option>
                     {meetingOptions.map((type) => (

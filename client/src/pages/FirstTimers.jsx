@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import './FirstTimers.css'
 
 const API_BASE = '/api'
 
 function FirstTimers() {
-  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('list')
   const [firstTimers, setFirstTimers] = useState([])
   const [followUps, setFollowUps] = useState([])
-  const [editingFirstTimer, setEditingFirstTimer] = useState(null)
   const [deletingFirstTimer, setDeletingFirstTimer] = useState(null)
   const [editingFollowUp, setEditingFollowUp] = useState(null)
   const [deletingFollowUp, setDeletingFollowUp] = useState(null)
   const [showAddFollowUp, setShowAddFollowUp] = useState(false)
   const [showAddFirstTimer, setShowAddFirstTimer] = useState(false)
+  const [inlineEdits, setInlineEdits] = useState({})
   const [addForm, setAddForm] = useState({
     name: '',
     surname: '',
@@ -78,46 +76,60 @@ function FirstTimers() {
     setDeletingFirstTimer(null)
   }
 
-  const handleSaveFirstTimer = async (event) => {
-    event.preventDefault()
-    if (!editingFirstTimer) return
+  const handleInlineSave = async (item) => {
     const token = localStorage.getItem('token')
     if (!token) return
-    const res = await fetch(`${API_BASE}/first-timers/${editingFirstTimer.id}`, {
+    const updates = inlineEdits[item.id] || {}
+    const payload = {
+      name: updates.name ?? item.name ?? item.full_name ?? '',
+      surname: updates.surname ?? item.surname ?? '',
+      gender: updates.gender ?? item.gender ?? '',
+      mobile: updates.mobile ?? item.mobile ?? '',
+      email: updates.email ?? item.email ?? '',
+      address: updates.address ?? item.address ?? '',
+      postcode: updates.postcode ?? item.postcode ?? '',
+      birthday: updates.birthday ?? item.birthday ?? '',
+      ageGroup: updates.ageGroup ?? item.ageGroup ?? '',
+      maritalStatus: updates.maritalStatus ?? item.maritalStatus ?? '',
+      bornAgain: updates.bornAgain ?? item.bornAgain ?? '',
+      speakTongues: updates.speakTongues ?? item.speakTongues ?? '',
+      findOut: updates.findOut ?? item.findOut ?? [],
+      contactPref: updates.contactPref ?? item.contactPref ?? [],
+      visit: updates.visit ?? item.visit ?? '',
+      visitWhen: updates.visitWhen ?? item.visitWhen ?? '',
+      prayerRequests: updates.prayerRequests ?? item.prayerRequests ?? [],
+      dateJoined: updates.dateJoined ?? item.dateJoined ?? item.joined_date ?? '',
+      status: updates.status ?? item.status ?? '',
+      foundationSchool: updates.foundationSchool ?? item.foundationSchool ?? '',
+      cellId: updates.cellId ?? item.cellId ?? '',
+      invitedBy: updates.invitedBy ?? item.invitedBy ?? ''
+    }
+    const res = await fetch(`${API_BASE}/first-timers/${item.id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({
-        name: editingFirstTimer.name,
-        surname: editingFirstTimer.surname,
-        gender: editingFirstTimer.gender,
-        mobile: editingFirstTimer.mobile,
-        email: editingFirstTimer.email,
-        address: editingFirstTimer.address,
-        postcode: editingFirstTimer.postcode,
-        birthday: editingFirstTimer.birthday,
-        ageGroup: editingFirstTimer.ageGroup,
-        maritalStatus: editingFirstTimer.maritalStatus,
-        bornAgain: editingFirstTimer.bornAgain,
-        speakTongues: editingFirstTimer.speakTongues,
-        findOut: editingFirstTimer.findOut,
-        contactPref: editingFirstTimer.contactPref,
-        visit: editingFirstTimer.visit,
-        visitWhen: editingFirstTimer.visitWhen,
-        prayerRequests: editingFirstTimer.prayerRequests,
-        dateJoined: editingFirstTimer.dateJoined,
-        status: editingFirstTimer.status,
-        foundationSchool: editingFirstTimer.foundationSchool,
-        cellId: editingFirstTimer.cellId,
-        invitedBy: editingFirstTimer.invitedBy
-      })
+      body: JSON.stringify(payload)
     })
     if (!res.ok) return
     const updated = await res.json()
     setFirstTimers((prev) => prev.map((item) => (String(item.id) === String(updated.id) ? updated : item)))
-    setEditingFirstTimer(null)
+    setInlineEdits((prev) => {
+      const next = { ...prev }
+      delete next[item.id]
+      return next
+    })
+  }
+
+  const updateInline = (id, field, value) => {
+    setInlineEdits((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || {}),
+        [field]: value
+      }
+    }))
   }
 
   const handleDeleteFollowUp = async () => {
@@ -243,9 +255,9 @@ function FirstTimers() {
           Follow-up Records
         </button>
         <div className="cell-tabs-actions">
-            <button className="btn btn-success" type="button" onClick={() => navigate('/ft-form')}>
-              <i className="fas fa-user-plus"></i> Add New First-Timer
-            </button>
+          <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
+            <i className="fas fa-user-plus"></i> Add New First-Timer
+          </button>
         </div>
       </div>
 
@@ -272,16 +284,38 @@ function FirstTimers() {
                 )}
                 {firstTimers.map((item) => (
                   <tr key={item.id}>
-                    <td data-label="Name">{item.name || item.full_name || '-'}</td>
-                    <td data-label="Mobile">{item.mobile || '-'}</td>
+                    <td data-label="Name">
+                      <input
+                        className="form-control"
+                        value={inlineEdits[item.id]?.name ?? item.name ?? item.full_name ?? ''}
+                        onChange={(e) => updateInline(item.id, 'name', e.target.value)}
+                      />
+                    </td>
+                    <td data-label="Mobile">
+                      <input
+                        className="form-control"
+                        value={inlineEdits[item.id]?.mobile ?? item.mobile ?? ''}
+                        onChange={(e) => updateInline(item.id, 'mobile', e.target.value)}
+                      />
+                    </td>
                     <td data-label="Date Joined">{formatDate(item.joined_date || item.created_at)}</td>
-                    <td data-label="Status">{item.status || '-'}</td>
+                    <td data-label="Status">
+                      <input
+                        className="form-control"
+                        value={inlineEdits[item.id]?.status ?? item.status ?? ''}
+                        onChange={(e) => updateInline(item.id, 'status', e.target.value)}
+                      />
+                    </td>
                     <td data-label="Actions">
                       <div className="action-buttons">
-                        <button className="action-btn edit-btn" type="button" onClick={() => setEditingFirstTimer({ ...item })}>
-                          <i className="fas fa-edit"></i> Edit
+                        <button className="action-btn edit-btn" type="button" onClick={() => handleInlineSave(item)}>
+                          <i className="fas fa-save"></i> Save
                         </button>
-                        <button className="action-btn delete-btn" type="button" onClick={() => setDeletingFirstTimer(item)}>
+                        <button
+                          className="action-btn delete-btn"
+                          type="button"
+                          onClick={() => setDeletingFirstTimer(item)}
+                        >
                           <i className="fas fa-trash"></i> Delete
                         </button>
                       </div>
@@ -351,78 +385,6 @@ function FirstTimers() {
         </div>
       )}
 
-      {editingFirstTimer && (
-        <div className="modal-overlay active" onClick={() => setEditingFirstTimer(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Edit First-Timer</h3>
-              <button className="close-modal" type="button" onClick={() => setEditingFirstTimer(null)}>
-                &times;
-              </button>
-            </div>
-            <div className="modal-body">
-              <form onSubmit={handleSaveFirstTimer}>
-                <div className="form-group">
-                  <label>Name</label>
-                  <input
-                    className="form-control"
-                    value={editingFirstTimer.name || ''}
-                    onChange={(e) => setEditingFirstTimer({ ...editingFirstTimer, name: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Surname</label>
-                  <input
-                    className="form-control"
-                    value={editingFirstTimer.surname || ''}
-                    onChange={(e) => setEditingFirstTimer({ ...editingFirstTimer, surname: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Gender</label>
-                  <input
-                    className="form-control"
-                    value={editingFirstTimer.gender || ''}
-                    onChange={(e) => setEditingFirstTimer({ ...editingFirstTimer, gender: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Mobile</label>
-                  <input
-                    className="form-control"
-                    value={editingFirstTimer.mobile || ''}
-                    onChange={(e) => setEditingFirstTimer({ ...editingFirstTimer, mobile: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input
-                    className="form-control"
-                    value={editingFirstTimer.email || ''}
-                    onChange={(e) => setEditingFirstTimer({ ...editingFirstTimer, email: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <input
-                    className="form-control"
-                    value={editingFirstTimer.status || ''}
-                    onChange={(e) => setEditingFirstTimer({ ...editingFirstTimer, status: e.target.value })}
-                  />
-                </div>
-                <div className="form-actions">
-                  <button className="btn" type="button" onClick={() => setEditingFirstTimer(null)}>
-                    Cancel
-                  </button>
-                  <button className="btn btn-success" type="submit">
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showAddFirstTimer && (
         <div className="modal-overlay active" onClick={() => setShowAddFirstTimer(false)}>
