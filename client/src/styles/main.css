@@ -187,6 +187,25 @@
             outline: none;
             background: transparent;
         }
+
+        .nav-section-title:hover {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .inline-input {
+            border: none;
+            background: transparent;
+            box-shadow: none;
+            padding: 0;
+            min-height: auto;
+        }
+
+        .inline-input:focus {
+            outline: none;
+            box-shadow: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
         
         .nav-section-title.hidden {
             display: none;

@@ -231,11 +231,18 @@ function Members() {
               <form onSubmit={handleSave}>
                 <div className="form-group">
                   <label>Title</label>
-                  <input
+                  <select
                     className="form-control"
                     value={editingMember.title || ''}
                     onChange={(e) => setEditingMember({ ...editingMember, title: e.target.value })}
-                  />
+                  >
+                    <option value="">Select Title</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Dcn">Dcn</option>
+                    <option value="Dcns">Dcns</option>
+                    <option value="Pastor">Pastor</option>
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Name</label>

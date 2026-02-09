@@ -27,6 +27,15 @@ function Cells() {
   const [editingReport, setEditingReport] = useState(null)
   const [deletingReport, setDeletingReport] = useState(null)
   const [showAddReport, setShowAddReport] = useState(false)
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [memberForm, setMemberForm] = useState({
+    title: '',
+    name: '',
+    gender: '',
+    mobile: '',
+    email: '',
+    role: ''
+  })
   const [reportForm, setReportForm] = useState({
     date: '',
     venue: '',
@@ -312,6 +321,34 @@ function Cells() {
     }
   }
 
+  const handleAddMember = async (event) => {
+    event.preventDefault()
+    if (!activeCellId) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        cellId: activeCellId,
+        title: memberForm.title,
+        name: memberForm.name,
+        gender: memberForm.gender,
+        mobile: memberForm.mobile,
+        email: memberForm.email,
+        role: memberForm.role
+      })
+    })
+    if (!res.ok) return
+    const created = await res.json()
+    setMembers((prev) => [created, ...prev])
+    setMemberForm({ title: '', name: '', gender: '', mobile: '', email: '', role: '' })
+    setShowAddMember(false)
+  }
+
   const handleAddReport = async (event) => {
     event.preventDefault()
     if (!activeCellId) return
@@ -387,7 +424,8 @@ function Cells() {
             </div>
           </div>
 
-          <div className="cell-tabs">
+          <div className="cell-tabs" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="cell-tabs-group">
             <button
               className={`cell-tab-btn${activeTab === 'members' ? ' active' : ''}`}
               type="button"
@@ -402,6 +440,21 @@ function Cells() {
             >
               Reports | Cell Data
             </button>
+            </div>
+            {activeTab === 'members' && (
+              <div className="cell-tabs-actions">
+                <button className="btn btn-success" type="button" onClick={() => setShowAddMember(true)}>
+                  <i className="fas fa-user-plus"></i> Add Member
+                </button>
+              </div>
+            )}
+            {activeTab === 'reports' && (
+              <div className="cell-tabs-actions">
+                <button className="btn btn-success" type="button" onClick={() => setShowAddReport(true)}>
+                  <i className="fas fa-plus"></i> Add Report
+                </button>
+              </div>
+            )}
           </div>
 
           {activeTab === 'members' && (
@@ -451,15 +504,6 @@ function Cells() {
 
           {activeTab === 'reports' && (
             <>
-              <div className="section-header" style={{ marginTop: '24px' }}>
-                <h2>Reports | Cell Data</h2>
-                <div className="page-actions">
-                  <button className="btn btn-success" type="button" onClick={() => setShowAddReport(true)}>
-                    <i className="fas fa-plus"></i> Add Report
-                  </button>
-                </div>
-              </div>
-
               <div className="page-actions" style={{ justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                 <div className="search-box">
                   <input
@@ -649,11 +693,18 @@ function Cells() {
               <form onSubmit={handleMemberSave}>
                 <div className="form-group">
                   <label>Title</label>
-                  <input
+                  <select
                     className="form-control"
                     value={editingMember.title || ''}
                     onChange={(e) => setEditingMember({ ...editingMember, title: e.target.value })}
-                  />
+                  >
+                    <option value="">Select Title</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Dcn">Dcn</option>
+                    <option value="Dcns">Dcns</option>
+                    <option value="Pastor">Pastor</option>
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Name</label>
@@ -925,6 +976,97 @@ function Cells() {
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setShowAddReport(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddMember && (
+        <div className="modal-overlay active" onClick={() => setShowAddMember(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Member</h3>
+              <button className="close-modal" type="button" onClick={() => setShowAddMember(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleAddMember}>
+                <div className="form-group">
+                  <label>Title</label>
+                  <select
+                    className="form-control"
+                    value={memberForm.title}
+                    onChange={(e) => setMemberForm((prev) => ({ ...prev, title: e.target.value }))}
+                  >
+                    <option value="">Select Title</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Dcn">Dcn</option>
+                    <option value="Dcns">Dcns</option>
+                    <option value="Pastor">Pastor</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Full Name</label>
+                  <input
+                    className="form-control"
+                    value={memberForm.name}
+                    onChange={(e) => setMemberForm((prev) => ({ ...prev, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Gender</label>
+                  <select
+                    className="form-control"
+                    value={memberForm.gender}
+                    onChange={(e) => setMemberForm((prev) => ({ ...prev, gender: e.target.value }))}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Mobile</label>
+                  <input
+                    className="form-control"
+                    value={memberForm.mobile}
+                    onChange={(e) => setMemberForm((prev) => ({ ...prev, mobile: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    className="form-control"
+                    value={memberForm.email}
+                    onChange={(e) => setMemberForm((prev) => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Cell Role</label>
+                  <select
+                    className="form-control"
+                    value={memberForm.role}
+                    onChange={(e) => setMemberForm((prev) => ({ ...prev, role: e.target.value }))}
+                  >
+                    <option value="">Select Role</option>
+                    <option value="Cell Leader">Cell Leader</option>
+                    <option value="Assistant Leader">Assistant Leader</option>
+                    <option value="Member">Member</option>
+                    <option value="New Member">New Member</option>
+                  </select>
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="button" onClick={() => setShowAddMember(false)}>
                     Cancel
                   </button>
                   <button className="btn btn-success" type="submit">

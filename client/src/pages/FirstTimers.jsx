@@ -14,6 +14,7 @@ function FirstTimers() {
   const [showAddFirstTimer, setShowAddFirstTimer] = useState(false)
   const [inlineEdits, setInlineEdits] = useState({})
   const [addForm, setAddForm] = useState({
+    title: '',
     name: '',
     surname: '',
     gender: '',
@@ -215,6 +216,7 @@ function FirstTimers() {
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
+        title: addForm.title,
         name: addForm.name,
         surname: addForm.surname,
         gender: addForm.gender,
@@ -227,6 +229,7 @@ function FirstTimers() {
     const created = await res.json()
     setFirstTimers((prev) => [created, ...prev])
     setAddForm({
+      title: '',
       name: '',
       surname: '',
       gender: '',
@@ -254,11 +257,13 @@ function FirstTimers() {
         >
           Follow-up Records
         </button>
-        <div className="cell-tabs-actions">
-          <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
-            <i className="fas fa-user-plus"></i> Add New First-Timer
-          </button>
-        </div>
+        {activeTab === 'list' && (
+          <div className="cell-tabs-actions">
+            <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
+              <i className="fas fa-user-plus"></i> Add New First-Timer
+            </button>
+          </div>
+        )}
       </div>
 
       {activeTab === 'list' && (
@@ -286,14 +291,14 @@ function FirstTimers() {
                   <tr key={item.id}>
                     <td data-label="Name">
                       <input
-                        className="form-control"
+                        className="form-control inline-input"
                         value={inlineEdits[item.id]?.name ?? item.name ?? item.full_name ?? ''}
                         onChange={(e) => updateInline(item.id, 'name', e.target.value)}
                       />
                     </td>
                     <td data-label="Mobile">
                       <input
-                        className="form-control"
+                        className="form-control inline-input"
                         value={inlineEdits[item.id]?.mobile ?? item.mobile ?? ''}
                         onChange={(e) => updateInline(item.id, 'mobile', e.target.value)}
                       />
@@ -301,7 +306,7 @@ function FirstTimers() {
                     <td data-label="Date Joined">{formatDate(item.joined_date || item.created_at)}</td>
                     <td data-label="Status">
                       <input
-                        className="form-control"
+                        className="form-control inline-input"
                         value={inlineEdits[item.id]?.status ?? item.status ?? ''}
                         onChange={(e) => updateInline(item.id, 'status', e.target.value)}
                       />
@@ -397,6 +402,21 @@ function FirstTimers() {
             </div>
             <div className="modal-body">
               <form onSubmit={handleAddFirstTimer}>
+                <div className="form-group">
+                  <label>Title</label>
+                  <select
+                    className="form-control"
+                    value={addForm.title}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, title: e.target.value }))}
+                  >
+                    <option value="">Select Title</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Dcn">Dcn</option>
+                    <option value="Dcns">Dcns</option>
+                    <option value="Pastor">Pastor</option>
+                  </select>
+                </div>
                 <div className="form-group">
                   <label>Name</label>
                   <input
