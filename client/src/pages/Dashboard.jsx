@@ -56,6 +56,18 @@ function Dashboard({ onAddCell }) {
           .map((report) => String(report.cellId || report.cell_id))
       )
 
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const monthReportCountByCell = (reports || []).reduce((acc, report) => {
+        const rawDate = report.date || report.report_date || report.reportDate
+        const parsed = rawDate ? new Date(rawDate) : null
+        if (!parsed || Number.isNaN(parsed.getTime()) || parsed < monthStart) return acc
+        const cellKey = String(report.cellId || report.cell_id || '')
+        if (!cellKey) return acc
+        acc[cellKey] = (acc[cellKey] || 0) + 1
+        return acc
+      }, {})
+
       const { activeCount, inactiveCount } = cellsData.reduce(
         (acc, cell) => {
           const isActive = activeCellIds.has(String(cell.id))
@@ -73,17 +85,45 @@ function Dashboard({ onAddCell }) {
         inactiveCells: inactiveCount
       })
       setMembers(members)
-      setCells(cellsData.map((cell) => ({
-        ...cell,
-        member_count: memberCountByCell[String(cell.id)] || 0,
-        computedStatus: activeCellIds.has(String(cell.id)) ? 'Active' : 'Inactive'
-      })))
+      const cellsById = cellsData.reduce((acc, cell) => {
+        acc[String(cell.id)] = cell
+        return acc
+      }, {})
+
+      const statusForCount = (count) => {
+        if (count >= 4) return { label: 'Active', className: 'status-active' }
+        if (count <= 2) return { label: 'Inactive', className: 'status-inactive' }
+        return { label: 'Making Progress', className: 'status-progress' }
+      }
+
+      setCells(cellsData.map((cell) => {
+        const count = monthReportCountByCell[String(cell.id)] || 0
+        const status = statusForCount(count)
+        return {
+          ...cell,
+          member_count: memberCountByCell[String(cell.id)] || 0,
+          computedStatus: status.label,
+          statusClass: status.className,
+          reportsThisMonth: count
+        }
+      }))
 
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
       const recent = (reports || []).filter(report => {
         const reportDate = report.date ? new Date(report.date) : new Date(report.report_date || report.reportDate || 0)
         return reportDate >= sevenDaysAgo
+      }).map((report) => {
+        const attendees = Array.isArray(report.attendees) ? report.attendees : []
+        const present = attendees.filter((item) => item?.present).length
+        const absent = attendees.filter((item) => item && item.present === false).length
+        const cellId = String(report.cellId || report.cell_id || '')
+        return {
+          ...report,
+          cellName: report.cell_name || report.cellName || cellsById[cellId]?.name || 'Cell Report',
+          presentCount: present,
+          absentCount: absent
+        }
       })
       setRecentReports(recent)
       const summary = Array.isArray(birthdays) ? birthdays : (birthdays?.members || [])
@@ -418,7 +458,7 @@ function Dashboard({ onAddCell }) {
       </div>
 
       <div className="table-container">
-        <table id="cellsTable" className="mobile-grid-table">
+        <table id="cellsTable" className="full-table-mobile">
           <thead>
             <tr>
               <th>Cell Name</th>
@@ -437,7 +477,7 @@ function Dashboard({ onAddCell }) {
               </tr>
             )}
             {cells.map(cell => (
-              <tr key={cell.id}>
+              <tr key={cell.id} className={cell.statusClass || ''}>
                 <td>{cell.name}</td>
                 <td>{cell.venue || '-'}</td>
                 <td>{cell.member_count || cell.membersCount || '-'}</td>
@@ -473,13 +513,14 @@ function Dashboard({ onAddCell }) {
           <div className="report-card" key={report.id}>
             <div className="report-header">
               <div>
-                <div className="report-title">{report.cell_name || report.cellName || 'Cell Report'}</div>
+                <div className="report-title">{report.cellName || report.cell_name || 'Cell Report'}</div>
                 <div className="report-date">{formatDate(report.date || report.report_date || report.reportDate)}</div>
               </div>
             </div>
             <div className="report-body">
               <div><strong>Venue:</strong> {report.venue || '-'}</div>
               <div><strong>Meeting Type:</strong> {report.meeting_type || report.meetingType || '-'}</div>
+              <div><strong>P:</strong> {report.presentCount ?? 0} &nbsp; <strong>A:</strong> {report.absentCount ?? 0}</div>
             </div>
           </div>
         ))}

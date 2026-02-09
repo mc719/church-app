@@ -2537,3 +2537,14 @@
                 font-size: 0.8rem;
             }
         }
+.status-active {
+    background: rgba(16, 185, 129, 0.12);
+}
+
+.status-progress {
+    background: rgba(245, 158, 11, 0.12);
+}
+
+.status-inactive {
+    background: rgba(239, 68, 68, 0.12);
+}
