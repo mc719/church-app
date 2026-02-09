@@ -2143,6 +2143,33 @@ app.delete("/api/follow-ups/:id", requireAuth, async (req, res) => {
 app.post("/api/reports", requireAuth, async (req, res) => {
   try {
     const { cellId, date, venue, meetingType, description, attendees } = req.body;
+    const normalizeAttendees = (value) => {
+      if (!value) return [];
+      if (typeof value === "string") {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => {
+            if (typeof item === "string") {
+              try {
+                return JSON.parse(item);
+              } catch {
+                return null;
+              }
+            }
+            return item;
+          })
+          .filter(Boolean);
+      }
+      return [];
+    };
+    const normalizedAttendees = normalizeAttendees(attendees);
 
     const result = await pool.query(
       `INSERT INTO reports (cell_id, date, venue, meeting_type, description, attendees, report_date)
@@ -2154,7 +2181,7 @@ app.post("/api/reports", requireAuth, async (req, res) => {
                  meeting_type as "meetingType",
                  description,
                  attendees`,
-      [cellId, date, venue, meetingType, description, attendees || []]
+      [cellId, date, venue, meetingType, description, normalizedAttendees]
     );
 
     const report = result.rows[0];
@@ -2349,6 +2376,33 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
 app.put("/api/reports/:id", requireAuth, async (req, res) => {
   try {
     const { date, venue, meetingType, description, attendees } = req.body;
+    const normalizeAttendees = (value) => {
+      if (!value) return [];
+      if (typeof value === "string") {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => {
+            if (typeof item === "string") {
+              try {
+                return JSON.parse(item);
+              } catch {
+                return null;
+              }
+            }
+            return item;
+          })
+          .filter(Boolean);
+      }
+      return [];
+    };
+    const normalizedAttendees = normalizeAttendees(attendees);
     const result = await pool.query(
       `UPDATE reports
        SET date = COALESCE($1, date),
@@ -2365,7 +2419,7 @@ app.put("/api/reports/:id", requireAuth, async (req, res) => {
                  meeting_type as "meetingType",
                  description,
                  attendees`,
-      [date ?? null, venue ?? null, meetingType ?? null, description ?? null, attendees ?? null, req.params.id]
+      [date ?? null, venue ?? null, meetingType ?? null, description ?? null, normalizedAttendees, req.params.id]
     );
 
     if (result.rows.length === 0) {
