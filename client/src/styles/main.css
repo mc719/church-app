@@ -225,13 +225,17 @@
             transition: transform 0.2s ease;
         }
 
-        .accordion-content {
-            display: none;
-        }
+.accordion-content {
+    display: none;
+}
 
-        .accordion-section:hover .accordion-content {
-            display: block;
-        }
+.accordion-content.open {
+    display: block;
+}
+
+.accordion-section:hover .accordion-content {
+    display: block;
+}
 
         .accordion-section.open .accordion-content {
             display: block;
