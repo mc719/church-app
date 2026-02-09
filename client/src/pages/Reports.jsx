@@ -219,6 +219,7 @@ function Reports() {
               <th>Venue</th>
               <th>Meeting Type</th>
               <th>Summary</th>
+              <th>Attendance</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -238,6 +239,15 @@ function Reports() {
                 <td data-label="Venue">{report.venue || '-'}</td>
                 <td data-label="Meeting Type">{report.meeting_type || report.meetingType || '-'}</td>
                 <td data-label="Summary">{report.description || report.notes || '-'}</td>
+                <td data-label="Attendance">
+                  {(() => {
+                    const attendees = Array.isArray(report.attendees) ? report.attendees : []
+                    const present = attendees.filter((item) => item?.present).length
+                    const absent = attendees.filter((item) => item && item.present === false).length
+                    if (!attendees.length) return '-'
+                    return `${present}P / ${absent}A`
+                  })()}
+                </td>
                 <td data-label="Actions">
                   <div className="action-buttons">
                     <button

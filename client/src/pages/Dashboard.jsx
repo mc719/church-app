@@ -414,7 +414,7 @@ function Dashboard({ onAddCell }) {
       </div>
 
       <div className="table-container">
-        <table id="cellsTable" className="full-table-mobile">
+        <table id="cellsTable" className="mobile-grid-table">
           <thead>
             <tr>
               <th>Cell Name</th>

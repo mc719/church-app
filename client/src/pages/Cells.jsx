@@ -28,7 +28,8 @@ function Cells() {
     date: '',
     venue: '',
     meetingType: '',
-    description: ''
+    description: '',
+    attendees: []
   })
 
   useEffect(() => {
@@ -88,14 +89,42 @@ function Cells() {
     [reports, activeCellId]
   )
 
-  const meetingTypes = useMemo(() => {
-    const types = new Set()
-    cellReports.forEach((report) => {
-      const type = report.meeting_type || report.meetingType
-      if (type) types.add(type)
+  const meetingOptions = useMemo(() => ([
+    'Prayer and Planning',
+    'Bible Study 1',
+    'Bible Study 2',
+    'Outreach Meeting'
+  ]), [])
+
+  const buildAttendeesList = (currentMembers, existing) => {
+    const existingList = Array.isArray(existing) ? existing : []
+    const byId = new Map()
+    existingList.forEach((item) => {
+      if (item && typeof item === 'object') {
+        const key = String(item.memberId || item.id || item.name || '')
+        if (key) byId.set(key, item)
+      } else if (typeof item === 'string') {
+        byId.set(item, { name: item, present: true })
+      }
     })
-    return Array.from(types)
-  }, [cellReports])
+    return currentMembers.map((member) => {
+      const key = String(member.id)
+      const cached = byId.get(key) || byId.get(member.name)
+      return {
+        memberId: member.id,
+        name: member.name,
+        present: cached?.present ?? false
+      }
+    })
+  }
+
+  useEffect(() => {
+    if (!showAddReport) return
+    setReportForm((prev) => ({
+      ...prev,
+      attendees: buildAttendeesList(cellMembers, prev.attendees)
+    }))
+  }, [showAddReport, cellMembers])
 
   const years = useMemo(() => {
     const list = new Set()
@@ -253,7 +282,8 @@ function Cells() {
         date: editingReport.date,
         venue: editingReport.venue,
         meetingType: editingReport.meetingType || editingReport.meeting_type,
-        description: editingReport.description
+        description: editingReport.description,
+        attendees: editingReport.attendees || []
       })
     })
     if (!res.ok) return
@@ -279,18 +309,19 @@ function Cells() {
         venue: reportForm.venue,
         meetingType: reportForm.meetingType,
         description: reportForm.description,
-        attendees: []
+        attendees: reportForm.attendees || []
       })
     })
     if (!res.ok) return
     const created = await res.json()
     setReports((prev) => [created, ...prev])
-    setReportForm({
-      date: '',
-      venue: '',
-      meetingType: '',
-      description: ''
-    })
+      setReportForm({
+        date: '',
+        venue: '',
+        meetingType: '',
+        description: '',
+        attendees: []
+      })
     setShowAddReport(false)
   }
 
@@ -439,7 +470,7 @@ function Cells() {
                   </select>
                   <select value={meetingFilter} onChange={(e) => setMeetingFilter(e.target.value)}>
                     <option value="all">All Meeting Types</option>
-                    {meetingTypes.map((type) => (
+                    {meetingOptions.map((type) => (
                       <option key={type} value={type}>{type}</option>
                     ))}
                   </select>
@@ -453,7 +484,8 @@ function Cells() {
                       <th>Date</th>
                       <th>Venue</th>
                       <th>Meeting Type</th>
-                      <th>Description</th>
+                      <th>Summary</th>
+                      <th>Attendance</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -470,7 +502,16 @@ function Cells() {
                         <td data-label="Date">{formatDate(report.date || report.report_date || report.reportDate)}</td>
                         <td data-label="Venue">{report.venue || '-'}</td>
                         <td data-label="Meeting Type">{report.meeting_type || report.meetingType || '-'}</td>
-                        <td data-label="Description">{report.description || report.notes || '-'}</td>
+                        <td data-label="Summary">{report.description || report.notes || '-'}</td>
+                        <td data-label="Attendance">
+                          {(() => {
+                            const attendees = Array.isArray(report.attendees) ? report.attendees : []
+                            const present = attendees.filter((item) => item?.present).length
+                            const absent = attendees.filter((item) => item && item.present === false).length
+                            if (!attendees.length) return '-'
+                            return `${present}P / ${absent}A`
+                          })()}
+                        </td>
                         <td data-label="Actions">
                           <div className="action-buttons">
                             <button className="action-btn edit-btn" type="button" onClick={() => setEditingReport({ ...report })}>
@@ -707,20 +748,51 @@ function Cells() {
                 </div>
                 <div className="form-group">
                   <label>Meeting Type</label>
-                  <input
+                  <select
                     className="form-control"
                     value={editingReport.meetingType || editingReport.meeting_type || ''}
                     onChange={(e) => setEditingReport({ ...editingReport, meetingType: e.target.value })}
-                  />
+                  >
+                    <option value="">Select Meeting Type</option>
+                    {meetingOptions.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
-                  <label>Description</label>
+                  <label>Summary</label>
                   <textarea
                     className="form-control"
                     rows="3"
                     value={editingReport.description || ''}
                     onChange={(e) => setEditingReport({ ...editingReport, description: e.target.value })}
                   />
+                </div>
+                <div className="form-group">
+                  <label>Attendees</label>
+                  <div className="attendees-list">
+                    {buildAttendeesList(cellMembers, editingReport.attendees).map((attendee) => (
+                      <label key={attendee.memberId} className="attendee-row">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(
+                            (editingReport.attendees || []).find((item) => String(item.memberId) === String(attendee.memberId))?.present
+                          )}
+                          onChange={(e) => {
+                            setEditingReport((prev) => ({
+                              ...prev,
+                              attendees: buildAttendeesList(cellMembers, prev.attendees).map((item) =>
+                                String(item.memberId) === String(attendee.memberId)
+                                  ? { ...item, present: e.target.checked }
+                                  : item
+                              )
+                            }))
+                          }}
+                        />
+                        <span>{attendee.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setEditingReport(null)}>
@@ -790,20 +862,51 @@ function Cells() {
                 </div>
                 <div className="form-group">
                   <label>Meeting Type</label>
-                  <input
+                  <select
                     className="form-control"
                     value={reportForm.meetingType}
                     onChange={(e) => setReportForm((prev) => ({ ...prev, meetingType: e.target.value }))}
-                  />
+                  >
+                    <option value="">Select Meeting Type</option>
+                    {meetingOptions.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
-                  <label>Description</label>
+                  <label>Summary</label>
                   <textarea
                     className="form-control"
                     rows="3"
                     value={reportForm.description}
                     onChange={(e) => setReportForm((prev) => ({ ...prev, description: e.target.value }))}
                   />
+                </div>
+                <div className="form-group">
+                  <label>Attendees</label>
+                  <div className="attendees-list">
+                    {buildAttendeesList(cellMembers, reportForm.attendees).map((attendee) => (
+                      <label key={attendee.memberId} className="attendee-row">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(
+                            (reportForm.attendees || []).find((item) => String(item.memberId) === String(attendee.memberId))?.present
+                          )}
+                          onChange={(e) => {
+                            setReportForm((prev) => ({
+                              ...prev,
+                              attendees: buildAttendeesList(cellMembers, prev.attendees).map((item) =>
+                                String(item.memberId) === String(attendee.memberId)
+                                  ? { ...item, present: e.target.checked }
+                                  : item
+                              )
+                            }))
+                          }}
+                        />
+                        <span>{attendee.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setShowAddReport(false)}>
