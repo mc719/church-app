@@ -20,6 +20,7 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pageMeta, setPageMeta] = useState({})
   const [pageVisibility, setPageVisibility] = useState({})
+  const [cellLinks, setCellLinks] = useState([])
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [notifications, setNotifications] = useState([])
@@ -104,6 +105,43 @@ function AppLayout() {
   }, [])
 
   useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    let mounted = true
+
+    const fetchCells = async () => {
+      try {
+        const res = await fetch('/api/cells', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const list = Array.isArray(data) ? data : []
+        if (mounted) {
+          setCellLinks(
+            list.map((cell) => ({
+              id: `/cells?cellId=${cell.id}`,
+              label: cell.name || `Cell ${cell.id}`,
+              icon: 'fas fa-users',
+              section: 'cells'
+            }))
+          )
+        }
+      } catch {
+        if (mounted) setCellLinks([])
+      }
+    }
+
+    fetchCells()
+    const handleCellsUpdated = () => fetchCells()
+    window.addEventListener('cells-updated', handleCellsUpdated)
+    return () => {
+      mounted = false
+      window.removeEventListener('cells-updated', handleCellsUpdated)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (!notificationsOpen) return
       if (bellRef.current?.contains(event.target)) return
@@ -166,7 +204,8 @@ function AppLayout() {
 
   const sectionVisible = (section) => sectionVisibility[section] !== false
   const mainPages = defaultPages.filter((p) => p.section === 'main' && isVisible(p.id) && sectionVisible('Main'))
-  const cellPages = defaultPages.filter((p) => p.section === 'cells' && isVisible(p.id) && sectionVisible('Cell Groups'))
+  const baseCellPages = defaultPages.filter((p) => p.section === 'cells' && isVisible(p.id) && sectionVisible('Cell Groups'))
+  const cellPages = [...baseCellPages, ...cellLinks]
   const adminPages = defaultPages.filter((p) => p.section === 'admin' && isVisible(p.id) && sectionVisible('Administrator'))
 
   const handleToggleSidebar = () => {

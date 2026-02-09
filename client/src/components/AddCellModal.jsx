@@ -42,6 +42,10 @@ function AddCellModal({ open, onClose }) {
         const error = await response.json().catch(() => ({}))
         throw new Error(error.error || 'Failed to add cell')
       }
+      const created = await response.json().catch(() => null)
+      if (created) {
+        window.dispatchEvent(new CustomEvent('cells-updated', { detail: created }))
+      }
       setForm({ name: '', venue: '', day: '', time: '', description: '' })
       onClose()
     } catch (err) {

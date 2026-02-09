@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import './Cells.css'
 
 const API_BASE = '/api'
@@ -8,6 +9,8 @@ const MONTHS = [
 ]
 
 function Cells() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [cells, setCells] = useState([])
   const [reports, setReports] = useState([])
   const [members, setMembers] = useState([])
@@ -31,6 +34,14 @@ function Cells() {
     description: '',
     attendees: []
   })
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const targetId = params.get('cellId')
+    if (targetId && String(targetId) !== String(activeCellId)) {
+      setActiveCellId(String(targetId))
+    }
+  }, [location.search, activeCellId])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -80,7 +91,7 @@ function Cells() {
   }, [activeCell])
 
   const cellMembers = useMemo(
-    () => members.filter((member) => String(member.cellId) === String(activeCellId)),
+    () => members.filter((member) => String(member.cellId || member.cell_id) === String(activeCellId)),
     [members, activeCellId]
   )
 
@@ -351,7 +362,11 @@ function Cells() {
             key={cell.id}
             className={`cell-selector-btn${String(cell.id) === String(activeCellId) ? ' active' : ''}`}
             type="button"
-            onClick={() => setActiveCellId(String(cell.id))}
+            onClick={() => {
+              const nextId = String(cell.id)
+              setActiveCellId(nextId)
+              navigate(`/cells?cellId=${cell.id}`, { replace: true })
+            }}
           >
             {cell.name}
           </button>
