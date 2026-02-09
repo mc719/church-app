@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './Dashboard.css'
 
 const API_BASE = '/api'
 
 function Dashboard({ onAddCell }) {
+  const navigate = useNavigate()
   const [stats, setStats] = useState({
     members: 0,
     cells: 0,
@@ -448,13 +450,22 @@ function Dashboard({ onAddCell }) {
 
       <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>All Cell Groups</h2>
-        <button
-          className="btn btn-success"
-          type="button"
-          onClick={() => (onAddCell ? onAddCell() : window.dispatchEvent(new Event('open-add-cell')))}
-        >
-          <i className="fas fa-plus"></i> Add New Cell
-        </button>
+        <div className="page-actions">
+          <button
+            className="btn btn-success"
+            type="button"
+            onClick={() => navigate('/departments?add=1')}
+          >
+            <i className="fas fa-plus"></i> Add Department
+          </button>
+          <button
+            className="btn btn-success"
+            type="button"
+            onClick={() => (onAddCell ? onAddCell() : window.dispatchEvent(new Event('open-add-cell')))}
+          >
+            <i className="fas fa-plus"></i> Add New Cell
+          </button>
+        </div>
       </div>
 
       <div className="table-container">

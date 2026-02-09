@@ -229,10 +229,6 @@
     display: none;
 }
 
-.accordion-content.open {
-    display: block;
-}
-
 .accordion-section:hover .accordion-content {
     display: block;
 }
@@ -245,11 +241,15 @@
             transform: rotate(180deg);
         }
 
-        @media (max-width: 768px) {
-            .accordion-section:hover .accordion-content {
-                display: none;
-            }
-        }
+@media (max-width: 768px) {
+    .accordion-section:hover .accordion-content {
+        display: none;
+    }
+
+    .accordion-content.open {
+        display: block;
+    }
+}
         
         .logout-btn {
             margin: 20px;

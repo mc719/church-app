@@ -42,6 +42,16 @@ function Departments() {
     return id ? String(id) : ''
   }, [location.search])
 
+  const addFromUrl = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get('add') === '1'
+  }, [location.search])
+
+  const clearDeepLink = () => {
+    if (!departmentIdFromUrl && !addFromUrl) return
+    navigate('/departments', { replace: true })
+  }
+
   useEffect(() => {
     if (!departmentIdFromUrl) return
     const target = departments.find((dept) => String(dept.id) === departmentIdFromUrl)
@@ -49,6 +59,12 @@ function Departments() {
       setEditingDepartment({ ...target })
     }
   }, [departmentIdFromUrl, departments])
+
+  useEffect(() => {
+    if (!addFromUrl) return
+    resetForm()
+    setShowAdd(true)
+  }, [addFromUrl])
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -67,11 +83,6 @@ function Departments() {
   const resetForm = () => {
     setForm({ name: '', hodName: '', hodMobile: '' })
     setError('')
-  }
-
-  const clearDeepLink = () => {
-    if (!departmentIdFromUrl) return
-    navigate('/departments', { replace: true })
   }
 
   const handleAdd = async (event) => {
@@ -96,6 +107,7 @@ function Departments() {
     window.dispatchEvent(new Event('departments-updated'))
     resetForm()
     setShowAdd(false)
+    clearDeepLink()
   }
 
   const handleUpdate = async (event) => {
@@ -236,11 +248,11 @@ function Departments() {
       </div>
 
       {showAdd && (
-        <div className="modal-overlay active" onClick={() => setShowAdd(false)}>
+        <div className="modal-overlay active" onClick={() => { setShowAdd(false); clearDeepLink() }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Add Department</h3>
-              <button className="close-modal" type="button" onClick={() => setShowAdd(false)}>
+              <button className="close-modal" type="button" onClick={() => { setShowAdd(false); clearDeepLink() }}>
                 &times;
               </button>
             </div>
@@ -271,7 +283,7 @@ function Departments() {
                   />
                 </div>
                 <div className="form-actions">
-                  <button className="btn" type="button" onClick={() => setShowAdd(false)}>
+                  <button className="btn" type="button" onClick={() => { setShowAdd(false); clearDeepLink() }}>
                     Cancel
                   </button>
                   <button className="btn btn-success" type="submit">
