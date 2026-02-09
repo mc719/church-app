@@ -40,7 +40,7 @@ window.fetch = async (input, init) => {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter basename="/app">
+    <BrowserRouter>
       <App />
     </BrowserRouter>
   </StrictMode>,
