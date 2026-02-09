@@ -356,23 +356,9 @@ function Cells() {
 
   return (
     <div className="cells-page">
-      <div className="cells-selector">
-        {cells.map((cell) => (
-          <button
-            key={cell.id}
-            className={`cell-selector-btn${String(cell.id) === String(activeCellId) ? ' active' : ''}`}
-            type="button"
-            onClick={() => {
-              const nextId = String(cell.id)
-              setActiveCellId(nextId)
-              navigate(`/cells?cellId=${cell.id}`, { replace: true })
-            }}
-          >
-            {cell.name}
-          </button>
-        ))}
-        {activeCell && (
-          <div className="cells-selector-actions">
+      {activeCell && (
+        <div className="cell-details">
+          <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end', marginBottom: '16px' }}>
             <button className="btn" type="button" onClick={() => setEditingCell({ ...activeCell })}>
               <i className="fas fa-edit"></i> Edit Cell
             </button>
@@ -380,11 +366,6 @@ function Cells() {
               <i className="fas fa-trash"></i> Delete Cell
             </button>
           </div>
-        )}
-      </div>
-
-      {activeCell && (
-        <div className="cell-details">
           <div className="cell-summary-card">
             <div className="cell-summary-grid">
               <div>

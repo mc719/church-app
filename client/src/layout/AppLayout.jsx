@@ -191,12 +191,13 @@ function AppLayout() {
     return () => window.removeEventListener('section-visibility-updated', loadSections)
   }, [])
 
-  const getPageMeta = (path) => {
+  const getPageMeta = (page) => {
+    const path = typeof page === 'string' ? page : page?.id
     const fallback = defaultPages.find((p) => p.id === path)
     const override = pageMeta[path]
     return {
-      label: override?.label || fallback?.label || path.replace('/', ''),
-      icon: override?.icon || fallback?.icon || 'fas fa-file-alt'
+      label: override?.label || page?.label || fallback?.label || path.replace('/', ''),
+      icon: override?.icon || page?.icon || fallback?.icon || 'fas fa-file-alt'
     }
   }
 
@@ -205,7 +206,7 @@ function AppLayout() {
   const sectionVisible = (section) => sectionVisibility[section] !== false
   const mainPages = defaultPages.filter((p) => p.section === 'main' && isVisible(p.id) && sectionVisible('Main'))
   const baseCellPages = defaultPages.filter((p) => p.section === 'cells' && isVisible(p.id) && sectionVisible('Cell Groups'))
-  const cellPages = [...baseCellPages, ...cellLinks]
+  const cellPages = [...cellLinks]
   const adminPages = defaultPages.filter((p) => p.section === 'admin' && isVisible(p.id) && sectionVisible('Administrator'))
 
   const handleToggleSidebar = () => {
@@ -302,7 +303,7 @@ function AppLayout() {
 
         <div className="nav-menu" id="navMenu">
           {mainPages.map((page) => {
-            const meta = getPageMeta(page.id)
+            const meta = getPageMeta(page)
             return (
               <NavLink key={page.id} className={navClass} to={page.id} onClick={handleCloseSidebar}>
                 <i className={meta.icon}></i>
@@ -325,7 +326,7 @@ function AppLayout() {
             </button>
             <div id="cellGroupsContainer" className={`accordion-content${cellGroupsOpen ? ' open' : ''}`}>
               {cellPages.map((page) => {
-                const meta = getPageMeta(page.id)
+                const meta = getPageMeta(page)
                 return (
                   <NavLink key={page.id} className={navClass} to={page.id} onClick={handleCloseSidebar}>
                     <i className={meta.icon}></i>
@@ -351,7 +352,7 @@ function AppLayout() {
 
             <div className={`accordion-content${adminOpen ? ' open' : ''}`} id="adminMenu">
               {adminPages.map((page) => {
-                const meta = getPageMeta(page.id)
+                const meta = getPageMeta(page)
                 return (
                   <NavLink key={page.id} className={navClass} to={page.id} onClick={handleCloseSidebar}>
                     <i className={meta.icon}></i>
