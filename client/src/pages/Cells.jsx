@@ -106,6 +106,12 @@ function Cells() {
   )
 
   useEffect(() => {
+    if (!cells.length) return
+    if (activeCell) return
+    setActiveCellId(String(cells[0].id))
+  }, [cells, activeCell, activeCellId])
+
+  useEffect(() => {
     if (!activeCell) return
     try {
       const meta = JSON.parse(localStorage.getItem('pageMeta') || '{}')
@@ -421,6 +427,11 @@ function Cells() {
 
   return (
     <div className="cells-page">
+      {!activeCell && (
+        <div className="dashboard-note" style={{ marginTop: '20px' }}>
+          {cells.length === 0 ? 'No cells found.' : 'Selected cell not found. Loading another cell...'}
+        </div>
+      )}
       {activeCell && (
         <div className="cell-details">
           <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end', marginBottom: '16px' }}>
