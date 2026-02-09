@@ -29,9 +29,9 @@ window.fetch = async (input, init) => {
     localStorage.removeItem('restrictedMenus')
     window.dispatchEvent(new Event('auth-changed'))
     showToast('Session expired. Please log in again.')
-    if (!window.location.pathname.endsWith('/app/login')) {
+    if (!window.location.pathname.endsWith('/login')) {
       setTimeout(() => {
-        window.location.href = '/app/login'
+        window.location.href = '/login'
       }, 800)
     }
   }
