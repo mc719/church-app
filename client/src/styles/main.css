@@ -176,6 +176,16 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            background: transparent;
+            border: none;
+            width: 100%;
+            text-align: left;
+        }
+
+        .nav-section-title:focus,
+        .nav-section-title:active {
+            outline: none;
+            background: transparent;
         }
         
         .nav-section-title.hidden {
@@ -2321,6 +2331,16 @@
                 padding: 12px;
             }
 
+            .table-container .full-table-mobile {
+                display: table;
+                width: max-content;
+            }
+
+            .table-container .full-table-mobile th,
+            .table-container .full-table-mobile td {
+                white-space: nowrap;
+            }
+
             .action-buttons {
                 flex-direction: column;
                 gap: 6px;
@@ -2332,11 +2352,11 @@
             }
 
             .members-table-container {
-                display: none;
+                display: block;
             }
 
             .members-grid {
-                display: grid;
+                display: none;
             }
 
             .table-container .mobile-grid-table thead {
@@ -2399,6 +2419,22 @@
                 font-weight: 600;
                 color: var(--gray-color);
                 flex: 0 0 45%;
+            }
+
+            .table-container .mobile-grid-table tbody td[data-label="Name"],
+            .table-container .mobile-grid-table tbody td[data-label="Cell Name"],
+            .table-container .mobile-grid-table tbody td[data-label="Cell"] {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                font-weight: 700;
+            }
+
+            .table-container .mobile-grid-table tbody td[data-label="Name"]::before,
+            .table-container .mobile-grid-table tbody td[data-label="Cell Name"]::before,
+            .table-container .mobile-grid-table tbody td[data-label="Cell"]::before {
+                flex: 0 0 auto;
+                margin-bottom: 4px;
             }
 
             .settings-grid {
