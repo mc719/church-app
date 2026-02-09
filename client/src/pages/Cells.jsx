@@ -740,11 +740,18 @@ function Cells() {
                 </div>
                 <div className="form-group">
                   <label>Cell Role</label>
-                  <input
+                  <select
                     className="form-control"
                     value={editingMember.role || ''}
                     onChange={(e) => setEditingMember({ ...editingMember, role: e.target.value })}
-                  />
+                  >
+                    <option value="">Select Role</option>
+                    <option value="Cell Leader">Cell Leader</option>
+                    <option value="Assistant Leader">Assistant Leader</option>
+                    <option value="BSCT">BSCT</option>
+                    <option value="Member">Member</option>
+                    <option value="New Member">New Member</option>
+                  </select>
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setEditingMember(null)}>
@@ -1061,6 +1068,7 @@ function Cells() {
                     <option value="">Select Role</option>
                     <option value="Cell Leader">Cell Leader</option>
                     <option value="Assistant Leader">Assistant Leader</option>
+                    <option value="BSCT">BSCT</option>
                     <option value="Member">Member</option>
                     <option value="New Member">New Member</option>
                   </select>
