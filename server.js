@@ -2171,7 +2171,6 @@ app.post("/api/reports", requireAuth, async (req, res) => {
     };
     const normalizedAttendees = normalizeAttendees(attendees);
     const attendeesJson = JSON.stringify(normalizedAttendees);
-    const attendeesJson = JSON.stringify(normalizedAttendees);
 
     const result = await pool.query(
       `INSERT INTO reports (cell_id, date, venue, meeting_type, description, attendees, report_date)
