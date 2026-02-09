@@ -16,11 +16,13 @@ function AppLayout() {
   ]), [])
 
   const [cellGroupsOpen, setCellGroupsOpen] = useState(true)
+  const [departmentsOpen, setDepartmentsOpen] = useState(true)
   const [adminOpen, setAdminOpen] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pageMeta, setPageMeta] = useState({})
   const [pageVisibility, setPageVisibility] = useState({})
   const [cellLinks, setCellLinks] = useState([])
+  const [departmentLinks, setDepartmentLinks] = useState([])
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [notifications, setNotifications] = useState([])
@@ -142,6 +144,43 @@ function AppLayout() {
   }, [])
 
   useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    let mounted = true
+
+    const fetchDepartments = async () => {
+      try {
+        const res = await fetch('/api/departments', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const list = Array.isArray(data) ? data : []
+        if (mounted) {
+          setDepartmentLinks(
+            list.map((dept) => ({
+              id: `/departments?departmentId=${dept.id}`,
+              label: dept.name || `Department ${dept.id}`,
+              icon: 'fas fa-sitemap',
+              section: 'departments'
+            }))
+          )
+        }
+      } catch {
+        if (mounted) setDepartmentLinks([])
+      }
+    }
+
+    fetchDepartments()
+    const handleDepartmentsUpdated = () => fetchDepartments()
+    window.addEventListener('departments-updated', handleDepartmentsUpdated)
+    return () => {
+      mounted = false
+      window.removeEventListener('departments-updated', handleDepartmentsUpdated)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (!notificationsOpen) return
       if (bellRef.current?.contains(event.target)) return
@@ -207,6 +246,7 @@ function AppLayout() {
   const mainPages = defaultPages.filter((p) => p.section === 'main' && isVisible(p.id) && sectionVisible('Main'))
   const baseCellPages = defaultPages.filter((p) => p.section === 'cells' && isVisible(p.id) && sectionVisible('Cell Groups'))
   const cellPages = [...cellLinks]
+  const departmentPages = [...departmentLinks]
   const adminPages = defaultPages.filter((p) => p.section === 'admin' && isVisible(p.id) && sectionVisible('Administrator'))
 
   const handleToggleSidebar = () => {
@@ -338,6 +378,31 @@ function AppLayout() {
           </div>
 
           <div className="nav-divider" id="adminDivider"></div>
+
+          <div className="accordion-section" id="departmentsSection">
+            <button
+              className="nav-section-title accordion-toggle"
+              id="departmentsTitle"
+              type="button"
+              onClick={() => setDepartmentsOpen((prev) => !prev)}
+            >
+              <span>Departments</span>
+              <i className={`fas fa-chevron-down accordion-caret${departmentsOpen ? ' open' : ''}`}></i>
+            </button>
+            <div id="departmentsContainer" className={`accordion-content${departmentsOpen ? ' open' : ''}`}>
+              {departmentPages.map((page) => {
+                const meta = getPageMeta(page)
+                return (
+                  <NavLink key={page.id} className={navClass} to={page.id} onClick={handleCloseSidebar}>
+                    <i className={meta.icon}></i>
+                    <span>{meta.label}</span>
+                  </NavLink>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="nav-divider" id="departmentsDivider"></div>
 
           <div className="accordion-section" id="adminSection">
             <button
