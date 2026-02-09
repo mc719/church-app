@@ -76,11 +76,23 @@ function Cells() {
     if (!token) return
     const headers = { Authorization: `Bearer ${token}` }
 
+    const safeJson = async (res) => {
+      if (!res.ok) return []
+      if (res.status === 204 || res.status === 304) return []
+      try {
+        return await res.json()
+      } catch {
+        return []
+      }
+    }
+
+    const fetchOptions = { headers, cache: 'no-store' }
+
     Promise.all([
-      fetch(`${API_BASE}/cells`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/reports`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/members`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/departments`, { headers }).then((r) => (r.ok ? r.json() : []))
+      fetch(`${API_BASE}/cells`, fetchOptions).then(safeJson),
+      fetch(`${API_BASE}/reports`, fetchOptions).then(safeJson),
+      fetch(`${API_BASE}/members`, fetchOptions).then(safeJson),
+      fetch(`${API_BASE}/departments`, fetchOptions).then(safeJson)
     ])
       .then(([cellsData, reportsData, membersData, departmentsData]) => {
         const safeCells = Array.isArray(cellsData) ? cellsData : []
