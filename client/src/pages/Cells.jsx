@@ -23,6 +23,13 @@ function Cells() {
   const [deletingMember, setDeletingMember] = useState(null)
   const [editingReport, setEditingReport] = useState(null)
   const [deletingReport, setDeletingReport] = useState(null)
+  const [showAddReport, setShowAddReport] = useState(false)
+  const [reportForm, setReportForm] = useState({
+    date: '',
+    venue: '',
+    meetingType: '',
+    description: ''
+  })
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -54,6 +61,22 @@ function Cells() {
     () => cells.find((cell) => String(cell.id) === String(activeCellId)),
     [cells, activeCellId]
   )
+
+  useEffect(() => {
+    if (!activeCell) return
+    try {
+      const meta = JSON.parse(localStorage.getItem('pageMeta') || '{}')
+      const updated = {
+        ...meta,
+        '/cells': {
+          ...(meta['/cells'] || {}),
+          label: activeCell.name || 'Cell'
+        }
+      }
+      localStorage.setItem('pageMeta', JSON.stringify(updated))
+      window.dispatchEvent(new Event('page-meta-updated'))
+    } catch {}
+  }, [activeCell])
 
   const cellMembers = useMemo(
     () => members.filter((member) => String(member.cellId) === String(activeCellId)),
@@ -239,12 +262,41 @@ function Cells() {
     setEditingReport(null)
   }
 
+  const handleAddReport = async (event) => {
+    event.preventDefault()
+    if (!activeCellId) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/reports`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        cellId: activeCellId,
+        date: reportForm.date,
+        venue: reportForm.venue,
+        meetingType: reportForm.meetingType,
+        description: reportForm.description,
+        attendees: []
+      })
+    })
+    if (!res.ok) return
+    const created = await res.json()
+    setReports((prev) => [created, ...prev])
+    setReportForm({
+      date: '',
+      venue: '',
+      meetingType: '',
+      description: ''
+    })
+    setShowAddReport(false)
+  }
+
   return (
     <div className="cells-page">
       <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn btn-success" type="button" onClick={() => (window.location.href = '/new-cell.html')}>
-          <i className="fas fa-plus"></i> Add New Cell
-        </button>
         {activeCell && (
           <>
             <button className="btn" type="button" onClick={() => setEditingCell({ ...activeCell })}>
@@ -273,7 +325,6 @@ function Cells() {
       {activeCell && (
         <div className="cell-details">
           <div className="cell-summary-card">
-            <h2>{activeCell.name}</h2>
             <div className="cell-summary-grid">
               <div>
                 <div className="cell-summary-label">Day of Meeting</div>
@@ -287,10 +338,10 @@ function Cells() {
                 <div className="cell-summary-label">Venue</div>
                 <div className="cell-summary-value">{activeCell.venue || '-'}</div>
               </div>
-              <div>
-                <div className="cell-summary-label">Description</div>
-                <div className="cell-summary-value">{activeCell.description || '-'}</div>
-              </div>
+            </div>
+            <div className="cell-summary-description">
+              <div className="cell-summary-label">Description</div>
+              <div className="cell-summary-value">{activeCell.description || '-'}</div>
             </div>
           </div>
 
@@ -360,6 +411,11 @@ function Cells() {
             <>
               <div className="section-header" style={{ marginTop: '24px' }}>
                 <h2>Reports | Cell Data</h2>
+                <div className="page-actions">
+                  <button className="btn btn-success" type="button" onClick={() => setShowAddReport(true)}>
+                    <i className="fas fa-plus"></i> Add Report
+                  </button>
+                </div>
               </div>
 
               <div className="page-actions" style={{ justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -701,6 +757,66 @@ function Cells() {
                   Delete
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddReport && (
+        <div className="modal-overlay active" onClick={() => setShowAddReport(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Report</h3>
+              <button className="close-modal" type="button" onClick={() => setShowAddReport(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleAddReport}>
+                <div className="form-group">
+                  <label>Date &amp; Time</label>
+                  <input
+                    type="datetime-local"
+                    className="form-control"
+                    value={reportForm.date}
+                    onChange={(e) => setReportForm((prev) => ({ ...prev, date: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Venue</label>
+                  <input
+                    className="form-control"
+                    value={reportForm.venue}
+                    onChange={(e) => setReportForm((prev) => ({ ...prev, venue: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Meeting Type</label>
+                  <input
+                    className="form-control"
+                    value={reportForm.meetingType}
+                    onChange={(e) => setReportForm((prev) => ({ ...prev, meetingType: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={reportForm.description}
+                    onChange={(e) => setReportForm((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="button" onClick={() => setShowAddReport(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

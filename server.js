@@ -18,9 +18,12 @@ const PORT = process.env.PORT || 5050;
 // 3) GLOBAL MIDDLEWARE
 // ===============================
 app.use(express.json());
+app.use("/old", (req, res) => {
+  res.status(404).send("Not found");
+});
 app.use(express.static("public"));
 const clientDistPath = path.join(__dirname, "client", "dist");
-app.use("/app", express.static(clientDistPath));
+app.use("/", express.static(clientDistPath));
 
 // ===============================
 // 4) DATABASE CONNECTION
@@ -804,6 +807,89 @@ app.post("/api/settings/logo", requireAuth, requireAdmin, async (req, res) => {
 });
 app.get("/api/test", (req, res) => {
   res.json({ message: "Server is working 🎉" });
+});
+
+// ROLES (PROTECTED)
+app.get("/api/roles", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id::text as id, name, created_at FROM roles ORDER BY name ASC"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load roles" });
+  }
+});
+
+app.post("/api/roles", requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body || {};
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: "Role name is required" });
+    }
+    const result = await pool.query(
+      "INSERT INTO roles (name) VALUES ($1) RETURNING id::text as id, name, created_at",
+      [String(name).trim()]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create role" });
+  }
+});
+
+app.put("/api/roles/:id", requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body || {};
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: "Role name is required" });
+    }
+    const result = await pool.query(
+      "UPDATE roles SET name = $1 WHERE id = $2 RETURNING id::text as id, name, created_at",
+      [String(name).trim(), req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Role not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update role" });
+  }
+});
+
+app.delete("/api/roles/:id", requireAuth, async (req, res) => {
+  try {
+    const roleResult = await pool.query(
+      "SELECT id::text as id, name FROM roles WHERE id = $1",
+      [req.params.id]
+    );
+    if (roleResult.rows.length === 0) {
+      return res.status(404).json({ error: "Role not found" });
+    }
+
+    const roleName = roleResult.rows[0].name;
+    const inUse = await pool.query(
+      "SELECT 1 FROM users WHERE role = $1 LIMIT 1",
+      [roleName]
+    );
+    if (inUse.rows.length > 0) {
+      return res.status(400).json({ error: "Role is in use" });
+    }
+
+    const result = await pool.query(
+      "DELETE FROM roles WHERE id = $1 RETURNING id::text as id",
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Role not found" });
+    }
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete role" });
+  }
 });
 
 // OTP SEND (PUBLIC) - by email
@@ -2523,14 +2609,18 @@ app.delete("/api/reports/:id", requireAuth, async (req, res) => {
   }
 });
 
-// React app (served at /app)
+// React app (served at /)
 app.get(/^\/app(\/.*)?$/, (req, res) => {
+  res.redirect("/");
+});
+
+app.get(/^\/(?!api\/|old\/).*/, (req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
-// Serve HTML LAST
+// Redirect any remaining routes to React app
 app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(__dirname, "public/index.html"));
+  res.redirect("/");
 });
 
 // ===============================

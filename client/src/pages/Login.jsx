@@ -6,7 +6,7 @@ function Login() {
   const [form, setForm] = useState({ username: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [logoSrc, setLogoSrc] = useState('/images/logo.png')
+  const [logoSrc, setLogoSrc] = useState(() => localStorage.getItem('logoImage') || '')
   const [logoTitle, setLogoTitle] = useState('Christ Embassy')
   const [logoSubtitle, setLogoSubtitle] = useState('Church Cell Data')
 
@@ -27,6 +27,7 @@ function Login() {
         const data = await res.json()
         if (data?.logo) {
           setLogoSrc(data.logo)
+          localStorage.setItem('logoImage', data.logo)
         }
       } catch {}
     }

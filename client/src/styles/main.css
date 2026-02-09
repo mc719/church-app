@@ -472,12 +472,24 @@
             background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+
+        .stat-icon.inactive {
+            color: #ef4444;
+            background: none;
+            -webkit-text-fill-color: #ef4444;
+        }
         
         .dark-theme .stat-icon {
             background: linear-gradient(135deg, #4dabf7, #339af0);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+
+        .dark-theme .stat-icon.inactive {
+            color: #f87171;
+            background: none;
+            -webkit-text-fill-color: #f87171;
         }
         
         .stat-value {
@@ -2273,6 +2285,17 @@
 
             .cell-tab-btn {
                 flex: 1 1 auto;
+            }
+
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .section-header .page-actions {
+                width: 100%;
+                justify-content: flex-end;
             }
 
             .btn {

@@ -18,6 +18,8 @@ function Dashboard({ onAddCell }) {
   const [calendarDate, setCalendarDate] = useState(() => new Date())
   const [editingCell, setEditingCell] = useState(null)
   const [deletingCell, setDeletingCell] = useState(null)
+  const [showAddBirthday, setShowAddBirthday] = useState(false)
+  const [birthdayForm, setBirthdayForm] = useState({ memberId: '', day: '', month: '' })
   const genderChartRef = useRef(null)
   const rolesChartRef = useRef(null)
   const genderChartInstance = useRef(null)
@@ -35,12 +37,24 @@ function Dashboard({ onAddCell }) {
       fetch(`${API_BASE}/reports`, { headers }).then(r => r.ok ? r.json() : []),
       fetch(`${API_BASE}/birthdays/summary`, { headers }).then(r => r.ok ? r.json() : [])
     ]).then(([members, cellsData, reports, birthdays]) => {
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      const activeCellIds = new Set(
+        (reports || [])
+          .filter((report) => {
+            const rawDate = report.date || report.report_date || report.reportDate
+            const parsed = rawDate ? new Date(rawDate) : null
+            return parsed && !Number.isNaN(parsed.getTime()) && parsed >= thirtyDaysAgo
+          })
+          .map((report) => String(report.cellId || report.cell_id))
+      )
+
       const { activeCount, inactiveCount } = cellsData.reduce(
         (acc, cell) => {
-          const status = String(cell.status ?? '').trim().toLowerCase()
-          const inactive = cell.status === false || status === 'inactive'
-          if (inactive) acc.inactiveCount += 1
-          else acc.activeCount += 1
+          const isActive = activeCellIds.has(String(cell.id))
+          if (isActive) acc.activeCount += 1
+          else acc.inactiveCount += 1
           return acc
         },
         { activeCount: 0, inactiveCount: 0 }
@@ -53,7 +67,10 @@ function Dashboard({ onAddCell }) {
         inactiveCells: inactiveCount
       })
       setMembers(members)
-      setCells(cellsData)
+      setCells(cellsData.map((cell) => ({
+        ...cell,
+        computedStatus: activeCellIds.has(String(cell.id)) ? 'Active' : 'Inactive'
+      })))
 
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -103,6 +120,36 @@ function Dashboard({ onAddCell }) {
 
   const closeBirthdayModal = () => {
     setBirthdayModal({ open: false, title: '', list: [] })
+  }
+
+  const handleAddBirthday = async (event) => {
+    event.preventDefault()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    if (!birthdayForm.memberId || !birthdayForm.day || !birthdayForm.month) return
+    const dobDay = String(birthdayForm.day).padStart(2, '0')
+    const dobMonth = String(birthdayForm.month).padStart(2, '0')
+    const dateOfBirth = `${dobMonth}-${dobDay}`
+    const res = await fetch(`${API_BASE}/members/${birthdayForm.memberId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        dateOfBirth,
+        dobMonth,
+        dobDay
+      })
+    })
+    if (!res.ok) return
+    const refreshed = await fetch(`${API_BASE}/birthdays/summary`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((r) => (r.ok ? r.json() : []))
+    const summary = Array.isArray(refreshed) ? refreshed : (refreshed?.members || [])
+    setBirthdaySummary(summary)
+    setBirthdayForm({ memberId: '', day: '', month: '' })
+    setShowAddBirthday(false)
   }
 
   const handleCellDelete = async () => {
@@ -252,7 +299,11 @@ function Dashboard({ onAddCell }) {
   return (
     <div className="dashboard-page">
       <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end' }}>
-        <button className="btn btn-success" type="button" onClick={() => (window.location.href = '/new-cell.html')}>
+        <button
+          className="btn btn-success"
+          type="button"
+          onClick={() => (onAddCell ? onAddCell() : window.dispatchEvent(new Event('open-add-cell')))}
+        >
           <i className="fas fa-plus"></i> Add New Cell
         </button>
       </div>
@@ -280,7 +331,7 @@ function Dashboard({ onAddCell }) {
           <div className="stat-value">{stats.activeCells}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
+          <div className="stat-icon inactive">
             <i className="fas fa-times-circle"></i>
           </div>
           <div className="stat-title">Inactive Cells</div>
@@ -341,7 +392,13 @@ function Dashboard({ onAddCell }) {
                   key={`day-${day}`}
                   className={`calendar-cell${hasBirthday ? ' has-birthday' : ''}`}
                   type="button"
-                  onClick={() => hasBirthday && openBirthdayModal(day, calendarMonth, list)}
+                  onClick={() => {
+                    if (hasBirthday) {
+                      openBirthdayModal(day, calendarMonth, list)
+                    } else {
+                      setShowAddBirthday(true)
+                    }
+                  }}
                 >
                   <span className="calendar-day">{day}</span>
                   {hasBirthday && <span className="calendar-dot"></span>}
@@ -380,7 +437,7 @@ function Dashboard({ onAddCell }) {
                 <td>{cell.name}</td>
                 <td>{cell.venue || '-'}</td>
                 <td>{cell.member_count || cell.membersCount || '-'}</td>
-                <td>{cell.status === false || String(cell.status || '').toLowerCase() === 'inactive' ? 'Inactive' : 'Active'}</td>
+                <td>{cell.computedStatus || 'Inactive'}</td>
                 <td>
                   <div className="action-buttons">
                     <button className="action-btn edit-btn" type="button" onClick={() => setEditingCell({ ...cell })}>
@@ -553,6 +610,74 @@ function Dashboard({ onAddCell }) {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddBirthday && (
+        <div className="modal-overlay active" onClick={() => setShowAddBirthday(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Birthday</h3>
+              <button className="close-modal" type="button" onClick={() => setShowAddBirthday(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleAddBirthday}>
+                <div className="form-group">
+                  <label>Member</label>
+                  <select
+                    className="form-control"
+                    value={birthdayForm.memberId}
+                    onChange={(e) => setBirthdayForm((prev) => ({ ...prev, memberId: e.target.value }))}
+                    required
+                  >
+                    <option value="">Select Member</option>
+                    {members.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.name || member.full_name} {member.email ? `(${member.email})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Birthday</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <select
+                      className="form-control"
+                      value={birthdayForm.day}
+                      onChange={(e) => setBirthdayForm((prev) => ({ ...prev, day: e.target.value }))}
+                      required
+                    >
+                      <option value="">Day</option>
+                      {Array.from({ length: 31 }).map((_, idx) => (
+                        <option key={`day-${idx + 1}`} value={idx + 1}>{idx + 1}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="form-control"
+                      value={birthdayForm.month}
+                      onChange={(e) => setBirthdayForm((prev) => ({ ...prev, month: e.target.value }))}
+                      required
+                    >
+                      <option value="">Month</option>
+                      {Array.from({ length: 12 }).map((_, idx) => (
+                        <option key={`month-${idx + 1}`} value={idx + 1}>{idx + 1}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="button" onClick={() => setShowAddBirthday(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

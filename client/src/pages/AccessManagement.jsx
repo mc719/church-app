@@ -19,6 +19,7 @@ const MENU_OPTIONS = [
 
 function AccessManagement() {
   const [users, setUsers] = useState([])
+  const [roles, setRoles] = useState([])
   const [page, setPage] = useState(1)
   const [editingUser, setEditingUser] = useState(null)
   const [deletingUser, setDeletingUser] = useState(null)
@@ -28,10 +29,18 @@ function AccessManagement() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) return
-    fetch(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setUsers(Array.isArray(data) ? data : []))
-      .catch(() => setUsers([]))
+    Promise.all([
+      fetch(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/roles`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : []))
+    ])
+      .then(([usersData, rolesData]) => {
+        setUsers(Array.isArray(usersData) ? usersData : [])
+        setRoles(Array.isArray(rolesData) ? rolesData : [])
+      })
+      .catch(() => {
+        setUsers([])
+        setRoles([])
+      })
   }, [])
 
   const toAllowedMenus = (restrictedMenus) => {
@@ -215,10 +224,14 @@ function AccessManagement() {
                     value={editingUser.role || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
                   >
-                    <option value="superuser">Superuser</option>
-                    <option value="admin">Admin</option>
-                    <option value="cell-leader">Cell Leader</option>
-                    <option value="member">Member</option>
+                    {roles.length === 0 && (
+                      <option value="">No roles</option>
+                    )}
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.name}>
+                        {role.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group">

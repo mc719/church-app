@@ -9,8 +9,10 @@ function Notifications() {
   const [selected, setSelected] = useState(new Set())
   const [users, setUsers] = useState([])
   const [members, setMembers] = useState([])
+  const [roles, setRoles] = useState([])
   const [targets, setTargets] = useState([])
   const [activeNotification, setActiveNotification] = useState(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [form, setForm] = useState({
     roles: [],
     targets: [],
@@ -26,43 +28,45 @@ function Notifications() {
     Promise.all([
       fetch(`${API_BASE}/notifications`, { headers }).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API_BASE}/users`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/members`, { headers }).then((r) => (r.ok ? r.json() : []))
+      fetch(`${API_BASE}/members`, { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/roles`, { headers }).then((r) => (r.ok ? r.json() : []))
     ])
-      .then(([notes, usersData, membersData]) => {
+      .then(([notes, usersData, membersData, rolesData]) => {
         setNotifications(Array.isArray(notes) ? notes : [])
         setUsers(Array.isArray(usersData) ? usersData : [])
         setMembers(Array.isArray(membersData) ? membersData : [])
+        setRoles(Array.isArray(rolesData) ? rolesData : [])
       })
       .catch(() => {
         setNotifications([])
         setUsers([])
         setMembers([])
+        setRoles([])
       })
   }, [])
 
-  useEffect(() => {
+    useEffect(() => {
     const roleTargets = []
     const roles = form.roles || []
-    if (roles.includes('superuser')) {
-      users.filter((u) => u.role === 'superuser').forEach((u) => {
-        roleTargets.push({ id: u.id, label: `${u.username} (Superuser)` })
-      })
-    }
-    if (roles.includes('admin')) {
-      users.filter((u) => u.role === 'admin').forEach((u) => {
-        roleTargets.push({ id: u.id, label: `${u.username} (Admin)` })
-      })
-    }
-    if (roles.includes('Cell Leader')) {
-      members
-        .filter((m) => String(m.role || '').toLowerCase() === 'cell leader')
-        .forEach((m) => {
-          const user = users.find((u) => u.email && m.email && u.email === m.email)
-          if (!user) return
-          const cellLabel = m.cellName ? ` — ${m.cellName}` : ''
-          roleTargets.push({ id: user.id, label: `${m.name}${cellLabel} (Cell Leader)` })
-        })
-    }
+    roles.forEach((roleName) => {
+      const normalized = String(roleName || '').trim().toLowerCase()
+      if (normalized === 'cell leader') {
+        members
+          .filter((m) => String(m.role || '').trim().toLowerCase() === 'cell leader')
+          .forEach((m) => {
+            const user = users.find((u) => u.email && m.email && u.email === m.email)
+            if (!user) return
+            const cellLabel = m.cellName ? ` - ${m.cellName}` : ''
+            roleTargets.push({ id: user.id, label: `${m.name}${cellLabel} (Cell Leader)` })
+          })
+      } else {
+        users
+          .filter((u) => String(u.role || '').trim().toLowerCase() === normalized)
+          .forEach((u) => {
+            roleTargets.push({ id: u.id, label: `${u.username} (${roleName})` })
+          })
+      }
+    })
     setTargets(roleTargets)
     setForm((prev) => ({ ...prev, targets: [] }))
   }, [form.roles, users, members])
@@ -100,6 +104,7 @@ function Notifications() {
     if (!res.ok) return
     setNotifications((prev) => prev.filter((n) => !selected.has(String(n.id))))
     setSelected(new Set())
+    setShowDeleteConfirm(false)
   }
 
   const handleSend = async (event) => {
@@ -187,7 +192,7 @@ function Notifications() {
           Send Notification
         </button>
         <div className="cell-tabs-actions">
-          <button className="btn btn-danger" type="button" onClick={handleDeleteSelected}>
+          <button className="btn btn-danger" type="button" onClick={() => setShowDeleteConfirm(true)}>
             <i className="fas fa-trash"></i> Delete Selected
           </button>
         </div>
@@ -275,9 +280,11 @@ function Notifications() {
                   }
                   required
                 >
-                  <option value="superuser">Superuser</option>
-                  <option value="admin">Admin</option>
-                  <option value="Cell Leader">Cell Leader</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.name}>
+                      {role.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">
@@ -357,8 +364,33 @@ function Notifications() {
           </div>
         </div>
       )}
+
+      {showDeleteConfirm && (
+        <div className="modal-overlay confirmation-modal active" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-body">
+              <div className="confirmation-icon">
+                <i className="fas fa-trash"></i>
+              </div>
+              <p className="confirmation-text">
+                Delete {selected.size} selected notification{selected.size === 1 ? '' : 's'}?
+              </p>
+              <div className="form-actions">
+                <button className="btn" type="button" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancel
+                </button>
+                <button className="btn btn-danger" type="button" onClick={handleDeleteSelected}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 export default Notifications
+
+

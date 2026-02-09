@@ -40,6 +40,12 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    const handleOpenAddCell = () => setShowAddCell(true)
+    window.addEventListener('open-add-cell', handleOpenAddCell)
+    return () => window.removeEventListener('open-add-cell', handleOpenAddCell)
+  }, [])
+
   return (
     <>
       <Routes>

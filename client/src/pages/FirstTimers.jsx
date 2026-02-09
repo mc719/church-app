@@ -12,6 +12,15 @@ function FirstTimers() {
   const [editingFollowUp, setEditingFollowUp] = useState(null)
   const [deletingFollowUp, setDeletingFollowUp] = useState(null)
   const [showAddFollowUp, setShowAddFollowUp] = useState(false)
+  const [showAddFirstTimer, setShowAddFirstTimer] = useState(false)
+  const [addForm, setAddForm] = useState({
+    name: '',
+    surname: '',
+    gender: '',
+    mobile: '',
+    email: '',
+    status: ''
+  })
   const [followUpForm, setFollowUpForm] = useState({
     firstTimerId: '',
     date: '',
@@ -181,6 +190,39 @@ function FirstTimers() {
     setShowAddFollowUp(false)
   }
 
+  const handleAddFirstTimer = async (event) => {
+    event.preventDefault()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/first-timers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        name: addForm.name,
+        surname: addForm.surname,
+        gender: addForm.gender,
+        mobile: addForm.mobile,
+        email: addForm.email,
+        status: addForm.status
+      })
+    })
+    if (!res.ok) return
+    const created = await res.json()
+    setFirstTimers((prev) => [created, ...prev])
+    setAddForm({
+      name: '',
+      surname: '',
+      gender: '',
+      mobile: '',
+      email: '',
+      status: ''
+    })
+    setShowAddFirstTimer(false)
+  }
+
   return (
     <div className="first-timers-page">
       <div className="cell-tabs" id="firstTimersTabs">
@@ -199,11 +241,7 @@ function FirstTimers() {
           Follow-up Records
         </button>
         <div className="cell-tabs-actions">
-          <button
-            className="btn btn-success"
-            type="button"
-            onClick={() => window.open('/FT-form.html', '_blank', 'noopener')}
-          >
+          <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
             <i className="fas fa-user-plus"></i> Add New First-Timer
           </button>
         </div>
@@ -372,6 +410,79 @@ function FirstTimers() {
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setEditingFirstTimer(null)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddFirstTimer && (
+        <div className="modal-overlay active" onClick={() => setShowAddFirstTimer(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add First-Timer</h3>
+              <button className="close-modal" type="button" onClick={() => setShowAddFirstTimer(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleAddFirstTimer}>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    className="form-control"
+                    value={addForm.name}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Surname</label>
+                  <input
+                    className="form-control"
+                    value={addForm.surname}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, surname: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Gender</label>
+                  <input
+                    className="form-control"
+                    value={addForm.gender}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, gender: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Mobile</label>
+                  <input
+                    className="form-control"
+                    value={addForm.mobile}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, mobile: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    className="form-control"
+                    value={addForm.email}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Status</label>
+                  <input
+                    className="form-control"
+                    value={addForm.status}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, status: e.target.value }))}
+                  />
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="button" onClick={() => setShowAddFirstTimer(false)}>
                     Cancel
                   </button>
                   <button className="btn btn-success" type="submit">

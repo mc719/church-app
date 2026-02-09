@@ -34,6 +34,16 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
+.cell-summary-description {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eaeaea;
+}
+
+.dark-theme .cell-summary-description {
+  border-top-color: #333;
+}
+
 .cell-summary-label {
   font-size: 0.75rem;
   text-transform: uppercase;

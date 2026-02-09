@@ -25,7 +25,7 @@ function AppLayout() {
   const [notifications, setNotifications] = useState([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [activeNotification, setActiveNotification] = useState(null)
-  const [logoSrc, setLogoSrc] = useState('/images/logo.png')
+  const [logoSrc, setLogoSrc] = useState(() => localStorage.getItem('logoImage') || '')
   const [logoTitle, setLogoTitle] = useState('Christ Embassy')
   const [logoSubtitle, setLogoSubtitle] = useState('Church Cell Data')
   const location = useLocation()
@@ -60,6 +60,7 @@ function AppLayout() {
         const data = await res.json()
         if (data?.logo) {
           setLogoSrc(data.logo)
+          localStorage.setItem('logoImage', data.logo)
         }
       } catch {}
     }
