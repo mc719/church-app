@@ -10,6 +10,7 @@ const MONTHS = [
 function Reports() {
   const [reports, setReports] = useState([])
   const [cells, setCells] = useState([])
+  const [members, setMembers] = useState([])
   const [search, setSearch] = useState('')
   const [yearFilter, setYearFilter] = useState('all')
   const [monthFilter, setMonthFilter] = useState('all')
@@ -24,26 +25,27 @@ function Reports() {
 
     Promise.all([
       fetch(`${API_BASE}/reports`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/cells`, { headers }).then((r) => (r.ok ? r.json() : []))
+      fetch(`${API_BASE}/cells`, { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/members`, { headers }).then((r) => (r.ok ? r.json() : []))
     ])
-      .then(([reportsData, cellsData]) => {
+      .then(([reportsData, cellsData, membersData]) => {
         setReports(Array.isArray(reportsData) ? reportsData : [])
         setCells(Array.isArray(cellsData) ? cellsData : [])
+        setMembers(Array.isArray(membersData) ? membersData : [])
       })
       .catch(() => {
         setReports([])
         setCells([])
+        setMembers([])
       })
   }, [])
 
-  const meetingTypes = useMemo(() => {
-    const types = new Set()
-    reports.forEach((report) => {
-      const type = report.meeting_type || report.meetingType
-      if (type) types.add(type)
-    })
-    return Array.from(types)
-  }, [reports])
+  const meetingOptions = useMemo(() => ([
+    'Prayer and Planning',
+    'Bible Study 1',
+    'Bible Study 2',
+    'Outreach Meeting'
+  ]), [])
 
   const years = useMemo(() => {
     const list = new Set()
@@ -109,6 +111,33 @@ function Reports() {
     return match ? match.name : '-'
   }
 
+  const getMembersForCell = (cellId) => {
+    if (!cellId) return members
+    return members.filter((member) => String(member.cellId || member.cell_id) === String(cellId))
+  }
+
+  const normalizeAttendees = (report, list) => {
+    const existing = Array.isArray(report.attendees) ? report.attendees : []
+    const byId = new Map()
+    existing.forEach((item) => {
+      if (item && typeof item === 'object') {
+        const key = String(item.memberId || item.id || item.name || '')
+        if (key) byId.set(key, item)
+      } else if (typeof item === 'string') {
+        byId.set(item, { name: item, present: true })
+      }
+    })
+    return list.map((member) => {
+      const key = String(member.id)
+      const cached = byId.get(key) || byId.get(member.name)
+      return {
+        memberId: member.id,
+        name: member.name,
+        present: cached?.present ?? false
+      }
+    })
+  }
+
   const handleDelete = async () => {
     if (!deletingReport) return
     const token = localStorage.getItem('token')
@@ -137,7 +166,8 @@ function Reports() {
         date: editingReport.date,
         venue: editingReport.venue,
         meetingType: editingReport.meetingType || editingReport.meeting_type,
-        description: editingReport.description
+        description: editingReport.description,
+        attendees: editingReport.attendees || []
       })
     })
     if (!res.ok) return
@@ -172,7 +202,7 @@ function Reports() {
           </select>
           <select value={meetingFilter} onChange={(e) => setMeetingFilter(e.target.value)}>
             <option value="all">All Meeting Types</option>
-            {meetingTypes.map((type) => (
+            {meetingOptions.map((type) => (
               <option key={type} value={type}>{type}</option>
             ))}
           </select>
@@ -188,7 +218,7 @@ function Reports() {
               <th>Time</th>
               <th>Venue</th>
               <th>Meeting Type</th>
-              <th>Description</th>
+              <th>Summary</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -207,10 +237,20 @@ function Reports() {
                 <td data-label="Time">{formatTime(report.date || report.report_date || report.reportDate)}</td>
                 <td data-label="Venue">{report.venue || '-'}</td>
                 <td data-label="Meeting Type">{report.meeting_type || report.meetingType || '-'}</td>
-                <td data-label="Description">{report.description || report.notes || '-'}</td>
+                <td data-label="Summary">{report.description || report.notes || '-'}</td>
                 <td data-label="Actions">
                   <div className="action-buttons">
-                    <button className="action-btn edit-btn" type="button" onClick={() => setEditingReport({ ...report })}>
+                    <button
+                      className="action-btn edit-btn"
+                      type="button"
+                      onClick={() => {
+                        const list = getMembersForCell(report.cellId || report.cell_id)
+                        setEditingReport({
+                          ...report,
+                          attendees: normalizeAttendees(report, list)
+                        })
+                      }}
+                    >
                       <i className="fas fa-edit"></i> Edit
                     </button>
                     <button className="action-btn delete-btn" type="button" onClick={() => setDeletingReport(report)}>
@@ -234,7 +274,18 @@ function Reports() {
               </button>
             </div>
             <div className="modal-body">
-              <form onSubmit={handleSave}>
+              <form
+                onSubmit={handleSave}
+                onChange={() => {
+                  if (!editingReport?.attendees) {
+                    const list = getMembersForCell(editingReport?.cellId || editingReport?.cell_id)
+                    setEditingReport((prev) => ({
+                      ...prev,
+                      attendees: normalizeAttendees(prev, list)
+                    }))
+                  }
+                }}
+              >
                 <div className="form-group">
                   <label>Cell</label>
                   <input className="form-control" value={getCellName(editingReport)} disabled />
@@ -258,20 +309,54 @@ function Reports() {
                 </div>
                 <div className="form-group">
                   <label>Meeting Type</label>
-                  <input
+                  <select
                     className="form-control"
                     value={editingReport.meetingType || editingReport.meeting_type || ''}
                     onChange={(e) => setEditingReport({ ...editingReport, meetingType: e.target.value })}
-                  />
+                  >
+                    <option value="">Select Meeting Type</option>
+                    {meetingOptions.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
-                  <label>Description</label>
+                  <label>Summary</label>
                   <textarea
                     className="form-control"
                     rows="3"
                     value={editingReport.description || ''}
                     onChange={(e) => setEditingReport({ ...editingReport, description: e.target.value })}
                   />
+                </div>
+                <div className="form-group">
+                  <label>Attendees</label>
+                  <div className="attendees-list">
+                    {normalizeAttendees(editingReport, getMembersForCell(editingReport.cellId || editingReport.cell_id)).map((attendee) => (
+                      <label key={attendee.memberId} className="attendee-row">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(
+                            (editingReport.attendees || []).find((item) => String(item.memberId) === String(attendee.memberId))?.present
+                          )}
+                          onChange={(e) => {
+                            setEditingReport((prev) => {
+                              const list = normalizeAttendees(prev, getMembersForCell(prev.cellId || prev.cell_id))
+                              return {
+                                ...prev,
+                                attendees: list.map((item) =>
+                                  String(item.memberId) === String(attendee.memberId)
+                                    ? { ...item, present: e.target.checked }
+                                    : item
+                                )
+                              }
+                            })
+                          }}
+                        />
+                        <span>{attendee.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setEditingReport(null)}>

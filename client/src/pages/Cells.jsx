@@ -296,19 +296,6 @@ function Cells() {
 
   return (
     <div className="cells-page">
-      <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end' }}>
-        {activeCell && (
-          <>
-            <button className="btn" type="button" onClick={() => setEditingCell({ ...activeCell })}>
-              <i className="fas fa-edit"></i> Edit Cell
-            </button>
-            <button className="btn btn-danger" type="button" onClick={() => setDeletingCell(activeCell)}>
-              <i className="fas fa-trash"></i> Delete Cell
-            </button>
-          </>
-        )}
-      </div>
-
       <div className="cells-selector">
         {cells.map((cell) => (
           <button
@@ -320,6 +307,16 @@ function Cells() {
             {cell.name}
           </button>
         ))}
+        {activeCell && (
+          <div className="cells-selector-actions">
+            <button className="btn" type="button" onClick={() => setEditingCell({ ...activeCell })}>
+              <i className="fas fa-edit"></i> Edit Cell
+            </button>
+            <button className="btn btn-danger" type="button" onClick={() => setDeletingCell(activeCell)}>
+              <i className="fas fa-trash"></i> Delete Cell
+            </button>
+          </div>
+        )}
       </div>
 
       {activeCell && (

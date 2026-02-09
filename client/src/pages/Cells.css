@@ -3,6 +3,7 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 18px;
+  align-items: center;
 }
 
 .cell-selector-btn {
@@ -12,6 +13,13 @@
   background: #fff;
   cursor: pointer;
   font-weight: 600;
+}
+
+.cells-selector-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .cell-selector-btn.active {
