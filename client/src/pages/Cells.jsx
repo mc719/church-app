@@ -14,6 +14,7 @@ function Cells() {
   const [cells, setCells] = useState([])
   const [reports, setReports] = useState([])
   const [members, setMembers] = useState([])
+  const [departments, setDepartments] = useState([])
   const [activeCellId, setActiveCellId] = useState(null)
   const [activeTab, setActiveTab] = useState('members')
   const [search, setSearch] = useState('')
@@ -34,8 +35,26 @@ function Cells() {
     gender: '',
     mobile: '',
     email: '',
-    role: ''
+    role: '',
+    departmentId: '',
+    dobDay: '',
+    dobMonth: ''
   })
+  const dobDays = useMemo(() => Array.from({ length: 31 }, (_, i) => String(i + 1)), [])
+  const dobMonths = useMemo(() => ([
+    { value: '1', label: 'January' },
+    { value: '2', label: 'February' },
+    { value: '3', label: 'March' },
+    { value: '4', label: 'April' },
+    { value: '5', label: 'May' },
+    { value: '6', label: 'June' },
+    { value: '7', label: 'July' },
+    { value: '8', label: 'August' },
+    { value: '9', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' }
+  ]), [])
   const [reportForm, setReportForm] = useState({
     date: '',
     venue: '',
@@ -60,13 +79,15 @@ function Cells() {
     Promise.all([
       fetch(`${API_BASE}/cells`, { headers }).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API_BASE}/reports`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/members`, { headers }).then((r) => (r.ok ? r.json() : []))
+      fetch(`${API_BASE}/members`, { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/departments`, { headers }).then((r) => (r.ok ? r.json() : []))
     ])
-      .then(([cellsData, reportsData, membersData]) => {
+      .then(([cellsData, reportsData, membersData, departmentsData]) => {
         const safeCells = Array.isArray(cellsData) ? cellsData : []
         setCells(safeCells)
         setReports(Array.isArray(reportsData) ? reportsData : [])
         setMembers(Array.isArray(membersData) ? membersData : [])
+        setDepartments(Array.isArray(departmentsData) ? departmentsData : [])
         if (!activeCellId && safeCells.length) {
           setActiveCellId(String(safeCells[0].id))
         }
@@ -75,6 +96,7 @@ function Cells() {
         setCells([])
         setReports([])
         setMembers([])
+        setDepartments([])
       })
   }, [activeCellId])
 
@@ -240,7 +262,10 @@ function Cells() {
         gender: editingMember.gender,
         mobile: editingMember.mobile,
         email: editingMember.email,
-        role: editingMember.role
+        role: editingMember.role,
+        departmentId: editingMember.departmentId || editingMember.department_id || null,
+        dobDay: editingMember.dobDay || editingMember.dob_day || '',
+        dobMonth: editingMember.dobMonth || editingMember.dob_month || ''
       })
     })
     if (!res.ok) return
@@ -339,13 +364,16 @@ function Cells() {
         gender: memberForm.gender,
         mobile: memberForm.mobile,
         email: memberForm.email,
-        role: memberForm.role
+        role: memberForm.role,
+        departmentId: memberForm.departmentId || null,
+        dobDay: memberForm.dobDay,
+        dobMonth: memberForm.dobMonth
       })
     })
     if (!res.ok) return
     const created = await res.json()
     setMembers((prev) => [created, ...prev])
-    setMemberForm({ title: '', name: '', gender: '', mobile: '', email: '', role: '' })
+    setMemberForm({ title: '', name: '', gender: '', mobile: '', email: '', role: '', departmentId: '', dobDay: '', dobMonth: '' })
     setShowAddMember(false)
   }
 
@@ -753,6 +781,44 @@ function Cells() {
                     <option value="New Member">New Member</option>
                   </select>
                 </div>
+                <div className="form-group">
+                  <label>Department</label>
+                  <select
+                    className="form-control"
+                    value={editingMember.departmentId || editingMember.department_id || ''}
+                    onChange={(e) => setEditingMember({ ...editingMember, departmentId: e.target.value })}
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Date of Birth</label>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <select
+                      className="form-control"
+                      value={editingMember.dobDay || editingMember.dob_day || ''}
+                      onChange={(e) => setEditingMember({ ...editingMember, dobDay: e.target.value })}
+                    >
+                      <option value="">Day</option>
+                      {dobDays.map((day) => (
+                        <option key={day} value={day}>{day}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="form-control"
+                      value={editingMember.dobMonth || editingMember.dob_month || ''}
+                      onChange={(e) => setEditingMember({ ...editingMember, dobMonth: e.target.value })}
+                    >
+                      <option value="">Month</option>
+                      {dobMonths.map((month) => (
+                        <option key={month.value} value={month.value}>{month.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setEditingMember(null)}>
                     Cancel
@@ -1072,6 +1138,44 @@ function Cells() {
                     <option value="Member">Member</option>
                     <option value="New Member">New Member</option>
                   </select>
+                </div>
+                <div className="form-group">
+                  <label>Department</label>
+                  <select
+                    className="form-control"
+                    value={memberForm.departmentId}
+                    onChange={(e) => setMemberForm((prev) => ({ ...prev, departmentId: e.target.value }))}
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Date of Birth</label>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <select
+                      className="form-control"
+                      value={memberForm.dobDay}
+                      onChange={(e) => setMemberForm((prev) => ({ ...prev, dobDay: e.target.value }))}
+                    >
+                      <option value="">Day</option>
+                      {dobDays.map((day) => (
+                        <option key={day} value={day}>{day}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="form-control"
+                      value={memberForm.dobMonth}
+                      onChange={(e) => setMemberForm((prev) => ({ ...prev, dobMonth: e.target.value }))}
+                    >
+                      <option value="">Month</option>
+                      {dobMonths.map((month) => (
+                        <option key={month.value} value={month.value}>{month.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setShowAddMember(false)}>
