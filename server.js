@@ -2170,10 +2170,12 @@ app.post("/api/reports", requireAuth, async (req, res) => {
       return [];
     };
     const normalizedAttendees = normalizeAttendees(attendees);
+    const attendeesJson = JSON.stringify(normalizedAttendees);
+    const attendeesJson = JSON.stringify(normalizedAttendees);
 
     const result = await pool.query(
       `INSERT INTO reports (cell_id, date, venue, meeting_type, description, attendees, report_date)
-       VALUES ($1,$2,$3,$4,$5,$6,($2::timestamptz)::date)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,($2::timestamptz)::date)
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  date,
@@ -2181,7 +2183,7 @@ app.post("/api/reports", requireAuth, async (req, res) => {
                  meeting_type as "meetingType",
                  description,
                  attendees`,
-      [cellId, date, venue, meetingType, description, normalizedAttendees]
+      [cellId, date, venue, meetingType, description, attendeesJson]
     );
 
     const report = result.rows[0];
@@ -2409,7 +2411,7 @@ app.put("/api/reports/:id", requireAuth, async (req, res) => {
            venue = COALESCE($2, venue),
            meeting_type = COALESCE($3, meeting_type),
            description = COALESCE($4, description),
-           attendees = COALESCE($5, attendees),
+           attendees = COALESCE($5::jsonb, attendees),
            report_date = COALESCE(($1::timestamptz)::date, report_date)
        WHERE id = $6
        RETURNING id::text as id,
@@ -2419,7 +2421,7 @@ app.put("/api/reports/:id", requireAuth, async (req, res) => {
                  meeting_type as "meetingType",
                  description,
                  attendees`,
-      [date ?? null, venue ?? null, meetingType ?? null, description ?? null, normalizedAttendees, req.params.id]
+      [date ?? null, venue ?? null, meetingType ?? null, description ?? null, attendeesJson, req.params.id]
     );
 
     if (result.rows.length === 0) {
