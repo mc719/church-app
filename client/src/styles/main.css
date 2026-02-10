@@ -229,8 +229,10 @@
     display: none;
 }
 
-.accordion-section:hover .accordion-content {
-    display: block;
+@media (hover: hover) and (pointer: fine) {
+    .accordion-section:hover .accordion-content {
+        display: block;
+    }
 }
 
         .accordion-section.open .accordion-caret {
@@ -238,10 +240,6 @@
         }
 
 @media (max-width: 768px) {
-    .accordion-section:hover .accordion-content {
-        display: none;
-    }
-
     .accordion-content.open {
         display: block;
     }
