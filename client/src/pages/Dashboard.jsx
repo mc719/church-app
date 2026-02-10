@@ -295,21 +295,16 @@ function Dashboard({ onAddCell }) {
       return acc
     }, { inCell: 0, unassigned: 0 })
 
-    const roleCounts = members.reduce((acc, member) => {
-      const key = (member.role || 'Unassigned').trim() || 'Unassigned'
-      acc[key] = (acc[key] || 0) + 1
+    const membersInDepartment = members.reduce((acc, member) => {
+      if (member.departmentId || member.department_id) acc.inDepartment += 1
       return acc
-    }, {})
+    }, { inDepartment: 0 })
 
     const genderLabels = ['Members in Cells', 'Unassigned Members']
     const genderValues = [cellMembershipCounts.inCell, cellMembershipCounts.unassigned]
-    const roleLabels = Object.keys(roleCounts)
-    const roleValues = roleLabels.map(label => roleCounts[label])
-    const rolePalette = [
-      '#2563eb', '#f97316', '#10b981', '#a855f7', '#facc15',
-      '#06b6d4', '#ef4444', '#22c55e', '#e11d48', '#64748b'
-    ]
-    const roleColors = roleLabels.map((_, idx) => rolePalette[idx % rolePalette.length])
+    const roleLabels = ['Members in Departments', 'Other Members']
+    const roleValues = [membersInDepartment.inDepartment, Math.max(0, members.length - membersInDepartment.inDepartment)]
+    const roleColors = ['#3b82f6', '#94a3b8']
 
     if (genderChartInstance.current) {
       genderChartInstance.current.data.labels = genderLabels
@@ -341,16 +336,15 @@ function Dashboard({ onAddCell }) {
       rolesChartInstance.current.update()
     } else if (rolesChartRef.current) {
       rolesChartInstance.current = new Chart(rolesChartRef.current, {
-        type: 'bar',
+        type: 'doughnut',
         data: {
           labels: roleLabels,
-          datasets: [{ label: 'Members', data: roleValues, backgroundColor: roleColors }]
+          datasets: [{ data: roleValues, backgroundColor: roleColors, radius: '70%' }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+          plugins: { legend: { display: false } }
         }
       })
     }
