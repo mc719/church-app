@@ -267,6 +267,7 @@ async function ensureUserProfilesSchema() {
     `CREATE TABLE IF NOT EXISTS departments (
        id SERIAL PRIMARY KEY,
        name TEXT UNIQUE NOT NULL,
+       hod_title TEXT,
        hod_name TEXT,
        hod_mobile TEXT,
        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -313,6 +314,11 @@ async function ensureUserProfilesSchema() {
        ADD COLUMN IF NOT EXISTS photo_data TEXT,
        ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'system',
        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`
+  );
+
+  await pool.query(
+    `ALTER TABLE departments
+       ADD COLUMN IF NOT EXISTS hod_title TEXT`
   );
 
   await pool.query(
@@ -904,6 +910,7 @@ app.get("/api/departments", requireAuth, async (req, res) => {
     const result = await pool.query(
       `SELECT id::text as id,
               name,
+              hod_title as "hodTitle",
               hod_name as "hodName",
               hod_mobile as "hodMobile",
               created_at as "createdAt",
@@ -920,20 +927,21 @@ app.get("/api/departments", requireAuth, async (req, res) => {
 
 app.post("/api/departments", requireAuth, async (req, res) => {
   try {
-    const { name, hodName, hodMobile } = req.body || {};
+    const { name, hodTitle, hodName, hodMobile } = req.body || {};
     if (!name || !String(name).trim()) {
       return res.status(400).json({ error: "Department name is required" });
     }
     const result = await pool.query(
-      `INSERT INTO departments (name, hod_name, hod_mobile, updated_at)
-       VALUES ($1,$2,$3,NOW())
+      `INSERT INTO departments (name, hod_title, hod_name, hod_mobile, updated_at)
+       VALUES ($1,$2,$3,$4,NOW())
        RETURNING id::text as id,
                  name,
+                 hod_title as "hodTitle",
                  hod_name as "hodName",
                  hod_mobile as "hodMobile",
                  created_at as "createdAt",
                  updated_at as "updatedAt"`,
-      [String(name).trim(), hodName || null, hodMobile || null]
+      [String(name).trim(), hodTitle || null, hodName || null, hodMobile || null]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -944,21 +952,23 @@ app.post("/api/departments", requireAuth, async (req, res) => {
 
 app.put("/api/departments/:id", requireAuth, async (req, res) => {
   try {
-    const { name, hodName, hodMobile } = req.body || {};
+    const { name, hodTitle, hodName, hodMobile } = req.body || {};
     const result = await pool.query(
       `UPDATE departments
        SET name = COALESCE($1, name),
-           hod_name = COALESCE($2, hod_name),
-           hod_mobile = COALESCE($3, hod_mobile),
+           hod_title = COALESCE($2, hod_title),
+           hod_name = COALESCE($3, hod_name),
+           hod_mobile = COALESCE($4, hod_mobile),
            updated_at = NOW()
-       WHERE id = $4
+       WHERE id = $5
        RETURNING id::text as id,
                  name,
+                 hod_title as "hodTitle",
                  hod_name as "hodName",
                  hod_mobile as "hodMobile",
                  created_at as "createdAt",
                  updated_at as "updatedAt"`,
-      [name || null, hodName || null, hodMobile || null, req.params.id]
+      [name || null, hodTitle || null, hodName || null, hodMobile || null, req.params.id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Department not found" });

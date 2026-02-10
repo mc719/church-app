@@ -23,7 +23,7 @@ function Dashboard({ onAddCell }) {
   const [showAddBirthday, setShowAddBirthday] = useState(false)
   const [birthdayForm, setBirthdayForm] = useState({ memberId: '', day: '', month: '' })
   const [showAddDepartment, setShowAddDepartment] = useState(false)
-  const [departmentForm, setDepartmentForm] = useState({ name: '', hodName: '', hodMobile: '' })
+  const [departmentForm, setDepartmentForm] = useState({ name: '', hodTitle: '', hodName: '', hodMobile: '' })
   const [departmentError, setDepartmentError] = useState('')
   const genderChartRef = useRef(null)
   const rolesChartRef = useRef(null)
@@ -217,6 +217,7 @@ function Dashboard({ onAddCell }) {
       },
       body: JSON.stringify({
         name: departmentForm.name,
+        hodTitle: departmentForm.hodTitle,
         hodName: departmentForm.hodName,
         hodMobile: departmentForm.hodMobile
       })
@@ -226,7 +227,7 @@ function Dashboard({ onAddCell }) {
       return
     }
     window.dispatchEvent(new Event('departments-updated'))
-    setDepartmentForm({ name: '', hodName: '', hodMobile: '' })
+    setDepartmentForm({ name: '', hodTitle: '', hodName: '', hodMobile: '' })
     setShowAddDepartment(false)
   }
 
@@ -477,8 +478,8 @@ function Dashboard({ onAddCell }) {
           <button
             className="btn btn-success"
             type="button"
-            onClick={() => {
-              setDepartmentForm({ name: '', hodName: '', hodMobile: '' })
+          onClick={() => {
+              setDepartmentForm({ name: '', hodTitle: '', hodName: '', hodMobile: '' })
               setDepartmentError('')
               setShowAddDepartment(true)
             }}
@@ -516,6 +517,21 @@ function Dashboard({ onAddCell }) {
                     value={departmentForm.name}
                     onChange={(e) => setDepartmentForm((prev) => ({ ...prev, name: e.target.value }))}
                   />
+                </div>
+                <div className="form-group">
+                  <label>Title</label>
+                  <select
+                    className="form-control"
+                    value={departmentForm.hodTitle}
+                    onChange={(e) => setDepartmentForm((prev) => ({ ...prev, hodTitle: e.target.value }))}
+                  >
+                    <option value="">Select Title</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Dcn">Dcn</option>
+                    <option value="Dcns">Dcns</option>
+                    <option value="Pastor">Pastor</option>
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>HOD Name</label>

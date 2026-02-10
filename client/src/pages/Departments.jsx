@@ -13,7 +13,7 @@ function Departments() {
   const [page, setPage] = useState(1)
   const [showAdd, setShowAdd] = useState(false)
   const [editingDepartment, setEditingDepartment] = useState(null)
-  const [form, setForm] = useState({ name: '', hodName: '', hodMobile: '' })
+  const [form, setForm] = useState({ name: '', hodTitle: '', hodName: '', hodMobile: '' })
   const [error, setError] = useState('')
   const [activeDepartmentId, setActiveDepartmentId] = useState('')
   const [activeTab, setActiveTab] = useState('members')
@@ -96,7 +96,7 @@ function Departments() {
   }, [departments, activeDepartmentId])
 
   const resetForm = () => {
-    setForm({ name: '', hodName: '', hodMobile: '' })
+    setForm({ name: '', hodTitle: '', hodName: '', hodMobile: '' })
     setError('')
   }
 
@@ -139,6 +139,7 @@ function Departments() {
       },
       body: JSON.stringify({
         name: editingDepartment.name,
+        hodTitle: editingDepartment.hodTitle,
         hodName: editingDepartment.hodName,
         hodMobile: editingDepartment.hodMobile
       })
@@ -316,7 +317,9 @@ function Departments() {
               </div>
               <div>
                 <div className="cell-summary-label">HOD</div>
-                <div className="cell-summary-value">{activeDepartment.hodName || '-'}</div>
+                <div className="cell-summary-value">
+                  {activeDepartment.hodTitle ? `${activeDepartment.hodTitle} ` : ''}{activeDepartment.hodName || '-'}
+                </div>
               </div>
               <div>
                 <div className="cell-summary-label">HOD Mobile</div>
@@ -446,6 +449,21 @@ function Departments() {
                   />
                 </div>
                 <div className="form-group">
+                  <label>Title</label>
+                  <select
+                    className="form-control"
+                    value={form.hodTitle}
+                    onChange={(e) => setForm((prev) => ({ ...prev, hodTitle: e.target.value }))}
+                  >
+                    <option value="">Select Title</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Dcn">Dcn</option>
+                    <option value="Dcns">Dcns</option>
+                    <option value="Pastor">Pastor</option>
+                  </select>
+                </div>
+                <div className="form-group">
                   <label>HOD Name</label>
                   <input
                     className="form-control"
@@ -493,6 +511,21 @@ function Departments() {
                     value={editingDepartment.name || ''}
                     onChange={(e) => setEditingDepartment({ ...editingDepartment, name: e.target.value })}
                   />
+                </div>
+                <div className="form-group">
+                  <label>Title</label>
+                  <select
+                    className="form-control"
+                    value={editingDepartment.hodTitle || ''}
+                    onChange={(e) => setEditingDepartment({ ...editingDepartment, hodTitle: e.target.value })}
+                  >
+                    <option value="">Select Title</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Dcn">Dcn</option>
+                    <option value="Dcns">Dcns</option>
+                    <option value="Pastor">Pastor</option>
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>HOD Name</label>
