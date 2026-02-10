@@ -11,6 +11,7 @@ import FirstTimers from './pages/FirstTimers.jsx'
 import Birthdays from './pages/Birthdays.jsx'
 import Notifications from './pages/Notifications.jsx'
 import AccessManagement from './pages/AccessManagement.jsx'
+import Departments from './pages/Departments.jsx'
 import PageManagement from './pages/PageManagement.jsx'
 import Sessions from './pages/Sessions.jsx'
 import Settings from './pages/Settings.jsx'
@@ -62,6 +63,7 @@ function App() {
           <Route path="first-timers" element={<FirstTimers />} />
           <Route path="birthdays" element={<Birthdays />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="departments" element={<Departments />} />
           <Route path="page-management" element={<PageManagement />} />
           <Route path="access-management" element={<AccessManagement />} />
           <Route path="sessions" element={<Sessions />} />

@@ -1,0 +1,19 @@
+.departments-page .departments-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.departments-page .inline-error {
+  margin: 12px 0;
+  color: #b42318;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .departments-page .departments-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

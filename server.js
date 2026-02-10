@@ -249,6 +249,11 @@ async function ensureFirstTimerSchema() {
   );
 
   await pool.query(
+    `ALTER TABLE members
+       ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL`
+  );
+
+  await pool.query(
     `UPDATE members
      SET dob_month = EXTRACT(MONTH FROM date_of_birth)::smallint,
          dob_day = EXTRACT(DAY FROM date_of_birth)::smallint
@@ -331,7 +336,7 @@ async function ensureUserProfileForUser({ userId, email, username = null, role =
   );
 }
 
-async function syncProfileByEmail({ email, fullName = null, phone = null, roleTitle = null, cellId = null, dobMonth = null, dobDay = null, address = null, source = "member-sync" }) {
+async function syncProfileByEmail({ email, fullName = null, phone = null, roleTitle = null, cellId = null, departmentId = null, dobMonth = null, dobDay = null, address = null, source = "member-sync" }) {
   if (!email) return;
   const normalized = String(email).trim().toLowerCase();
   const userResult = await pool.query(
@@ -354,13 +359,14 @@ async function syncProfileByEmail({ email, fullName = null, phone = null, roleTi
          phone = COALESCE($2, phone),
          role_title = COALESCE($3, role_title),
          cell_id = COALESCE($4, cell_id),
-         dob_month = COALESCE($5, dob_month),
-         dob_day = COALESCE($6, dob_day),
-         address = COALESCE($7, address),
-         source = COALESCE($8, source),
+         department_id = COALESCE($5, department_id),
+         dob_month = COALESCE($6, dob_month),
+         dob_day = COALESCE($7, dob_day),
+         address = COALESCE($8, address),
+         source = COALESCE($9, source),
          updated_at = NOW()
-     WHERE user_id = $9`,
-    [fullName, phone, roleTitle, cellId, dobMonth, dobDay, address, source, user.id]
+     WHERE user_id = $10`,
+    [fullName, phone, roleTitle, cellId, departmentId, dobMonth, dobDay, address, source, user.id]
   );
 }
 
@@ -892,6 +898,107 @@ app.delete("/api/roles/:id", requireAuth, async (req, res) => {
   }
 });
 
+// DEPARTMENTS (PROTECTED)
+app.get("/api/departments", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id::text as id,
+              name,
+              hod_name as "hodName",
+              hod_mobile as "hodMobile",
+              created_at as "createdAt",
+              updated_at as "updatedAt"
+       FROM departments
+       ORDER BY name`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load departments" });
+  }
+});
+
+app.post("/api/departments", requireAuth, async (req, res) => {
+  try {
+    const { name, hodName, hodMobile } = req.body || {};
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: "Department name is required" });
+    }
+    const result = await pool.query(
+      `INSERT INTO departments (name, hod_name, hod_mobile, updated_at)
+       VALUES ($1,$2,$3,NOW())
+       RETURNING id::text as id,
+                 name,
+                 hod_name as "hodName",
+                 hod_mobile as "hodMobile",
+                 created_at as "createdAt",
+                 updated_at as "updatedAt"`,
+      [String(name).trim(), hodName || null, hodMobile || null]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to add department" });
+  }
+});
+
+app.put("/api/departments/:id", requireAuth, async (req, res) => {
+  try {
+    const { name, hodName, hodMobile } = req.body || {};
+    const result = await pool.query(
+      `UPDATE departments
+       SET name = COALESCE($1, name),
+           hod_name = COALESCE($2, hod_name),
+           hod_mobile = COALESCE($3, hod_mobile),
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING id::text as id,
+                 name,
+                 hod_name as "hodName",
+                 hod_mobile as "hodMobile",
+                 created_at as "createdAt",
+                 updated_at as "updatedAt"`,
+      [name || null, hodName || null, hodMobile || null, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Department not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update department" });
+  }
+});
+
+app.delete("/api/departments/:id", requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const memberUsage = await pool.query(
+      "SELECT COUNT(*)::int as count FROM members WHERE department_id = $1",
+      [id]
+    );
+    const profileUsage = await pool.query(
+      "SELECT COUNT(*)::int as count FROM user_profiles WHERE department_id = $1",
+      [id]
+    );
+    const usedCount = (memberUsage.rows[0]?.count || 0) + (profileUsage.rows[0]?.count || 0);
+    if (usedCount > 0) {
+      return res.status(400).json({ error: "Department is in use" });
+    }
+    const result = await pool.query(
+      "DELETE FROM departments WHERE id = $1 RETURNING id::text as id",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Department not found" });
+    }
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete department" });
+  }
+});
+
 // OTP SEND (PUBLIC) - by email
 app.post("/api/otp/send", rateLimit({ keyPrefix: "otp-send", windowMs: 60_000, max: 5 }), async (req, res) => {
   try {
@@ -1405,27 +1512,38 @@ app.delete("/api/cells/:id", requireAuth, async (req, res) => {
 app.get("/api/members", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id::text as id,
-              cell_id::text as "cellId",
-              title,
-              name,
-              gender,
-              mobile,
-              email,
-              role,
-              is_first_timer as "isFirstTimer",
-              dob_month as "dobMonth",
-              dob_day as "dobDay",
+      `SELECT m.id::text as id,
+              m.cell_id::text as "cellId",
+              m.title,
+              m.name,
+              m.gender,
+              m.mobile,
+              m.email,
+              m.role,
+              m.is_first_timer as "isFirstTimer",
+              m.dob_month as "dobMonth",
+              m.dob_day as "dobDay",
               CASE
-                WHEN dob_month IS NOT NULL AND dob_day IS NOT NULL
-                  THEN LPAD(dob_month::text, 2, '0') || '-' || LPAD(dob_day::text, 2, '0')
-                WHEN date_of_birth IS NOT NULL
-                  THEN TO_CHAR(date_of_birth, 'MM-DD')
+                WHEN m.dob_month IS NOT NULL AND m.dob_day IS NOT NULL
+                  THEN LPAD(m.dob_month::text, 2, '0') || '-' || LPAD(m.dob_day::text, 2, '0')
+                WHEN m.date_of_birth IS NOT NULL
+                  THEN TO_CHAR(m.date_of_birth, 'MM-DD')
                 ELSE NULL
               END as "dateOfBirth",
-              joined_date as "joinedDate"
-       FROM members
-       ORDER BY id`
+              m.joined_date as "joinedDate",
+              c.name as "cellName",
+              c.venue as "cellVenue",
+              c.day as "cellDay",
+              c.time as "cellTime",
+              COALESCE(m.department_id, up.department_id) as "departmentId",
+              d.name as "departmentName",
+              d.hod_name as "departmentHead",
+              d.hod_mobile as "departmentHeadMobile"
+       FROM members m
+       LEFT JOIN cells c ON c.id = m.cell_id
+       LEFT JOIN user_profiles up ON LOWER(up.email) = LOWER(m.email)
+       LEFT JOIN departments d ON d.id = COALESCE(m.department_id, up.department_id)
+       ORDER BY m.id`
     );
     res.json(result.rows);
   } catch (err) {
@@ -1437,14 +1555,15 @@ app.get("/api/members", requireAuth, async (req, res) => {
 // ADD MEMBER (AUTH OR ACCESS CODE)
 app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { cellId, title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth, dobMonth, dobDay } = req.body;
+    const { cellId, departmentId, title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth, dobMonth, dobDay } = req.body;
     const parsedDob = parseMonthDay(dateOfBirth || (dobMonth && dobDay ? `${dobMonth}-${dobDay}` : ""));
 
     const result = await pool.query(
-      `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, is_first_timer, dob_month, dob_day, date_of_birth, joined_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL, NOW())
+      `INSERT INTO members (cell_id, department_id, title, name, gender, mobile, email, role, is_first_timer, dob_month, dob_day, date_of_birth, joined_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULL, NOW())
        RETURNING id::text as id,
                  cell_id::text as "cellId",
+                 department_id::text as "departmentId",
                  title,
                  name,
                  gender,
@@ -1460,7 +1579,7 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
                    ELSE NULL
                  END as "dateOfBirth",
                  joined_date as "joinedDate"`,
-      [cellId, title, name, gender, mobile, email, role, !!isFirstTimer, parsedDob.month, parsedDob.day]
+      [cellId, departmentId, title, name, gender, mobile, email, role, !!isFirstTimer, parsedDob.month, parsedDob.day]
     );
 
     const member = result.rows[0];
@@ -1471,6 +1590,7 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
       phone: member.mobile,
       roleTitle: member.role,
       cellId: member.cellId,
+      departmentId: member.departmentId,
       dobMonth: member.dobMonth || parseMonthDay(member.dateOfBirth).month,
       dobDay: member.dobDay || parseMonthDay(member.dateOfBirth).day,
       source: "member-sync"
@@ -1515,7 +1635,7 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE MEMBER (PROTECTED)
 app.put("/api/members/:id", requireAuth, async (req, res) => {
   try {
-    const { title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth, dobMonth, dobDay } = req.body;
+    const { title, name, gender, mobile, email, role, isFirstTimer, cellId, departmentId, dateOfBirth, dobMonth, dobDay } = req.body;
     const parsedDob = parseMonthDay(dateOfBirth || (dobMonth && dobDay ? `${dobMonth}-${dobDay}` : ""));
     const hasDobInput = Object.prototype.hasOwnProperty.call(req.body || {}, "dateOfBirth")
       || Object.prototype.hasOwnProperty.call(req.body || {}, "dobMonth")
@@ -1528,13 +1648,16 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
            mobile = COALESCE($4, mobile),
            email = COALESCE($5, email),
            role = COALESCE($6, role),
-           is_first_timer = COALESCE($7, is_first_timer),
-           dob_month = COALESCE($8, dob_month),
-           dob_day = COALESCE($9, dob_day),
+           cell_id = COALESCE($7, cell_id),
+           department_id = COALESCE($8, department_id),
+           is_first_timer = COALESCE($9, is_first_timer),
+           dob_month = COALESCE($10, dob_month),
+           dob_day = COALESCE($11, dob_day),
            date_of_birth = NULL
-       WHERE id = $10
+       WHERE id = $12
        RETURNING id::text as id,
                  cell_id::text as "cellId",
+                 department_id::text as "departmentId",
                  title,
                  name,
                  gender,
@@ -1557,6 +1680,8 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
         mobile ?? null,
         email ?? null,
         role ?? null,
+        cellId ?? null,
+        departmentId ?? null,
         typeof isFirstTimer === "boolean" ? isFirstTimer : null,
         hasDobInput ? parsedDob.month : null,
         hasDobInput ? parsedDob.day : null,
@@ -1576,6 +1701,7 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
       phone: member.mobile,
       roleTitle: member.role,
       cellId: member.cellId,
+      departmentId: member.departmentId,
       dobMonth: member.dobMonth || parseMonthDay(member.dateOfBirth).month,
       dobDay: member.dobDay || parseMonthDay(member.dateOfBirth).day,
       source: "member-sync"
@@ -1633,6 +1759,63 @@ app.delete("/api/members/:id", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to delete member" });
+  }
+});
+
+// MEMBER ATTENDANCE SUMMARY (PROTECTED)
+app.get("/api/members/:id/attendance", requireAuth, async (req, res) => {
+  try {
+    const memberId = String(req.params.id);
+    const result = await pool.query(
+      `SELECT r.id::text as id,
+              r.cell_id::text as "cellId",
+              r.report_date as "reportDate",
+              r.date,
+              r.meeting_type as "meetingType",
+              r.attendees
+       FROM reports r
+       WHERE r.attendees IS NOT NULL
+       ORDER BY r.report_date DESC NULLS LAST, r.id DESC`
+    );
+
+    let present = 0;
+    let absent = 0;
+    const records = [];
+
+    for (const row of result.rows) {
+      let attendees = row.attendees;
+      if (typeof attendees === "string") {
+        try {
+          attendees = JSON.parse(attendees);
+        } catch {
+          attendees = [];
+        }
+      }
+      if (!Array.isArray(attendees)) attendees = [];
+      const hit = attendees.find((item) => String(item?.memberId ?? item?.id ?? "") === memberId);
+      if (!hit) continue;
+      const isPresent = hit.present === true;
+      if (isPresent) present += 1;
+      else absent += 1;
+      records.push({
+        reportId: row.id,
+        cellId: row.cellId,
+        reportDate: row.reportDate || row.date || null,
+        meetingType: row.meetingType || null,
+        present: isPresent
+      });
+    }
+
+    res.json({
+      memberId,
+      present,
+      absent,
+      total: present + absent,
+      records
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load attendance" });
   }
 });
 
