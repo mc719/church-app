@@ -45,69 +45,68 @@ function Profile() {
 
   return (
     <div className="profile-page">
-      <div className="profile-header">
-        <div>
-          <h2>Profile</h2>
-          <p>Overview of your information and assignments.</p>
-        </div>
-        <button className="btn" type="button" onClick={() => setEditing((prev) => !prev)}>
-          {editing ? 'Cancel' : 'Edit'}
-        </button>
-      </div>
-
-      <form className={`profile-form ${editing ? 'edit-mode' : 'view-mode'}`} onSubmit={handleSave}>
-        <div className="profile-layout">
-          <div className="profile-card profile-summary">
-            <div className="profile-photo-wrap">
-              {profile.photo ? (
-                <img src={profile.photo} alt="Profile" className="profile-photo-lg" />
-              ) : (
-                <div className="profile-photo-lg profile-photo-placeholder">
-                  <i className="fas fa-user"></i>
-                </div>
-              )}
-            </div>
-            <div className="profile-summary-name">
-              <h3>{profile.full_name || 'Member'}</h3>
-              <span>{profile.title || 'Member'}</span>
-            </div>
-            <div className="profile-meta">
-              <div>
-                <span>Email</span>
-                <strong>{profile.email || '-'}</strong>
-              </div>
-              <div>
-                <span>Mobile</span>
-                <strong>{profile.mobile || '-'}</strong>
-              </div>
-            </div>
-            <div className="profile-meta">
-              <div>
-                <span>Role</span>
-                <strong>{profile.role || 'Member'}</strong>
-              </div>
-              <div>
-                <span>Cell</span>
-                <strong>{profile.cell_name || '-'}</strong>
-              </div>
-            </div>
-            {editing && (
-              <div className="form-group">
-                <label>Profile Photo URL</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Photo URL"
-                  value={profile.photo || ''}
-                  onChange={(e) => setProfile({ ...profile, photo: e.target.value })}
-                />
+      <div className="profile-hero">
+        <div className="profile-hero-bg"></div>
+        <div className="profile-hero-content">
+          <div className="profile-avatar">
+            {profile.photo ? (
+              <img src={profile.photo} alt="Profile" className="profile-photo-xl" />
+            ) : (
+              <div className="profile-photo-xl profile-photo-placeholder">
+                <i className="fas fa-user"></i>
               </div>
             )}
           </div>
+          <div className="profile-hero-text">
+            <h2>{profile.full_name || 'Member'}</h2>
+            <p>{profile.title || 'Member'} · {profile.role || 'Member'}</p>
+            <div className="profile-badges">
+              <span className="badge badge-primary">{profile.role || 'Member'}</span>
+              <span className="badge badge-success">{profile.cell_name || 'No Cell'}</span>
+              <span className="badge badge-purple">{profile.department_name || 'No Department'}</span>
+            </div>
+          </div>
+          <div className="profile-hero-actions">
+            <button className="btn" type="button" onClick={() => setEditing((prev) => !prev)}>
+              {editing ? 'Cancel' : 'Edit'}
+            </button>
+          </div>
+        </div>
+      </div>
 
-          <div className="profile-details">
-            <div className="profile-card profile-section">
+      <form className={`profile-form ${editing ? 'edit-mode' : 'view-mode'}`} onSubmit={handleSave}>
+        <div className="profile-stats">
+          <div className="stat-card">
+            <span>Cell</span>
+            <strong>{profile.cell_name || '-'}</strong>
+          </div>
+          <div className="stat-card">
+            <span>Department</span>
+            <strong>{profile.department_name || '-'}</strong>
+          </div>
+          <div className="stat-card">
+            <span>Email</span>
+            <strong>{profile.email || '-'}</strong>
+          </div>
+        </div>
+
+        <div className="profile-grid">
+          <div className="profile-card profile-section card-personal">
+            <div className="card-header">
               <h3>Personal Information</h3>
+              {editing && (
+                <div className="form-group inline-field">
+                  <label>Photo URL</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Photo URL"
+                    value={profile.photo || ''}
+                    onChange={(e) => setProfile({ ...profile, photo: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
               <div className="form-group">
                 <label>Title</label>
                 <input
@@ -191,7 +190,7 @@ function Profile() {
               </div>
             </div>
 
-            <div className="profile-card profile-section">
+            <div className="profile-card profile-section card-cell">
               <h3>Cell</h3>
               <div className="form-group">
                 <label>Role</label>
@@ -245,7 +244,7 @@ function Profile() {
               </div>
             </div>
 
-            <div className="profile-card profile-section">
+            <div className="profile-card profile-section card-department">
               <h3>Department</h3>
               <div className="form-group">
                 <label>Department Name</label>
@@ -278,7 +277,6 @@ function Profile() {
                 />
               </div>
             </div>
-          </div>
         </div>
         {editing && (
           <div className="profile-actions-bar">
