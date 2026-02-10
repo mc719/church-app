@@ -288,12 +288,12 @@ function Dashboard({ onAddCell }) {
   useEffect(() => {
     if (!members.length || typeof Chart === 'undefined') return
 
-    const genderCounts = members.reduce((acc, member) => {
-      const raw = String(member.gender || '').trim().toLowerCase()
-      if (raw.includes('female')) acc.female += 1
-      else if (raw.includes('male')) acc.male += 1
+    const cellMembershipCounts = members.reduce((acc, member) => {
+      const hasCell = Boolean(member.cellId || member.cell_id)
+      if (hasCell) acc.inCell += 1
+      else acc.unassigned += 1
       return acc
-    }, { male: 0, female: 0 })
+    }, { inCell: 0, unassigned: 0 })
 
     const roleCounts = members.reduce((acc, member) => {
       const key = (member.role || 'Unassigned').trim() || 'Unassigned'
@@ -301,8 +301,8 @@ function Dashboard({ onAddCell }) {
       return acc
     }, {})
 
-    const genderLabels = ['Male', 'Female']
-    const genderValues = [genderCounts.male, genderCounts.female]
+    const genderLabels = ['Members in Cells', 'Unassigned Members']
+    const genderValues = [cellMembershipCounts.inCell, cellMembershipCounts.unassigned]
     const roleLabels = Object.keys(roleCounts)
     const roleValues = roleLabels.map(label => roleCounts[label])
     const rolePalette = [
@@ -322,7 +322,7 @@ function Dashboard({ onAddCell }) {
           labels: genderLabels,
           datasets: [{
             data: genderValues,
-            backgroundColor: ['#2563eb', '#f97316'],
+            backgroundColor: ['#22c55e', '#f97316'],
             radius: '70%'
           }]
         },
@@ -410,7 +410,7 @@ function Dashboard({ onAddCell }) {
       <div className="dashboard-charts">
         <div className="chart-card">
           <div className="section-header" style={{ marginTop: 0 }}>
-            <h2>Gender Distribution</h2>
+            <h2>Members in Cells</h2>
           </div>
           <canvas ref={genderChartRef} height="200"></canvas>
         </div>
