@@ -354,7 +354,7 @@ function AppLayout() {
 
           <div className="nav-divider" id="cellGroupsDivider"></div>
 
-          <div className="accordion-section" id="cellGroupsSection">
+          <div className={`accordion-section${cellGroupsOpen ? ' open' : ''}`} id="cellGroupsSection">
             <button
               className="nav-section-title accordion-toggle"
               id="cellGroupsTitle"
@@ -379,7 +379,7 @@ function AppLayout() {
 
           <div className="nav-divider" id="adminDivider"></div>
 
-          <div className="accordion-section" id="departmentsSection">
+          <div className={`accordion-section${departmentsOpen ? ' open' : ''}`} id="departmentsSection">
             <button
               className="nav-section-title accordion-toggle"
               id="departmentsTitle"
@@ -404,7 +404,7 @@ function AppLayout() {
 
           <div className="nav-divider" id="departmentsDivider"></div>
 
-          <div className="accordion-section" id="adminSection">
+          <div className={`accordion-section${adminOpen ? ' open' : ''}`} id="adminSection">
             <button
               className="nav-section-title accordion-toggle"
               id="adminTitle"
