@@ -83,11 +83,6 @@ function Departments() {
     setActiveDepartmentId(String(departments[0].id))
   }, [departments, activeDepartmentId])
 
-  const totalPages = Math.max(1, Math.ceil(departmentMembers.length / PAGE_SIZE))
-  const currentPage = Math.min(page, totalPages)
-  const startIndex = (currentPage - 1) * PAGE_SIZE
-  const pageMembers = departmentMembers.slice(startIndex, startIndex + PAGE_SIZE)
-
   const resetForm = () => {
     setForm({ name: '', hodName: '', hodMobile: '' })
     setError('')
@@ -177,6 +172,19 @@ function Departments() {
     [members, activeDepartmentId]
   )
 
+  const totalPages = Math.max(1, Math.ceil(departmentMembers.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const startIndex = (currentPage - 1) * PAGE_SIZE
+  const pageMembers = departmentMembers.slice(startIndex, startIndex + PAGE_SIZE)
+
+  const getDepartmentRole = (member) => {
+    if (!activeDepartment) return 'Member'
+    const hodName = String(activeDepartment.hodName || '').trim().toLowerCase()
+    const memberName = String(member.name || '').trim().toLowerCase()
+    if (hodName && memberName && hodName === memberName) return 'HOD'
+    return member.departmentRole || 'Member'
+  }
+
   useEffect(() => {
     if (!activeDepartment) return
     try {
@@ -258,6 +266,7 @@ function Departments() {
                   <tr>
                     <th>Title</th>
                     <th>Name</th>
+                    <th>Role</th>
                     <th>Gender</th>
                     <th>Mobile</th>
                     <th>Email</th>
@@ -267,7 +276,7 @@ function Departments() {
                 <tbody>
                   {pageMembers.length === 0 && (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-color)' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-color)' }}>
                         No members assigned to this department.
                       </td>
                     </tr>
@@ -276,6 +285,7 @@ function Departments() {
                     <tr key={member.id}>
                       <td data-label="Title">{member.title || '-'}</td>
                       <td data-label="Name">{member.name || '-'}</td>
+                      <td data-label="Role">{getDepartmentRole(member)}</td>
                       <td data-label="Gender">{member.gender || '-'}</td>
                       <td data-label="Mobile">{member.mobile ? <a href={`tel:${member.mobile}`}>{member.mobile}</a> : '-'}</td>
                       <td data-label="Email">{member.email ? <a href={`mailto:${member.email}`}>{member.email}</a> : '-'}</td>
