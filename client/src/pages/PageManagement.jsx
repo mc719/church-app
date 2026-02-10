@@ -19,31 +19,102 @@ function PageManagement() {
   const [pageVisibility, setPageVisibility] = useState({})
   const [editingPage, setEditingPage] = useState(null)
   const [sectionVisibility, setSectionVisibility] = useState({})
+  const [deletedPages, setDeletedPages] = useState([])
+  const [dynamicPages, setDynamicPages] = useState([])
 
   useEffect(() => {
-    try {
-      setPageMeta(JSON.parse(localStorage.getItem('pageMeta') || '{}'))
-    } catch {
-      setPageMeta({})
+    const loadFromStorage = () => {
+      try {
+        setPageMeta(JSON.parse(localStorage.getItem('pageMeta') || '{}'))
+      } catch {
+        setPageMeta({})
+      }
+      try {
+        setPageVisibility(JSON.parse(localStorage.getItem('pageVisibility') || '{}'))
+      } catch {
+        setPageVisibility({})
+      }
+      try {
+        setSectionVisibility(JSON.parse(localStorage.getItem('sectionVisibility') || '{}'))
+      } catch {
+        setSectionVisibility({})
+      }
+      try {
+        const deleted = JSON.parse(localStorage.getItem('deletedPages') || '[]')
+        setDeletedPages(Array.isArray(deleted) ? deleted : [])
+      } catch {
+        setDeletedPages([])
+      }
     }
-    try {
-      setPageVisibility(JSON.parse(localStorage.getItem('pageVisibility') || '{}'))
-    } catch {
-      setPageVisibility({})
+
+    const fetchDynamicPages = async () => {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      try {
+        const headers = { Authorization: `Bearer ${token}` }
+        const [cells, departments] = await Promise.all([
+          fetch('/api/cells', { headers }).then((r) => (r.ok ? r.json() : [])),
+          fetch('/api/departments', { headers }).then((r) => (r.ok ? r.json() : []))
+        ])
+        const cellPages = (Array.isArray(cells) ? cells : []).map((cell) => ({
+          id: `/cells?cellId=${cell.id}`,
+          label: cell.name || `Cell ${cell.id}`,
+          icon: 'fas fa-users',
+          section: 'Cell Groups'
+        }))
+        const departmentPages = (Array.isArray(departments) ? departments : []).map((dept) => ({
+          id: `/departments?departmentId=${dept.id}`,
+          label: dept.name || `Department ${dept.id}`,
+          icon: 'fas fa-sitemap',
+          section: 'Departments'
+        }))
+        setDynamicPages([...cellPages, ...departmentPages])
+      } catch {
+        setDynamicPages([])
+      }
     }
-    try {
-      setSectionVisibility(JSON.parse(localStorage.getItem('sectionVisibility') || '{}'))
-    } catch {
-      setSectionVisibility({})
+
+    loadFromStorage()
+    fetchDynamicPages()
+
+    const handleRefresh = () => {
+      loadFromStorage()
+      fetchDynamicPages()
+    }
+
+    window.addEventListener('page-meta-updated', handleRefresh)
+    window.addEventListener('page-visibility-updated', handleRefresh)
+    window.addEventListener('page-deleted-updated', handleRefresh)
+    window.addEventListener('section-visibility-updated', handleRefresh)
+    window.addEventListener('cells-updated', handleRefresh)
+    window.addEventListener('departments-updated', handleRefresh)
+    return () => {
+      window.removeEventListener('page-meta-updated', handleRefresh)
+      window.removeEventListener('page-visibility-updated', handleRefresh)
+      window.removeEventListener('page-deleted-updated', handleRefresh)
+      window.removeEventListener('section-visibility-updated', handleRefresh)
+      window.removeEventListener('cells-updated', handleRefresh)
+      window.removeEventListener('departments-updated', handleRefresh)
     }
   }, [])
 
-  const pages = useMemo(() => DEFAULT_PAGES.map((page) => ({
-    ...page,
-    label: pageMeta[page.id]?.label || page.label,
-    icon: pageMeta[page.id]?.icon || page.icon,
-    visible: pageVisibility[page.id] !== false
-  })), [pageMeta, pageVisibility])
+  const pages = useMemo(() => {
+    const merged = [
+      ...DEFAULT_PAGES.map((page) => ({
+        ...page,
+        label: pageMeta[page.id]?.label || page.label,
+        icon: pageMeta[page.id]?.icon || page.icon,
+        visible: pageVisibility[page.id] !== false
+      })),
+      ...dynamicPages.map((page) => ({
+        ...page,
+        label: pageMeta[page.id]?.label || page.label,
+        icon: pageMeta[page.id]?.icon || page.icon,
+        visible: pageVisibility[page.id] !== false
+      }))
+    ]
+    return merged.filter((page) => !deletedPages.includes(page.id))
+  }, [pageMeta, pageVisibility, dynamicPages, deletedPages])
 
   const saveVisibility = (updated) => {
     localStorage.setItem('pageVisibility', JSON.stringify(updated))
@@ -63,8 +134,27 @@ function PageManagement() {
     window.dispatchEvent(new Event('section-visibility-updated'))
   }
 
+  const saveDeletedPages = (updated) => {
+    localStorage.setItem('deletedPages', JSON.stringify(updated))
+    setDeletedPages(updated)
+    window.dispatchEvent(new Event('page-deleted-updated'))
+  }
+
   const toggleVisibility = (pageId, value) => {
     saveVisibility({ ...pageVisibility, [pageId]: value })
+  }
+
+  const handleDeletePage = (pageId) => {
+    const confirmed = window.confirm('Delete this page from the menu?')
+    if (!confirmed) return
+    const nextDeleted = Array.from(new Set([...(deletedPages || []), pageId]))
+    saveDeletedPages(nextDeleted)
+    const nextMeta = { ...(pageMeta || {}) }
+    delete nextMeta[pageId]
+    saveMeta(nextMeta)
+    const nextVisibility = { ...(pageVisibility || {}) }
+    delete nextVisibility[pageId]
+    saveVisibility(nextVisibility)
   }
 
   const handleShowAll = () => {
@@ -112,7 +202,7 @@ function PageManagement() {
       </div>
 
       <div className="page-actions" style={{ justifyContent: 'flex-start', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
-        {['Main', 'Cell Groups', 'Administrator'].map((section) => (
+        {['Main', 'Cell Groups', 'Departments', 'Administrator'].map((section) => (
           <label key={section} className="section-toggle">
             <input
               type="checkbox"
@@ -159,8 +249,8 @@ function PageManagement() {
                     <button className="action-btn edit-btn" type="button" onClick={() => setEditingPage(page)}>
                       <i className="fas fa-edit"></i> Edit
                     </button>
-                    <button className="action-btn delete-btn" type="button" onClick={() => toggleVisibility(page.id, false)}>
-                      <i className="fas fa-trash"></i> Hide
+                    <button className="action-btn delete-btn" type="button" onClick={() => handleDeletePage(page.id)}>
+                      <i className="fas fa-trash"></i> Delete
                     </button>
                   </div>
                 </td>

@@ -21,6 +21,7 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pageMeta, setPageMeta] = useState({})
   const [pageVisibility, setPageVisibility] = useState({})
+  const [deletedPages, setDeletedPages] = useState([])
   const [cellLinks, setCellLinks] = useState([])
   const [departmentLinks, setDepartmentLinks] = useState([])
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
@@ -78,7 +79,7 @@ function AppLayout() {
 
     window.addEventListener('logo-updated', handleLogoUpdate)
     return () => window.removeEventListener('logo-updated', handleLogoUpdate)
-  }, [])
+  }, [deletedPages])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -104,7 +105,7 @@ function AppLayout() {
       mounted = false
       clearInterval(timer)
     }
-  }, [])
+  }, [deletedPages])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -121,12 +122,14 @@ function AppLayout() {
         const list = Array.isArray(data) ? data : []
         if (mounted) {
           setCellLinks(
-            list.map((cell) => ({
-              id: `/cells?cellId=${cell.id}`,
-              label: cell.name || `Cell ${cell.id}`,
-              icon: 'fas fa-users',
-              section: 'cells'
-            }))
+            list
+              .map((cell) => ({
+                id: `/cells?cellId=${cell.id}`,
+                label: cell.name || `Cell ${cell.id}`,
+                icon: 'fas fa-users',
+                section: 'cells'
+              }))
+              .filter((page) => !deletedPages.includes(page.id))
           )
         }
       } catch {
@@ -158,12 +161,14 @@ function AppLayout() {
         const list = Array.isArray(data) ? data : []
         if (mounted) {
           setDepartmentLinks(
-            list.map((dept) => ({
-              id: `/departments?departmentId=${dept.id}`,
-              label: dept.name || `Department ${dept.id}`,
-              icon: 'fas fa-sitemap',
-              section: 'departments'
-            }))
+            list
+              .map((dept) => ({
+                id: `/departments?departmentId=${dept.id}`,
+                label: dept.name || `Department ${dept.id}`,
+                icon: 'fas fa-sitemap',
+                section: 'departments'
+              }))
+              .filter((page) => !deletedPages.includes(page.id))
           )
         }
       } catch {
@@ -217,14 +222,22 @@ function AppLayout() {
       } catch {
         setPageVisibility({})
       }
+      try {
+        const deleted = JSON.parse(localStorage.getItem('deletedPages') || '[]')
+        setDeletedPages(Array.isArray(deleted) ? deleted : [])
+      } catch {
+        setDeletedPages([])
+      }
     }
 
     loadMeta()
     window.addEventListener('page-meta-updated', loadMeta)
     window.addEventListener('page-visibility-updated', loadMeta)
+    window.addEventListener('page-deleted-updated', loadMeta)
     return () => {
       window.removeEventListener('page-meta-updated', loadMeta)
       window.removeEventListener('page-visibility-updated', loadMeta)
+      window.removeEventListener('page-deleted-updated', loadMeta)
     }
   }, [])
 
@@ -252,7 +265,7 @@ function AppLayout() {
     }
   }
 
-  const isVisible = (path) => pageVisibility[path] !== false
+  const isVisible = (path) => pageVisibility[path] !== false && !deletedPages.includes(path)
 
   const sectionVisible = (section) => sectionVisibility[section] !== false
   const mainPages = defaultPages.filter((p) => p.section === 'main' && isVisible(p.id) && sectionVisible('Main'))
