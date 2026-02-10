@@ -9,6 +9,7 @@ function Departments() {
   const location = useLocation()
   const navigate = useNavigate()
   const [departments, setDepartments] = useState([])
+  const [members, setMembers] = useState([])
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showAdd, setShowAdd] = useState(false)
@@ -16,6 +17,10 @@ function Departments() {
   const [deletingDepartment, setDeletingDepartment] = useState(null)
   const [form, setForm] = useState({ name: '', hodName: '', hodMobile: '' })
   const [error, setError] = useState('')
+  const [activeDepartmentId, setActiveDepartmentId] = useState('')
+  const [activeTab, setActiveTab] = useState('members')
+  const [showAssignMember, setShowAssignMember] = useState(false)
+  const [assignMemberId, setAssignMemberId] = useState('')
 
   const loadDepartments = async () => {
     const token = localStorage.getItem('token')
@@ -34,6 +39,14 @@ function Departments() {
 
   useEffect(() => {
     loadDepartments()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API_BASE}/members`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setMembers(Array.isArray(data) ? data : []))
+      .catch(() => setMembers([]))
   }, [])
 
   const departmentIdFromUrl = useMemo(() => {
@@ -56,7 +69,7 @@ function Departments() {
     if (!departmentIdFromUrl) return
     const target = departments.find((dept) => String(dept.id) === departmentIdFromUrl)
     if (target) {
-      setEditingDepartment({ ...target })
+      setActiveDepartmentId(String(target.id))
     }
   }, [departmentIdFromUrl, departments])
 
@@ -65,6 +78,12 @@ function Departments() {
     resetForm()
     setShowAdd(true)
   }, [addFromUrl])
+
+  useEffect(() => {
+    if (!departments.length) return
+    if (activeDepartmentId && departments.some((dept) => String(dept.id) === String(activeDepartmentId))) return
+    setActiveDepartmentId(String(departments[0].id))
+  }, [departments, activeDepartmentId])
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -157,6 +176,52 @@ function Departments() {
     setDeletingDepartment(null)
   }
 
+  const handleAssignMember = async (event) => {
+    event.preventDefault()
+    if (!assignMemberId || !activeDepartmentId) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/members/${assignMemberId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ departmentId: activeDepartmentId })
+    })
+    if (!res.ok) return
+    const updated = await res.json()
+    setMembers((prev) => prev.map((item) => (String(item.id) === String(updated.id) ? updated : item)))
+    setAssignMemberId('')
+    setShowAssignMember(false)
+  }
+
+  const activeDepartment = useMemo(
+    () => departments.find((dept) => String(dept.id) === String(activeDepartmentId)),
+    [departments, activeDepartmentId]
+  )
+
+  const departmentMembers = useMemo(
+    () => members.filter((member) => String(member.departmentId || member.department_id || '') === String(activeDepartmentId)),
+    [members, activeDepartmentId]
+  )
+
+  useEffect(() => {
+    if (!activeDepartment) return
+    try {
+      const meta = JSON.parse(localStorage.getItem('pageMeta') || '{}')
+      const updated = {
+        ...meta,
+        '/departments': {
+          ...(meta['/departments'] || {}),
+          label: activeDepartment.name || 'Department'
+        }
+      }
+      localStorage.setItem('pageMeta', JSON.stringify(updated))
+      window.dispatchEvent(new Event('page-meta-updated'))
+    } catch {}
+  }, [activeDepartment])
+
   return (
     <div className="departments-page">
       <div className="page-actions departments-actions">
@@ -197,7 +262,11 @@ function Departments() {
               </tr>
             )}
             {pageDepartments.map((dept) => (
-              <tr key={dept.id}>
+              <tr
+                key={dept.id}
+                style={{ cursor: 'pointer' }}
+                onClick={() => setActiveDepartmentId(String(dept.id))}
+              >
                 <td data-label="Name">{dept.name || '-'}</td>
                 <td data-label="HOD">{dept.hodName || '-'}</td>
                 <td data-label="HOD Mobile">
@@ -208,14 +277,20 @@ function Departments() {
                     <button
                       className="action-btn edit-btn"
                       type="button"
-                      onClick={() => setEditingDepartment({ ...dept })}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setEditingDepartment({ ...dept })
+                      }}
                     >
                       <i className="fas fa-edit"></i> Edit
                     </button>
                     <button
                       className="action-btn delete-btn"
                       type="button"
-                      onClick={() => setDeletingDepartment(dept)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setDeletingDepartment(dept)
+                      }}
                     >
                       <i className="fas fa-trash"></i> Delete
                     </button>
@@ -246,6 +321,117 @@ function Departments() {
           Next
         </button>
       </div>
+
+      {!activeDepartment && (
+        <div className="dashboard-note" style={{ marginTop: '16px' }}>
+          Select a department to view details.
+        </div>
+      )}
+
+      {activeDepartment && (
+        <div className="department-details">
+          <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end', marginBottom: '16px' }}>
+            <button className="btn" type="button" onClick={() => setEditingDepartment({ ...activeDepartment })}>
+              <i className="fas fa-edit"></i> Edit Department
+            </button>
+            <button className="btn btn-danger" type="button" onClick={() => setDeletingDepartment(activeDepartment)}>
+              <i className="fas fa-trash"></i> Delete Department
+            </button>
+          </div>
+
+          <div className="cell-summary-card">
+            <div className="cell-summary-grid">
+              <div>
+                <div className="cell-summary-label">Department Name</div>
+                <div className="cell-summary-value">{activeDepartment.name || '-'}</div>
+              </div>
+              <div>
+                <div className="cell-summary-label">HOD</div>
+                <div className="cell-summary-value">{activeDepartment.hodName || '-'}</div>
+              </div>
+              <div>
+                <div className="cell-summary-label">HOD Mobile</div>
+                <div className="cell-summary-value">{activeDepartment.hodMobile || '-'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="cell-tabs" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="cell-tabs-group">
+              <button
+                className={`cell-tab-btn${activeTab === 'members' ? ' active' : ''}`}
+                type="button"
+                onClick={() => setActiveTab('members')}
+              >
+                Members List
+              </button>
+              <button
+                className={`cell-tab-btn${activeTab === 'details' ? ' active' : ''}`}
+                type="button"
+                onClick={() => setActiveTab('details')}
+              >
+                Details
+              </button>
+            </div>
+            {activeTab === 'members' && (
+              <div className="cell-tabs-actions">
+                <button className="btn btn-success" type="button" onClick={() => setShowAssignMember(true)}>
+                  <i className="fas fa-user-plus"></i> Add Member
+                </button>
+              </div>
+            )}
+          </div>
+
+          {activeTab === 'members' && (
+            <div className="table-container" style={{ marginTop: '16px' }}>
+              <table className="mobile-grid-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Name</th>
+                    <th>Gender</th>
+                    <th>Mobile</th>
+                    <th>Email</th>
+                    <th>Cell</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {departmentMembers.length === 0 && (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-color)' }}>
+                        No members assigned to this department.
+                      </td>
+                    </tr>
+                  )}
+                  {departmentMembers.map((member) => (
+                    <tr key={member.id}>
+                      <td data-label="Title">{member.title || '-'}</td>
+                      <td data-label="Name">{member.name || '-'}</td>
+                      <td data-label="Gender">{member.gender || '-'}</td>
+                      <td data-label="Mobile">{member.mobile ? <a href={`tel:${member.mobile}`}>{member.mobile}</a> : '-'}</td>
+                      <td data-label="Email">{member.email ? <a href={`mailto:${member.email}`}>{member.email}</a> : '-'}</td>
+                      <td data-label="Cell">{member.cellName || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {activeTab === 'details' && (
+            <div className="table-container" style={{ marginTop: '16px' }}>
+              <table className="mobile-grid-table">
+                <tbody>
+                  <tr><td data-label="Department">{activeDepartment.name || '-'}</td></tr>
+                  <tr><td data-label="HOD">{activeDepartment.hodName || '-'}</td></tr>
+                  <tr><td data-label="HOD Mobile">{activeDepartment.hodMobile || '-'}</td></tr>
+                  <tr><td data-label="Total Members">{departmentMembers.length}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {showAdd && (
         <div className="modal-overlay active" onClick={() => { setShowAdd(false); clearDeepLink() }}>
@@ -363,6 +549,46 @@ function Departments() {
                   Delete
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAssignMember && (
+        <div className="modal-overlay active" onClick={() => setShowAssignMember(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Member to Department</h3>
+              <button className="close-modal" type="button" onClick={() => setShowAssignMember(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleAssignMember}>
+                <div className="form-group">
+                  <label>Select Member</label>
+                  <select
+                    className="form-control"
+                    value={assignMemberId}
+                    onChange={(e) => setAssignMemberId(e.target.value)}
+                  >
+                    <option value="">Select Member</option>
+                    {members.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.title ? `${member.title} ` : ''}{member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="button" onClick={() => setShowAssignMember(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
