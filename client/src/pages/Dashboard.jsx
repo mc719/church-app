@@ -22,6 +22,9 @@ function Dashboard({ onAddCell }) {
   const [deletingCell, setDeletingCell] = useState(null)
   const [showAddBirthday, setShowAddBirthday] = useState(false)
   const [birthdayForm, setBirthdayForm] = useState({ memberId: '', day: '', month: '' })
+  const [showAddDepartment, setShowAddDepartment] = useState(false)
+  const [departmentForm, setDepartmentForm] = useState({ name: '', hodName: '', hodMobile: '' })
+  const [departmentError, setDepartmentError] = useState('')
   const genderChartRef = useRef(null)
   const rolesChartRef = useRef(null)
   const genderChartInstance = useRef(null)
@@ -199,6 +202,32 @@ function Dashboard({ onAddCell }) {
     setBirthdaySummary(summary)
     setBirthdayForm({ memberId: '', day: '', month: '' })
     setShowAddBirthday(false)
+  }
+
+  const handleAddDepartment = async (event) => {
+    event.preventDefault()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    setDepartmentError('')
+    const res = await fetch(`${API_BASE}/departments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        name: departmentForm.name,
+        hodName: departmentForm.hodName,
+        hodMobile: departmentForm.hodMobile
+      })
+    })
+    if (!res.ok) {
+      setDepartmentError('Failed to add department')
+      return
+    }
+    window.dispatchEvent(new Event('departments-updated'))
+    setDepartmentForm({ name: '', hodName: '', hodMobile: '' })
+    setShowAddDepartment(false)
   }
 
   const handleCellDelete = async () => {
@@ -454,7 +483,11 @@ function Dashboard({ onAddCell }) {
           <button
             className="btn btn-success"
             type="button"
-            onClick={() => navigate('/departments?add=1')}
+            onClick={() => {
+              setDepartmentForm({ name: '', hodName: '', hodMobile: '' })
+              setDepartmentError('')
+              setShowAddDepartment(true)
+            }}
           >
             <i className="fas fa-plus"></i> Add Department
           </button>
@@ -467,6 +500,58 @@ function Dashboard({ onAddCell }) {
           </button>
         </div>
       </div>
+
+      {showAddDepartment && (
+        <div className="modal-overlay active" onClick={() => setShowAddDepartment(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Department</h3>
+              <button className="close-modal" type="button" onClick={() => setShowAddDepartment(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              {departmentError && (
+                <div className="inline-error" style={{ marginBottom: '12px' }}>{departmentError}</div>
+              )}
+              <form onSubmit={handleAddDepartment}>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    className="form-control"
+                    value={departmentForm.name}
+                    onChange={(e) => setDepartmentForm((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>HOD Name</label>
+                  <input
+                    className="form-control"
+                    value={departmentForm.hodName}
+                    onChange={(e) => setDepartmentForm((prev) => ({ ...prev, hodName: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>HOD Mobile</label>
+                  <input
+                    className="form-control"
+                    value={departmentForm.hodMobile}
+                    onChange={(e) => setDepartmentForm((prev) => ({ ...prev, hodMobile: e.target.value }))}
+                  />
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="button" onClick={() => setShowAddDepartment(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="table-container">
         <table id="cellsTable" className="full-table-mobile">
