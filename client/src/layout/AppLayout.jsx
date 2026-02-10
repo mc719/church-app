@@ -15,9 +15,9 @@ function AppLayout() {
     { id: '/settings', label: 'Settings', icon: 'fas fa-cog', section: 'admin' }
   ]), [])
 
-  const [cellGroupsOpen, setCellGroupsOpen] = useState(true)
-  const [departmentsOpen, setDepartmentsOpen] = useState(true)
-  const [adminOpen, setAdminOpen] = useState(true)
+  const [cellGroupsOpen, setCellGroupsOpen] = useState(() => window.innerWidth > 768)
+  const [departmentsOpen, setDepartmentsOpen] = useState(() => window.innerWidth > 768)
+  const [adminOpen, setAdminOpen] = useState(() => window.innerWidth > 768)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pageMeta, setPageMeta] = useState({})
   const [pageVisibility, setPageVisibility] = useState({})
@@ -190,6 +190,18 @@ function AppLayout() {
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [notificationsOpen])
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 768) {
+        setCellGroupsOpen(false)
+        setDepartmentsOpen(false)
+        setAdminOpen(false)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     const loadMeta = () => {
