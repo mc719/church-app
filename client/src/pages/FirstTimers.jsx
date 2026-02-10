@@ -20,6 +20,7 @@ function FirstTimers() {
     gender: '',
     mobile: '',
     email: '',
+    photoData: '',
     status: ''
   })
   const [followUpForm, setFollowUpForm] = useState({
@@ -215,28 +216,30 @@ function FirstTimers() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({
-        title: addForm.title,
-        name: addForm.name,
-        surname: addForm.surname,
-        gender: addForm.gender,
-        mobile: addForm.mobile,
-        email: addForm.email,
-        status: addForm.status
+        body: JSON.stringify({
+          title: addForm.title,
+          name: addForm.name,
+          surname: addForm.surname,
+          gender: addForm.gender,
+          mobile: addForm.mobile,
+          email: addForm.email,
+          photoData: addForm.photoData,
+          status: addForm.status
+        })
       })
-    })
     if (!res.ok) return
     const created = await res.json()
     setFirstTimers((prev) => [created, ...prev])
-    setAddForm({
-      title: '',
-      name: '',
-      surname: '',
-      gender: '',
-      mobile: '',
-      email: '',
-      status: ''
-    })
+      setAddForm({
+        title: '',
+        name: '',
+        surname: '',
+        gender: '',
+        mobile: '',
+        email: '',
+        photoData: '',
+        status: ''
+      })
     setShowAddFirstTimer(false)
   }
 
@@ -271,10 +274,11 @@ function FirstTimers() {
           <div className="table-container">
             <table className="mobile-grid-table" id="firstTimersTable">
               <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Mobile</th>
-                  <th>Date Joined</th>
+              <tr>
+                <th>Photo</th>
+                <th>Name</th>
+                <th>Mobile</th>
+                <th>Date Joined</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -282,13 +286,22 @@ function FirstTimers() {
               <tbody>
                 {firstTimers.length === 0 && (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
                       No first-timers found.
                     </td>
                   </tr>
                 )}
                 {firstTimers.map((item) => (
                   <tr key={item.id}>
+                    <td data-label="Photo">
+                      <div className="first-timer-avatar">
+                        {item.photoData ? (
+                          <img src={item.photoData} alt={item.name || 'First-timer'} />
+                        ) : (
+                          <i className="fas fa-user"></i>
+                        )}
+                      </div>
+                    </td>
                     <td data-label="Name">
                       <input
                         className="form-control inline-input"
@@ -455,6 +468,14 @@ function FirstTimers() {
                     className="form-control"
                     value={addForm.email}
                     onChange={(e) => setAddForm((prev) => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Photo URL</label>
+                  <input
+                    className="form-control"
+                    value={addForm.photoData}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, photoData: e.target.value }))}
                   />
                 </div>
                 <div className="form-group">
