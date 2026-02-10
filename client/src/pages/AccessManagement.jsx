@@ -111,15 +111,16 @@ function AccessManagement() {
       <div className="table-container">
         <table className="mobile-grid-table">
           <thead>
-            <tr>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Password</th>
-              <th>Role</th>
-              <th>Allowed Menus</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
+              <tr>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Password</th>
+                <th>Role</th>
+                <th>Allowed Menus</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
           </thead>
           <tbody>
             {pageUsers.length === 0 && (
@@ -130,11 +131,12 @@ function AccessManagement() {
               </tr>
             )}
             {pageUsers.map((user) => (
-              <tr key={user.id}>
-                <td data-label="Username">{user.username}</td>
-                <td data-label="Email">
-                  {user.email ? <a href={`mailto:${user.email}`}>{user.email}</a> : '-'}
-                </td>
+                <tr key={user.id}>
+                  <td data-label="Name">{user.name || '-'}</td>
+                  <td data-label="Username">{user.username}</td>
+                  <td data-label="Email">
+                    {user.email ? <a href={`mailto:${user.email}`}>{user.email}</a> : '-'}
+                  </td>
                 <td data-label="Password">******</td>
                 <td data-label="Role">{user.role}</td>
                 <td data-label="Allowed Menus">

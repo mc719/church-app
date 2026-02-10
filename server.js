@@ -1168,16 +1168,19 @@ app.post("/api/cells", requireAuthOrAccessCode, async (req, res) => {
 // USERS (PROTECTED, ADMIN ONLY)
 app.get("/api/users", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id::text as id,
-              username,
-              email,
-              role,
-              status,
-              restricted_menus as "restrictedMenus"
-       FROM users
-       ORDER BY id`
-    );
+      const result = await pool.query(
+        `SELECT u.id::text as id,
+                u.username,
+                u.email,
+                u.role,
+                u.status,
+                u.restricted_menus as "restrictedMenus",
+                m.full_name as name
+         FROM users u
+         LEFT JOIN members m
+           ON lower(m.email) = lower(u.email)
+         ORDER BY u.id`
+      );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
