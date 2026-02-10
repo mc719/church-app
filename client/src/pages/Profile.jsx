@@ -7,6 +7,12 @@ function Profile() {
   const [profile, setProfile] = useState(null)
   const [editing, setEditing] = useState(false)
 
+  const photoSrc = profile?.photoData || profile?.photo || ''
+  const displayName = profile?.fullName || profile?.full_name || 'Member'
+  const displayRole = profile?.roleTitle || profile?.role || 'Member'
+  const displayCell = profile?.cellName || profile?.cell_name || ''
+  const displayDepartment = profile?.departmentName || profile?.department_name || ''
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) return
@@ -15,6 +21,14 @@ function Profile() {
       .then((data) => setProfile(data))
       .catch(() => setProfile(null))
   }, [])
+
+  const setDobPart = (field, value) => {
+    const next = { ...(profile || {}), [field]: value }
+    const month = String(next.dobMonth || '').padStart(2, '0')
+    const day = String(next.dobDay || '').padStart(2, '0')
+    next.dateOfBirth = month && day ? `${month}-${day}` : null
+    setProfile(next)
+  }
 
   const handleSave = async (event) => {
     event.preventDefault()
@@ -49,8 +63,8 @@ function Profile() {
         <div className="profile-hero-bg"></div>
         <div className="profile-hero-content">
           <div className="profile-avatar">
-            {profile.photo ? (
-              <img src={profile.photo} alt="Profile" className="profile-photo-xl" />
+            {photoSrc ? (
+              <img src={photoSrc} alt="Profile" className="profile-photo-xl" />
             ) : (
               <div className="profile-photo-xl profile-photo-placeholder">
                 <i className="fas fa-user"></i>
@@ -58,12 +72,12 @@ function Profile() {
             )}
           </div>
           <div className="profile-hero-text">
-            <h2>{profile.full_name || 'Member'}</h2>
-            <p>{profile.title || 'Member'} Â· {profile.role || 'Member'}</p>
+            <h2>{displayName}</h2>
+            <p>{profile.title || 'Member'} · {displayRole}</p>
             <div className="profile-badges">
-              <span className="badge badge-primary">{profile.role || 'Member'}</span>
-              <span className="badge badge-success">{profile.cell_name || 'No Cell'}</span>
-              <span className="badge badge-purple">{profile.department_name || 'No Department'}</span>
+              <span className="badge badge-primary">{displayRole}</span>
+              <span className="badge badge-success">{displayCell || 'No Cell'}</span>
+              <span className="badge badge-purple">{displayDepartment || 'No Department'}</span>
             </div>
           </div>
           <div className="profile-hero-actions">
@@ -78,11 +92,11 @@ function Profile() {
         <div className="profile-stats">
           <div className="stat-card">
             <span>Cell</span>
-            <strong>{profile.cell_name || '-'}</strong>
+            <strong>{displayCell || '-'}</strong>
           </div>
           <div className="stat-card">
             <span>Department</span>
-            <strong>{profile.department_name || '-'}</strong>
+            <strong>{displayDepartment || '-'}</strong>
           </div>
           <div className="stat-card">
             <span>Email</span>
@@ -101,8 +115,8 @@ function Profile() {
                     type="text"
                     className="form-control"
                     placeholder="Photo URL"
-                    value={profile.photo || ''}
-                    onChange={(e) => setProfile({ ...profile, photo: e.target.value })}
+                    value={profile.photoData || ''}
+                    onChange={(e) => setProfile({ ...profile, photoData: e.target.value })}
                   />
                 </div>
               )}
@@ -122,8 +136,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.full_name || ''}
-                  onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                  value={profile.fullName || ''}
+                  onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -132,8 +146,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.mobile || ''}
-                  onChange={(e) => setProfile({ ...profile, mobile: e.target.value })}
+                  value={profile.phone || ''}
+                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -154,16 +168,16 @@ function Profile() {
                     type="text"
                     className="form-control"
                     placeholder="Day"
-                    value={profile.dob_day || ''}
-                    onChange={(e) => setProfile({ ...profile, dob_day: e.target.value })}
+                    value={profile.dobDay || ''}
+                    onChange={(e) => setDobPart('dobDay', e.target.value)}
                     disabled={!editing}
                   />
                   <input
                     type="text"
                     className="form-control"
                     placeholder="Month"
-                    value={profile.dob_month || ''}
-                    onChange={(e) => setProfile({ ...profile, dob_month: e.target.value })}
+                    value={profile.dobMonth || ''}
+                    onChange={(e) => setDobPart('dobMonth', e.target.value)}
                     disabled={!editing}
                   />
                 </div>
@@ -197,8 +211,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.role || ''}
-                  onChange={(e) => setProfile({ ...profile, role: e.target.value })}
+                  value={profile.roleTitle || ''}
+                  onChange={(e) => setProfile({ ...profile, roleTitle: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -207,8 +221,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.cell_name || ''}
-                  onChange={(e) => setProfile({ ...profile, cell_name: e.target.value })}
+                  value={profile.cellName || ''}
+                  onChange={(e) => setProfile({ ...profile, cellName: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -217,8 +231,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.cell_venue || ''}
-                  onChange={(e) => setProfile({ ...profile, cell_venue: e.target.value })}
+                  value={profile.cellVenue || ''}
+                  onChange={(e) => setProfile({ ...profile, cellVenue: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -227,8 +241,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.cell_leader || ''}
-                  onChange={(e) => setProfile({ ...profile, cell_leader: e.target.value })}
+                  value={profile.cellLeader || ''}
+                  onChange={(e) => setProfile({ ...profile, cellLeader: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -237,8 +251,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.cell_leader_mobile || ''}
-                  onChange={(e) => setProfile({ ...profile, cell_leader_mobile: e.target.value })}
+                  value={profile.cellLeaderMobile || ''}
+                  onChange={(e) => setProfile({ ...profile, cellLeaderMobile: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -251,8 +265,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.department_name || ''}
-                  onChange={(e) => setProfile({ ...profile, department_name: e.target.value })}
+                  value={profile.departmentName || ''}
+                  onChange={(e) => setProfile({ ...profile, departmentName: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -261,8 +275,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.hod_name || ''}
-                  onChange={(e) => setProfile({ ...profile, hod_name: e.target.value })}
+                  value={profile.hodName || ''}
+                  onChange={(e) => setProfile({ ...profile, hodName: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -271,8 +285,8 @@ function Profile() {
                 <input
                   type="text"
                   className="form-control"
-                  value={profile.hod_mobile || ''}
-                  onChange={(e) => setProfile({ ...profile, hod_mobile: e.target.value })}
+                  value={profile.hodMobile || ''}
+                  onChange={(e) => setProfile({ ...profile, hodMobile: e.target.value })}
                   disabled={!editing}
                 />
               </div>
@@ -291,3 +305,4 @@ function Profile() {
 }
 
 export default Profile
+
