@@ -19,6 +19,18 @@ function Departments() {
   const [activeTab, setActiveTab] = useState('members')
   const [showAssignMember, setShowAssignMember] = useState(false)
   const [assignMemberId, setAssignMemberId] = useState('')
+  const [assignSearch, setAssignSearch] = useState('')
+  const [showAssignForm, setShowAssignForm] = useState(false)
+  const [assignForm, setAssignForm] = useState({
+    title: '',
+    name: '',
+    role: '',
+    gender: '',
+    mobile: '',
+    email: ''
+  })
+  const [editingMember, setEditingMember] = useState(null)
+  const [deletingMember, setDeletingMember] = useState(null)
 
   const loadDepartments = async () => {
     const token = localStorage.getItem('token')
@@ -144,22 +156,90 @@ function Departments() {
 
   const handleAssignMember = async (event) => {
     event.preventDefault()
-    if (!assignMemberId || !activeDepartmentId) return
     const token = localStorage.getItem('token')
     if (!token) return
-    const res = await fetch(`${API_BASE}/members/${assignMemberId}`, {
+    if (!activeDepartmentId) return
+    if (assignMemberId) {
+      const res = await fetch(`${API_BASE}/members/${assignMemberId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ departmentId: activeDepartmentId })
+      })
+      if (!res.ok) return
+      const updated = await res.json()
+      setMembers((prev) => prev.map((item) => (String(item.id) === String(updated.id) ? updated : item)))
+    } else if (showAssignForm && assignForm.name.trim()) {
+      const res = await fetch(`${API_BASE}/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          departmentId: activeDepartmentId,
+          title: assignForm.title,
+          name: assignForm.name,
+          gender: assignForm.gender,
+          mobile: assignForm.mobile,
+          email: assignForm.email,
+          role: assignForm.role
+        })
+      })
+      if (!res.ok) return
+      const created = await res.json()
+      setMembers((prev) => [created, ...prev])
+    } else {
+      return
+    }
+
+    setAssignMemberId('')
+    setAssignSearch('')
+    setShowAssignForm(false)
+    setAssignForm({ title: '', name: '', role: '', gender: '', mobile: '', email: '' })
+    setShowAssignMember(false)
+  }
+
+  const handleMemberSave = async (event) => {
+    event.preventDefault()
+    if (!editingMember) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/members/${editingMember.id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ departmentId: activeDepartmentId })
+      body: JSON.stringify({
+        title: editingMember.title,
+        name: editingMember.name,
+        gender: editingMember.gender,
+        mobile: editingMember.mobile,
+        email: editingMember.email,
+        role: editingMember.role,
+        departmentId: activeDepartmentId
+      })
     })
     if (!res.ok) return
     const updated = await res.json()
     setMembers((prev) => prev.map((item) => (String(item.id) === String(updated.id) ? updated : item)))
-    setAssignMemberId('')
-    setShowAssignMember(false)
+    setEditingMember(null)
+  }
+
+  const handleMemberDelete = async () => {
+    if (!deletingMember) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/members/${deletingMember.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    setMembers((prev) => prev.filter((item) => String(item.id) !== String(deletingMember.id)))
+    setDeletingMember(null)
   }
 
   const activeDepartment = useMemo(
@@ -171,6 +251,15 @@ function Departments() {
     () => members.filter((member) => String(member.departmentId || member.department_id || '') === String(activeDepartmentId)),
     [members, activeDepartmentId]
   )
+
+  const memberSearchMatches = useMemo(() => {
+    const term = assignSearch.trim().toLowerCase()
+    if (!term) return []
+    return members.filter((member) => {
+      const name = String(member.name || '').toLowerCase()
+      return name.includes(term)
+    })
+  }, [assignSearch, members])
 
   const totalPages = Math.max(1, Math.ceil(departmentMembers.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -270,13 +359,13 @@ function Departments() {
                     <th>Gender</th>
                     <th>Mobile</th>
                     <th>Email</th>
-                    <th>Cell</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pageMembers.length === 0 && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-color)' }}>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-color)' }}>
                         No members assigned to this department.
                       </td>
                     </tr>
@@ -289,7 +378,24 @@ function Departments() {
                       <td data-label="Gender">{member.gender || '-'}</td>
                       <td data-label="Mobile">{member.mobile ? <a href={`tel:${member.mobile}`}>{member.mobile}</a> : '-'}</td>
                       <td data-label="Email">{member.email ? <a href={`mailto:${member.email}`}>{member.email}</a> : '-'}</td>
-                      <td data-label="Cell">{member.cellName || '-'}</td>
+                      <td data-label="Actions">
+                        <div className="action-buttons">
+                          <button
+                            className="action-btn edit-btn"
+                            type="button"
+                            onClick={() => setEditingMember({ ...member })}
+                          >
+                            <i className="fas fa-edit"></i> Edit
+                          </button>
+                          <button
+                            className="action-btn delete-btn"
+                            type="button"
+                            onClick={() => setDeletingMember(member)}
+                          >
+                            <i className="fas fa-trash"></i> Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -430,20 +536,82 @@ function Departments() {
             <div className="modal-body">
               <form onSubmit={handleAssignMember}>
                 <div className="form-group">
-                  <label>Select Member</label>
-                  <select
+                  <label>Member Name</label>
+                  <input
                     className="form-control"
-                    value={assignMemberId}
-                    onChange={(e) => setAssignMemberId(e.target.value)}
-                  >
-                    <option value="">Select Member</option>
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.title ? `${member.title} ` : ''}{member.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Type member name..."
+                    value={assignSearch}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setAssignSearch(value)
+                      setAssignMemberId('')
+                      const match = members.find((member) => String(member.name || '').toLowerCase() === value.trim().toLowerCase())
+                      if (match) {
+                        setAssignMemberId(String(match.id))
+                        setShowAssignForm(false)
+                        setAssignForm((prev) => ({ ...prev, name: match.name || value }))
+                      } else {
+                        setShowAssignForm(true)
+                        setAssignForm((prev) => ({ ...prev, name: value }))
+                      }
+                    }}
+                  />
+                  {memberSearchMatches.length > 0 && (
+                    <div className="suggestions-list">
+                      {memberSearchMatches.slice(0, 6).map((member) => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          className="suggestion-item"
+                          onClick={() => {
+                            setAssignSearch(member.name || '')
+                            setAssignMemberId(String(member.id))
+                            setShowAssignForm(false)
+                            setAssignForm((prev) => ({ ...prev, name: member.name || '' }))
+                          }}
+                        >
+                          {member.title ? `${member.title} ` : ''}{member.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+                {showAssignForm && (
+                  <>
+                    <div className="form-group">
+                      <label>Role</label>
+                      <input
+                        className="form-control"
+                        value={assignForm.role}
+                        onChange={(e) => setAssignForm((prev) => ({ ...prev, role: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Gender</label>
+                      <input
+                        className="form-control"
+                        value={assignForm.gender}
+                        onChange={(e) => setAssignForm((prev) => ({ ...prev, gender: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Mobile</label>
+                      <input
+                        className="form-control"
+                        value={assignForm.mobile}
+                        onChange={(e) => setAssignForm((prev) => ({ ...prev, mobile: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Email</label>
+                      <input
+                        className="form-control"
+                        value={assignForm.email}
+                        onChange={(e) => setAssignForm((prev) => ({ ...prev, email: e.target.value }))}
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setShowAssignMember(false)}>
                     Cancel
@@ -453,6 +621,102 @@ function Departments() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingMember && (
+        <div className="modal-overlay active" onClick={() => setEditingMember(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Edit Member</h3>
+              <button className="close-modal" type="button" onClick={() => setEditingMember(null)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleMemberSave}>
+                <div className="form-group">
+                  <label>Title</label>
+                  <input
+                    className="form-control"
+                    value={editingMember.title || ''}
+                    onChange={(e) => setEditingMember({ ...editingMember, title: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    className="form-control"
+                    value={editingMember.name || ''}
+                    onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Gender</label>
+                  <input
+                    className="form-control"
+                    value={editingMember.gender || ''}
+                    onChange={(e) => setEditingMember({ ...editingMember, gender: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Mobile</label>
+                  <input
+                    className="form-control"
+                    value={editingMember.mobile || ''}
+                    onChange={(e) => setEditingMember({ ...editingMember, mobile: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    className="form-control"
+                    value={editingMember.email || ''}
+                    onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Cell Role</label>
+                  <input
+                    className="form-control"
+                    value={editingMember.role || ''}
+                    onChange={(e) => setEditingMember({ ...editingMember, role: e.target.value })}
+                  />
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="button" onClick={() => setEditingMember(null)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingMember && (
+        <div className="modal-overlay confirmation-modal active" onClick={() => setDeletingMember(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-body">
+              <div className="confirmation-icon">
+                <i className="fas fa-trash"></i>
+              </div>
+              <p className="confirmation-text">
+                Delete {deletingMember.name || 'this member'}?
+              </p>
+              <div className="form-actions">
+                <button className="btn" type="button" onClick={() => setDeletingMember(null)}>
+                  Cancel
+                </button>
+                <button className="btn btn-danger" type="button" onClick={handleMemberDelete}>
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>

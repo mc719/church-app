@@ -11,6 +11,45 @@
   font-weight: 600;
 }
 
+.suggestions-list {
+  margin-top: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+
+.suggestion-item {
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.suggestion-item:hover {
+  background: rgba(30, 58, 95, 0.08);
+}
+
+body.dark-theme .suggestions-list {
+  background: #1f2937;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-theme .suggestion-item {
+  color: #e5e7eb;
+}
+
+body.dark-theme .suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 @media (max-width: 768px) {
   .departments-page .departments-actions {
     flex-direction: column;
