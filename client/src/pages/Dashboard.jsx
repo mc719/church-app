@@ -371,29 +371,29 @@ function Dashboard({ onAddCell }) {
 
   return (
     <div className="dashboard-page">
-      <div className="stats-container" id="statsContainer">
-        <div className="stat-card">
+      <div className="dashboard-kpis" id="statsContainer">
+        <div className="stat-card kpi-card">
           <div className="stat-icon">
             <i className="fas fa-users"></i>
           </div>
           <div className="stat-title">Total Members</div>
           <div className="stat-value">{stats.members}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card kpi-card">
           <div className="stat-icon">
             <i className="fas fa-layer-group"></i>
           </div>
           <div className="stat-title">Total Cells</div>
           <div className="stat-value">{stats.cells}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card kpi-card">
           <div className="stat-icon">
             <i className="fas fa-check-circle"></i>
           </div>
           <div className="stat-title">Active Cells</div>
           <div className="stat-value">{stats.activeCells}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card kpi-card">
           <div className="stat-icon inactive">
             <i className="fas fa-times-circle"></i>
           </div>
@@ -402,72 +402,76 @@ function Dashboard({ onAddCell }) {
         </div>
       </div>
 
-      <div className="dashboard-charts">
-        <div className="chart-card">
-          <div className="section-header" style={{ marginTop: 0 }}>
-            <h2>Members in Cells</h2>
+      <div className="dashboard-section">
+        <div className="dashboard-charts">
+          <div className="chart-card">
+            <div className="section-header" style={{ marginTop: 0 }}>
+              <h2>Members in Cells</h2>
+            </div>
+            <canvas ref={genderChartRef} height="200"></canvas>
           </div>
-          <canvas ref={genderChartRef} height="200"></canvas>
-        </div>
-        <div className="chart-card">
-          <div className="section-header" style={{ marginTop: 0 }}>
-            <h2>Member Roles</h2>
+          <div className="chart-card">
+            <div className="section-header" style={{ marginTop: 0 }}>
+              <h2>Member Roles</h2>
+            </div>
+            <canvas ref={rolesChartRef} height="200"></canvas>
           </div>
-          <canvas ref={rolesChartRef} height="200"></canvas>
         </div>
       </div>
 
-      <div className="birthday-section">
-        <div className="section-header" style={{ marginTop: 0 }}>
-          <h2>Birthdays Calendar</h2>
-        </div>
-        <div className="birthday-calendar" id="birthdayCalendar">
-          <div className="calendar-header">
-            <button
-              className="calendar-nav-btn"
-              type="button"
-              onClick={() => setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-            >
-              <i className="fas fa-chevron-left"></i>
-            </button>
-            <div className="calendar-title">{monthLabel}</div>
-            <button
-              className="calendar-nav-btn"
-              type="button"
-              onClick={() => setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
-            >
-              <i className="fas fa-chevron-right"></i>
-            </button>
+      <div className="dashboard-section">
+        <div className="birthday-section">
+          <div className="section-header" style={{ marginTop: 0 }}>
+            <h2>Birthdays Calendar</h2>
           </div>
-          <div className="calendar-grid">
-            {weekdays.map((day) => (
-              <div key={day} className="calendar-weekday">{day}</div>
-            ))}
-            {Array.from({ length: startDay }).map((_, idx) => (
-              <div key={`blank-${idx}`} className="calendar-cell muted"></div>
-            ))}
-            {Array.from({ length: totalDays }).map((_, idx) => {
-              const day = idx + 1
-              const list = birthdaysByDay[day] || []
-              const hasBirthday = list.length > 0
-              return (
-                <button
-                  key={`day-${day}`}
-                  className={`calendar-cell${hasBirthday ? ' has-birthday' : ''}`}
-                  type="button"
-                  onClick={() => {
-                    if (hasBirthday) {
-                      openBirthdayModal(day, calendarMonth, list)
-                    } else {
-                      setShowAddBirthday(true)
-                    }
-                  }}
-                >
-                  <span className="calendar-day">{day}</span>
-                  {hasBirthday && <span className="calendar-dot"></span>}
-                </button>
-              )
-            })}
+          <div className="birthday-calendar" id="birthdayCalendar">
+            <div className="calendar-header">
+              <button
+                className="calendar-nav-btn"
+                type="button"
+                onClick={() => setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+              >
+                <i className="fas fa-chevron-left"></i>
+              </button>
+              <div className="calendar-title">{monthLabel}</div>
+              <button
+                className="calendar-nav-btn"
+                type="button"
+                onClick={() => setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+              >
+                <i className="fas fa-chevron-right"></i>
+              </button>
+            </div>
+            <div className="calendar-grid">
+              {weekdays.map((day) => (
+                <div key={day} className="calendar-weekday">{day}</div>
+              ))}
+              {Array.from({ length: startDay }).map((_, idx) => (
+                <div key={`blank-${idx}`} className="calendar-cell muted"></div>
+              ))}
+              {Array.from({ length: totalDays }).map((_, idx) => {
+                const day = idx + 1
+                const list = birthdaysByDay[day] || []
+                const hasBirthday = list.length > 0
+                return (
+                  <button
+                    key={`day-${day}`}
+                    className={`calendar-cell${hasBirthday ? ' has-birthday' : ''}`}
+                    type="button"
+                    onClick={() => {
+                      if (hasBirthday) {
+                        openBirthdayModal(day, calendarMonth, list)
+                      } else {
+                        setShowAddBirthday(true)
+                      }
+                    }}
+                  >
+                    <span className="calendar-day">{day}</span>
+                    {hasBirthday && <span className="calendar-dot"></span>}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -605,31 +609,32 @@ function Dashboard({ onAddCell }) {
       </div>
       <div className="table-pagination" id="cellsPagination"></div>
 
-      <div className="section-header">
-        <h2>Recent Reports (Last 7 Days)</h2>
-      </div>
-
-      <div className="reports-grid" id="recentReports">
-        {recentReports.length === 0 && (
-          <div className="dashboard-note">
-            Recent reports will show here once available.
-          </div>
-        )}
-        {recentReports.map(report => (
-          <div className="report-card" key={report.id}>
-            <div className="report-header">
-              <div>
-                <div className="report-title">{report.cellName || report.cell_name || 'Cell Report'}</div>
-                <div className="report-date">{formatDate(report.date || report.report_date || report.reportDate)}</div>
+      <div className="dashboard-section">
+        <div className="section-header">
+          <h2>Recent Reports (Last 7 Days)</h2>
+        </div>
+        <div className="reports-grid" id="recentReports">
+          {recentReports.length === 0 && (
+            <div className="dashboard-note">
+              Recent reports will show here once available.
+            </div>
+          )}
+          {recentReports.map(report => (
+            <div className="report-card" key={report.id}>
+              <div className="report-header">
+                <div>
+                  <div className="report-title">{report.cellName || report.cell_name || 'Cell Report'}</div>
+                  <div className="report-date">{formatDate(report.date || report.report_date || report.reportDate)}</div>
+                </div>
+              </div>
+              <div className="report-body">
+                <div><strong>Venue:</strong> {report.venue || '-'}</div>
+                <div><strong>Meeting Type:</strong> {report.meeting_type || report.meetingType || '-'}</div>
+                <div><strong>P:</strong> {report.presentCount ?? 0} &nbsp; <strong>A:</strong> {report.absentCount ?? 0}</div>
               </div>
             </div>
-            <div className="report-body">
-              <div><strong>Venue:</strong> {report.venue || '-'}</div>
-              <div><strong>Meeting Type:</strong> {report.meeting_type || report.meetingType || '-'}</div>
-              <div><strong>P:</strong> {report.presentCount ?? 0} &nbsp; <strong>A:</strong> {report.absentCount ?? 0}</div>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {editingCell && (
