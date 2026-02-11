@@ -444,11 +444,18 @@ function FirstTimers() {
                   </div>
                   <div className="detail-row">
                     <span>Title</span>
-                    <input
+                    <select
                       className="form-control inline-input"
                       value={inlineEdits[selectedFirstTimer.id]?.title ?? selectedFirstTimer.title ?? ''}
                       onChange={(e) => updateInline(selectedFirstTimer.id, 'title', e.target.value)}
-                    />
+                    >
+                      <option value="">Select</option>
+                      <option value="Brother">Brother</option>
+                      <option value="Sister">Sister</option>
+                      <option value="Dcn">Dcn</option>
+                      <option value="Dcns">Dcns</option>
+                      <option value="Pastor">Pastor</option>
+                    </select>
                   </div>
                   <div className="detail-row">
                     <span>Name</span>
@@ -484,11 +491,15 @@ function FirstTimers() {
                   </div>
                   <div className="detail-row">
                     <span>Gender</span>
-                    <input
+                    <select
                       className="form-control inline-input"
                       value={inlineEdits[selectedFirstTimer.id]?.gender ?? selectedFirstTimer.gender ?? ''}
                       onChange={(e) => updateInline(selectedFirstTimer.id, 'gender', e.target.value)}
-                    />
+                    >
+                      <option value="">Select</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
                   </div>
                   <div className="detail-row">
                     <span>Status</span>
@@ -611,11 +622,15 @@ function FirstTimers() {
                 </div>
                 <div className="form-group">
                   <label>Gender</label>
-                  <input
+                  <select
                     className="form-control"
                     value={addForm.gender}
                     onChange={(e) => setAddForm((prev) => ({ ...prev, gender: e.target.value }))}
-                  />
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Mobile</label>
