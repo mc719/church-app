@@ -50,9 +50,137 @@ body.dark-theme .suggestion-item:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.department-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(16, 185, 129, 0.08));
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  margin-bottom: 20px;
+}
+
+.department-hero-main h1 {
+  margin: 0 0 8px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.department-hero-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.department-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--gray-color);
+  font-size: 0.95rem;
+}
+
+.department-hero-meta i {
+  color: var(--primary-color);
+  margin-right: 6px;
+}
+
+.department-hero-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  color: var(--primary-color);
+}
+
+.status-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.status-active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+
+.status-progress {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.status-inactive {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.department-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.department-stat-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: var(--shadow);
+}
+
+.department-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary-color);
+}
+
+.department-stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--gray-color);
+  letter-spacing: 0.4px;
+}
+
+.department-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
 @media (max-width: 768px) {
   .departments-page .departments-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .department-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .department-hero-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .department-stats-row {
+    grid-template-columns: 1fr;
   }
 }

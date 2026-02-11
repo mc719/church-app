@@ -253,6 +253,14 @@ function Departments() {
     [members, activeDepartmentId]
   )
 
+  const departmentStats = useMemo(() => {
+    const totalMembers = departmentMembers.length
+    const updatedAt = activeDepartment?.updatedAt || activeDepartment?.updated_at || activeDepartment?.createdAt || activeDepartment?.created_at
+    const statusKey = totalMembers ? 'active' : 'inactive'
+    const statusLabel = totalMembers ? 'Active' : 'Needs Members'
+    return { totalMembers, updatedAt, statusKey, statusLabel }
+  }, [departmentMembers, activeDepartment])
+
   const memberSearchMatches = useMemo(() => {
     const term = assignSearch.trim().toLowerCase()
     if (!term) return []
@@ -303,10 +311,47 @@ function Departments() {
 
       {activeDepartment && (
         <div className="department-details">
-          <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end', marginBottom: '16px' }}>
-            <button className="btn" type="button" onClick={() => setEditingDepartment({ ...activeDepartment })}>
-              <i className="fas fa-edit"></i> Edit Department
-            </button>
+          <div className="department-hero">
+            <div className="department-hero-main">
+              <div className="department-hero-title">
+                <h1>{activeDepartment.name || 'Department'}</h1>
+                <span className={`status-pill status-${departmentStats.statusKey}`}>{departmentStats.statusLabel}</span>
+              </div>
+              <div className="department-hero-meta">
+                <span><i className="fas fa-user-tie"></i> {activeDepartment.hodName || 'No HOD'}</span>
+                <span><i className="fas fa-phone"></i> {activeDepartment.hodMobile || '-'}</span>
+                <span><i className="fas fa-calendar"></i> {departmentStats.updatedAt ? new Date(departmentStats.updatedAt).toLocaleDateString() : '-'}</span>
+              </div>
+            </div>
+            <div className="department-hero-actions">
+              <button className="btn ghost-btn" type="button" onClick={() => setEditingDepartment({ ...activeDepartment })}>
+                <i className="fas fa-edit"></i> Edit
+              </button>
+            </div>
+          </div>
+
+          <div className="department-stats-row">
+            <div className="department-stat-card">
+              <div className="department-stat-icon"><i className="fas fa-users"></i></div>
+              <div>
+                <div className="department-stat-label">Members</div>
+                <div className="department-stat-value">{departmentStats.totalMembers}</div>
+              </div>
+            </div>
+            <div className="department-stat-card">
+              <div className="department-stat-icon"><i className="fas fa-user-tie"></i></div>
+              <div>
+                <div className="department-stat-label">HOD</div>
+                <div className="department-stat-value">{activeDepartment.hodName || '-'}</div>
+              </div>
+            </div>
+            <div className="department-stat-card">
+              <div className="department-stat-icon"><i className="fas fa-clock"></i></div>
+              <div>
+                <div className="department-stat-label">Updated</div>
+                <div className="department-stat-value">{departmentStats.updatedAt ? new Date(departmentStats.updatedAt).toLocaleDateString() : '-'}</div>
+              </div>
+            </div>
           </div>
 
           <div className="cell-summary-card">
