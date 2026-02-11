@@ -144,6 +144,9 @@ function Members() {
     if (!res.ok) return
     const updated = await res.json()
     setMembers((prev) => prev.map((m) => (String(m.id) === String(updated.id) ? updated : m)))
+    setSelectedMember((prev) =>
+      prev && String(prev.id) === String(updated.id) ? { ...prev, ...updated } : prev
+    )
     setEditingMember(null)
   }
 
