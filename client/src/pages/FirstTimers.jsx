@@ -14,6 +14,7 @@ function FirstTimers() {
   const [deletingFollowUp, setDeletingFollowUp] = useState(null)
   const [showAddFollowUp, setShowAddFollowUp] = useState(false)
   const [showAddFirstTimer, setShowAddFirstTimer] = useState(false)
+  const [photoPreview, setPhotoPreview] = useState(null)
   const [inlineEdits, setInlineEdits] = useState({})
   const [addForm, setAddForm] = useState({
     title: '',
@@ -428,6 +429,11 @@ function FirstTimers() {
                           <img
                             src={inlineEdits[selectedFirstTimer.id]?.photoData || selectedFirstTimer.photoData}
                             alt={selectedFirstTimer.name || 'First-timer'}
+                            onClick={() =>
+                              setPhotoPreview(
+                                inlineEdits[selectedFirstTimer.id]?.photoData || selectedFirstTimer.photoData
+                              )
+                            }
                           />
                         ) : (
                           <i className="fas fa-user"></i>
@@ -783,9 +789,9 @@ function FirstTimers() {
         </div>
       )}
 
-      {showAddFollowUp && (
-        <div className="modal-overlay active" onClick={() => setShowAddFollowUp(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        {showAddFollowUp && (
+          <div className="modal-overlay active" onClick={() => setShowAddFollowUp(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Add Follow-up</h3>
               <button className="close-modal" type="button" onClick={() => setShowAddFollowUp(false)}>
@@ -869,10 +875,30 @@ function FirstTimers() {
               </form>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
+          </div>
+        )}
+
+        {photoPreview && (
+          <div className="modal-overlay active" onClick={() => setPhotoPreview(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Photo Preview</h3>
+                <button className="close-modal" type="button" onClick={() => setPhotoPreview(null)}>
+                  &times;
+                </button>
+              </div>
+              <div className="modal-body" style={{ textAlign: 'center' }}>
+                <img
+                  src={photoPreview}
+                  alt="First-timer"
+                  style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '12px' }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
 export default FirstTimers
