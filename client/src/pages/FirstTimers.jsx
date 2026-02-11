@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './FirstTimers.css'
 
 const API_BASE = '/api'
 
 function FirstTimers() {
-  const [activeTab, setActiveTab] = useState('list')
   const [firstTimers, setFirstTimers] = useState([])
   const [followUps, setFollowUps] = useState([])
+  const [search, setSearch] = useState('')
+  const [selectedFirstTimer, setSelectedFirstTimer] = useState(null)
+  const [detailTab, setDetailTab] = useState('details')
   const [deletingFirstTimer, setDeletingFirstTimer] = useState(null)
   const [editingFollowUp, setEditingFollowUp] = useState(null)
   const [deletingFollowUp, setDeletingFollowUp] = useState(null)
@@ -64,6 +66,47 @@ function FirstTimers() {
     if (Number.isNaN(date.getTime())) return ''
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
+
+  const filteredFirstTimers = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return firstTimers
+    return firstTimers.filter((item) => {
+      const values = [
+        item.title,
+        item.name,
+        item.surname,
+        item.mobile,
+        item.email,
+        item.status,
+        item.gender,
+        item.cellName,
+        item.invitedBy
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return values.includes(term)
+    })
+  }, [firstTimers, search])
+
+  const filteredFollowUps = useMemo(() => {
+    if (!selectedFirstTimer?.id) return []
+    return followUps.filter(
+      (item) => String(item.firstTimerId || item.first_timer_id) === String(selectedFirstTimer.id)
+    )
+  }, [followUps, selectedFirstTimer])
+
+  useEffect(() => {
+    if (!filteredFirstTimers.length) {
+      setSelectedFirstTimer(null)
+      return
+    }
+    if (selectedFirstTimer && filteredFirstTimers.some((item) => String(item.id) === String(selectedFirstTimer.id))) {
+      return
+    }
+    setSelectedFirstTimer({ ...filteredFirstTimers[0] })
+    setDetailTab('details')
+  }, [filteredFirstTimers, selectedFirstTimer])
 
   const handleDeleteFirstTimer = async () => {
     if (!deletingFirstTimer) return
@@ -175,6 +218,8 @@ function FirstTimers() {
 
   const handleAddFollowUp = async (event) => {
     event.preventDefault()
+    const resolvedFirstTimerId = followUpForm.firstTimerId || selectedFirstTimer?.id
+    if (!resolvedFirstTimerId) return
     const token = localStorage.getItem('token')
     if (!token) return
     const res = await fetch(`${API_BASE}/follow-ups`, {
@@ -184,7 +229,7 @@ function FirstTimers() {
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
-        firstTimerId: followUpForm.firstTimerId,
+        firstTimerId: resolvedFirstTimerId,
         date: followUpForm.date,
         time: followUpForm.time,
         comment: followUpForm.comment,
@@ -245,163 +290,233 @@ function FirstTimers() {
 
   return (
     <div className="first-timers-page">
-      <div className="cell-tabs" id="firstTimersTabs">
-        <button
-          className={`cell-tab-btn${activeTab === 'list' ? ' active' : ''}`}
-          onClick={() => setActiveTab('list')}
-          type="button"
-        >
-          First-Timers List
-        </button>
-        <button
-          className={`cell-tab-btn${activeTab === 'followups' ? ' active' : ''}`}
-          onClick={() => setActiveTab('followups')}
-          type="button"
-        >
-          Follow-up Records
-        </button>
-        {activeTab === 'list' && (
-          <div className="cell-tabs-actions">
+      <div className="first-timers-layout">
+        <div className="first-timers-list-panel">
+          <div className="first-timers-list-header">
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search first-timers..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
             <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
               <i className="fas fa-user-plus"></i> Add New First-Timer
             </button>
           </div>
-        )}
+          <div className="first-timers-list">
+            {filteredFirstTimers.length === 0 && <div className="dashboard-note">No first-timers found.</div>}
+            {filteredFirstTimers.map((item) => {
+              const isActive = selectedFirstTimer && String(selectedFirstTimer.id) === String(item.id)
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`first-timer-row${isActive ? ' active' : ''}`}
+                  onClick={() => {
+                    setSelectedFirstTimer({ ...item })
+                    setDetailTab('details')
+                  }}
+                >
+                  <div className="first-timer-row-left">
+                    <div className="first-timer-avatar">
+                      {item.photoData ? <img src={item.photoData} alt={item.name || 'First-timer'} /> : <i className="fas fa-user"></i>}
+                    </div>
+                    <div className="first-timer-row-info">
+                      <div className="first-timer-row-name">
+                        {item.title ? `${item.title} ` : ''}
+                        {item.name || 'First-timer'} {item.surname || ''}
+                      </div>
+                      <div className="first-timer-row-meta">
+                        <span>{item.status || 'Pending'}</span>
+                        <span>•</span>
+                        <span>{item.mobile || '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="first-timer-row-tag">{item.gender || '-'}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="first-timers-detail-panel">
+          {!selectedFirstTimer && <div className="dashboard-note">Select a first-timer to view details.</div>}
+          {selectedFirstTimer && (
+            <>
+              <div className="first-timer-detail-header">
+                <div>
+                  <h2>
+                    {selectedFirstTimer.title ? `${selectedFirstTimer.title} ` : ''}
+                    {selectedFirstTimer.name || 'First-timer'} {selectedFirstTimer.surname || ''}
+                  </h2>
+                  <div className="member-detail-meta">
+                    <span>{selectedFirstTimer.status || 'Pending'}</span>
+                    <span>•</span>
+                    <span>{selectedFirstTimer.email || '-'}</span>
+                  </div>
+                </div>
+                <div className="member-detail-actions">
+                  <button className="btn ghost-btn" type="button" onClick={() => handleInlineSave(selectedFirstTimer)}>
+                    <i className="fas fa-save"></i> Save
+                  </button>
+                  <button
+                    className="btn ghost-btn danger"
+                    type="button"
+                    onClick={() => setDeletingFirstTimer(selectedFirstTimer)}
+                  >
+                    <i className="fas fa-trash"></i> Delete
+                  </button>
+                </div>
+              </div>
+
+              <div className="cell-tabs first-timer-tabs">
+                <button
+                  className={`cell-tab-btn${detailTab === 'details' ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDetailTab('details')}
+                >
+                  Details
+                </button>
+                <button
+                  className={`cell-tab-btn${detailTab === 'followups' ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDetailTab('followups')}
+                >
+                  Follow-up Records
+                </button>
+                {detailTab === 'followups' && (
+                  <div className="cell-tabs-actions">
+                    <button className="btn btn-success" type="button" onClick={() => setShowAddFollowUp(true)}>
+                      <i className="fas fa-plus"></i> Add Record
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {detailTab === 'details' && (
+                <div className="detail-grid first-timer-detail-grid">
+                  <div className="detail-row">
+                    <span>Title</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.title ?? selectedFirstTimer.title ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'title', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Name</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.name ?? selectedFirstTimer.name ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'name', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Surname</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.surname ?? selectedFirstTimer.surname ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'surname', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Mobile</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.mobile ?? selectedFirstTimer.mobile ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'mobile', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Email</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.email ?? selectedFirstTimer.email ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'email', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Gender</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.gender ?? selectedFirstTimer.gender ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'gender', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Status</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.status ?? selectedFirstTimer.status ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'status', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Date Joined</span>
+                    <strong>{formatDate(selectedFirstTimer.joined_date || selectedFirstTimer.created_at)}</strong>
+                  </div>
+                  <div className="detail-row">
+                    <span>Invited By</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.invitedBy ?? selectedFirstTimer.invitedBy ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'invitedBy', e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {detailTab === 'followups' && (
+                <div className="table-container">
+                  <table className="mobile-grid-table" id="followUpsTable">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Comment</th>
+                        <th>Visitation Arranged</th>
+                        <th>Visitation Date</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredFollowUps.length === 0 && (
+                        <tr>
+                          <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
+                            No follow-up records found.
+                          </td>
+                        </tr>
+                      )}
+                      {filteredFollowUps.map((item) => (
+                        <tr key={item.id}>
+                          <td data-label="Date">{formatDate(item.follow_up_date || item.date)}</td>
+                          <td data-label="Time">{formatTime(item.follow_up_date || item.date)}</td>
+                          <td data-label="Comment">{item.comment || '-'}</td>
+                          <td data-label="Visitation Arranged">{item.visitation_arranged ? 'Yes' : 'No'}</td>
+                          <td data-label="Visitation Date">{formatDate(item.visitation_date)}</td>
+                          <td data-label="Actions">
+                            <div className="action-buttons">
+                              <button className="action-btn edit-btn" type="button" onClick={() => setEditingFollowUp({ ...item })}>
+                                <i className="fas fa-edit"></i> Edit
+                              </button>
+                              <button className="action-btn delete-btn" type="button" onClick={() => setDeletingFollowUp(item)}>
+                                <i className="fas fa-trash"></i> Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-
-      {activeTab === 'list' && (
-        <div className="cell-tab-content active">
-          <div className="table-container">
-            <table className="mobile-grid-table" id="firstTimersTable">
-              <thead>
-              <tr>
-                <th>Photo</th>
-                <th>Name</th>
-                <th>Mobile</th>
-                <th>Date Joined</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {firstTimers.length === 0 && (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
-                      No first-timers found.
-                    </td>
-                  </tr>
-                )}
-                {firstTimers.map((item) => (
-                  <tr key={item.id}>
-                    <td data-label="Photo">
-                      <div className="first-timer-avatar">
-                        {item.photoData ? (
-                          <img src={item.photoData} alt={item.name || 'First-timer'} />
-                        ) : (
-                          <i className="fas fa-user"></i>
-                        )}
-                      </div>
-                    </td>
-                    <td data-label="Name">
-                      <input
-                        className="form-control inline-input"
-                        value={inlineEdits[item.id]?.name ?? item.name ?? item.full_name ?? ''}
-                        onChange={(e) => updateInline(item.id, 'name', e.target.value)}
-                      />
-                    </td>
-                    <td data-label="Mobile">
-                      <input
-                        className="form-control inline-input"
-                        value={inlineEdits[item.id]?.mobile ?? item.mobile ?? ''}
-                        onChange={(e) => updateInline(item.id, 'mobile', e.target.value)}
-                      />
-                    </td>
-                    <td data-label="Date Joined">{formatDate(item.joined_date || item.created_at)}</td>
-                    <td data-label="Status">
-                      <input
-                        className="form-control inline-input"
-                        value={inlineEdits[item.id]?.status ?? item.status ?? ''}
-                        onChange={(e) => updateInline(item.id, 'status', e.target.value)}
-                      />
-                    </td>
-                    <td data-label="Actions">
-                      <div className="action-buttons">
-                        <button className="action-btn edit-btn" type="button" onClick={() => handleInlineSave(item)}>
-                          <i className="fas fa-save"></i> Save
-                        </button>
-                        <button
-                          className="action-btn delete-btn"
-                          type="button"
-                          onClick={() => setDeletingFirstTimer(item)}
-                        >
-                          <i className="fas fa-trash"></i> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'followups' && (
-        <div className="cell-tab-content active">
-          <div className="section-header" style={{ marginTop: 0 }}>
-            <h2>Follow-up Records</h2>
-            <div className="page-actions">
-              <button className="btn btn-success" type="button" onClick={() => setShowAddFollowUp(true)}>
-                <i className="fas fa-plus"></i> Add Record
-              </button>
-            </div>
-          </div>
-          <div className="table-container">
-            <table className="mobile-grid-table" id="followUpsTable">
-              <thead>
-                <tr>
-                  <th>First-Timer</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Comment</th>
-                  <th>Visitation Arranged</th>
-                  <th>Visitation Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {followUps.length === 0 && (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
-                      No follow-up records found.
-                    </td>
-                  </tr>
-                )}
-                {followUps.map((item) => (
-                  <tr key={item.id}>
-                    <td data-label="First-Timer">{item.first_timer_name || item.firstTimerName || '-'}</td>
-                    <td data-label="Date">{formatDate(item.follow_up_date || item.date)}</td>
-                    <td data-label="Time">{formatTime(item.follow_up_date || item.date)}</td>
-                    <td data-label="Comment">{item.comment || '-'}</td>
-                    <td data-label="Visitation Arranged">{item.visitation_arranged ? 'Yes' : 'No'}</td>
-                    <td data-label="Visitation Date">{formatDate(item.visitation_date)}</td>
-                    <td data-label="Actions">
-                      <div className="action-buttons">
-                        <button className="action-btn edit-btn" type="button" onClick={() => setEditingFollowUp({ ...item })}>
-                          <i className="fas fa-edit"></i> Edit
-                        </button>
-                        <button className="action-btn delete-btn" type="button" onClick={() => setDeletingFollowUp(item)}>
-                          <i className="fas fa-trash"></i> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
 
       {showAddFirstTimer && (
@@ -636,18 +751,18 @@ function FirstTimers() {
               </button>
             </div>
             <div className="modal-body">
-              <form onSubmit={handleAddFollowUp}>
-                <div className="form-group">
-                  <label>First-Timer</label>
-                  <select
-                    className="form-control"
-                    value={followUpForm.firstTimerId}
-                    onChange={(e) => setFollowUpForm({ ...followUpForm, firstTimerId: e.target.value })}
-                  >
-                    <option value="">Select</option>
-                    {firstTimers.map((ft) => (
-                      <option key={ft.id} value={ft.id}>
-                        {ft.name} {ft.surname || ''}
+                <form onSubmit={handleAddFollowUp}>
+                  <div className="form-group">
+                    <label>First-Timer</label>
+                    <select
+                      className="form-control"
+                      value={followUpForm.firstTimerId || selectedFirstTimer?.id || ''}
+                      onChange={(e) => setFollowUpForm({ ...followUpForm, firstTimerId: e.target.value })}
+                    >
+                      <option value="">Select</option>
+                      {firstTimers.map((ft) => (
+                        <option key={ft.id} value={ft.id}>
+                          {ft.name} {ft.surname || ''}
                       </option>
                     ))}
                   </select>

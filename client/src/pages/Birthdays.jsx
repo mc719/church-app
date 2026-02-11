@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './Birthdays.css'
 
 const API_BASE = '/api'
@@ -7,6 +7,8 @@ function Birthdays() {
   const [birthdays, setBirthdays] = useState([])
   const [cells, setCells] = useState([])
   const [members, setMembers] = useState([])
+  const [search, setSearch] = useState('')
+  const [selectedBirthday, setSelectedBirthday] = useState(null)
   const [editingBirthday, setEditingBirthday] = useState(null)
   const [deletingBirthday, setDeletingBirthday] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
@@ -55,6 +57,39 @@ function Birthdays() {
     return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
   }
 
+  const filteredBirthdays = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return birthdays
+    return birthdays.filter((item) => {
+      const values = [
+        item.name,
+        item.email,
+        item.mobile,
+        item.cell,
+        getCellName(item.cellId),
+        item.dateOfBirth
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return values.includes(term)
+    })
+  }, [birthdays, search, cells])
+
+  useEffect(() => {
+    if (!filteredBirthdays.length) {
+      setSelectedBirthday(null)
+      setEditingBirthday(null)
+      return
+    }
+    if (selectedBirthday && filteredBirthdays.some((item) => String(item.id) === String(selectedBirthday.id))) {
+      return
+    }
+    const first = { ...filteredBirthdays[0] }
+    setSelectedBirthday(first)
+    setEditingBirthday(first)
+  }, [filteredBirthdays, selectedBirthday])
+
   const handleDelete = async () => {
     if (!deletingBirthday) return
     const token = localStorage.getItem('token')
@@ -65,11 +100,15 @@ function Birthdays() {
     })
     if (!res.ok) return
     setBirthdays((prev) => prev.filter((item) => String(item.id) !== String(deletingBirthday.id)))
+    if (selectedBirthday && String(selectedBirthday.id) === String(deletingBirthday.id)) {
+      setSelectedBirthday(null)
+      setEditingBirthday(null)
+    }
     setDeletingBirthday(null)
   }
 
   const handleSave = async (event) => {
-    event.preventDefault()
+    if (event?.preventDefault) event.preventDefault()
     if (!editingBirthday) return
     const token = localStorage.getItem('token')
     if (!token) return
@@ -86,7 +125,8 @@ function Birthdays() {
     if (!res.ok) return
     const updated = await res.json()
     setBirthdays((prev) => prev.map((item) => (String(item.id) === String(updated.id) ? updated : item)))
-    setEditingBirthday(null)
+    setSelectedBirthday(updated)
+    setEditingBirthday(updated)
   }
 
   const handleAdd = async (event) => {
@@ -122,114 +162,148 @@ function Birthdays() {
 
   return (
     <div className="birthdays-page">
-      <div className="page-actions" style={{ justifyContent: 'flex-end', marginBottom: '16px' }}>
-        <button className="btn btn-success" type="button" onClick={() => setShowAdd(true)}>
-          <i className="fas fa-plus"></i> Add Birthday
-        </button>
-      </div>
-
-      <div className="table-container">
-        <table className="mobile-grid-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Cell</th>
-              <th>Birthday</th>
-              <th>Mobile</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {birthdays.length === 0 && (
-              <tr>
-                <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
-                  No birthdays found.
-                </td>
-              </tr>
-            )}
-            {birthdays.map((item) => (
-              <tr key={`${item.id}-${item.dateOfBirth}`}>
-                <td data-label="Name">{item.name || '-'}</td>
-                <td data-label="Cell">{item.cell || getCellName(item.cellId)}</td>
-                <td data-label="Birthday">{formatMonthDay(item.dateOfBirth) || '-'}</td>
-                <td data-label="Mobile">
-                  {item.mobile ? <a href={`tel:${item.mobile}`}>{item.mobile}</a> : '-'}
-                </td>
-                <td data-label="Actions">
-                  <div className="action-buttons">
-                    <button className="action-btn edit-btn" type="button" onClick={() => setEditingBirthday({ ...item })}>
-                      <i className="fas fa-edit"></i> Edit
-                    </button>
-                    <button className="action-btn delete-btn" type="button" onClick={() => setDeletingBirthday(item)}>
-                      <i className="fas fa-trash"></i> Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {editingBirthday && (
-        <div className="modal-overlay active" onClick={() => setEditingBirthday(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Edit Birthday</h3>
-              <button className="close-modal" type="button" onClick={() => setEditingBirthday(null)}>
-                &times;
-              </button>
+      <div className="birthdays-layout">
+        <div className="birthdays-list-panel">
+          <div className="birthdays-list-header">
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search birthdays..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-            <div className="modal-body">
-              <form onSubmit={handleSave}>
-                <div className="form-group">
-                  <label>Birthday</label>
+            <button className="btn btn-success" type="button" onClick={() => setShowAdd(true)}>
+              <i className="fas fa-plus"></i> Add Birthday
+            </button>
+          </div>
+          <div className="birthdays-list">
+            {filteredBirthdays.length === 0 && <div className="dashboard-note">No birthdays found.</div>}
+            {filteredBirthdays.map((item) => {
+              const isActive = selectedBirthday && String(selectedBirthday.id) === String(item.id)
+              return (
+                <button
+                  key={`${item.id}-${item.dateOfBirth}`}
+                  type="button"
+                  className={`birthday-row${isActive ? ' active' : ''}`}
+                  onClick={() => {
+                    setSelectedBirthday({ ...item })
+                    setEditingBirthday({ ...item })
+                  }}
+                >
+                  <div className="birthday-row-main">
+                    <div className="birthday-row-name">{item.name || 'Member'}</div>
+                    <div className="birthday-row-meta">
+                      <span>{formatMonthDay(item.dateOfBirth) || '-'}</span>
+                      <span>•</span>
+                      <span>{item.cell || getCellName(item.cellId) || '-'}</span>
+                    </div>
+                  </div>
+                  <span className="birthday-row-tag">{item.mobile || '-'}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="birthdays-detail-panel">
+          {!selectedBirthday && <div className="dashboard-note">Select a birthday to view details.</div>}
+          {selectedBirthday && editingBirthday && (
+            <>
+              <div className="birthday-detail-header">
+                <div>
+                  <h2>{selectedBirthday.name || 'Member'}</h2>
+                  <div className="member-detail-meta">
+                    <span>{selectedBirthday.email || '-'}</span>
+                    <span>•</span>
+                    <span>{selectedBirthday.mobile || '-'}</span>
+                  </div>
+                </div>
+                <div className="member-detail-actions">
+                  <button className="btn ghost-btn" type="button" onClick={handleSave}>
+                    <i className="fas fa-save"></i> Save
+                  </button>
+                  <button
+                    className="btn ghost-btn danger"
+                    type="button"
+                    onClick={() => setDeletingBirthday(selectedBirthday)}
+                  >
+                    <i className="fas fa-trash"></i> Delete
+                  </button>
+                </div>
+              </div>
+
+              <div className="detail-grid birthday-detail-grid">
+                <div className="detail-row">
+                  <span>Cell</span>
+                  <strong>{selectedBirthday.cell || getCellName(selectedBirthday.cellId) || '-'}</strong>
+                </div>
+                <div className="detail-row">
+                  <span>Birthday</span>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <select
                       className="form-control"
-                      value={editingBirthday.dateOfBirth ? String(Number(editingBirthday.dateOfBirth.split('-')[1] || '')) : ''}
+                      value={
+                        editingBirthday.dateOfBirth
+                          ? String(Number(editingBirthday.dateOfBirth.split('-')[1] || ''))
+                          : ''
+                      }
                       onChange={(e) => {
                         const month = editingBirthday.dateOfBirth?.split('-')[0] || ''
                         const day = e.target.value
-                        const dob = month && day ? `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` : ''
+                        const dob =
+                          month && day
+                            ? `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                            : ''
                         setEditingBirthday({ ...editingBirthday, dateOfBirth: dob })
                       }}
                     >
                       <option value="">Day</option>
                       {Array.from({ length: 31 }).map((_, idx) => (
-                        <option key={`edit-day-${idx + 1}`} value={idx + 1}>{idx + 1}</option>
+                        <option key={`edit-day-${idx + 1}`} value={idx + 1}>
+                          {idx + 1}
+                        </option>
                       ))}
                     </select>
                     <select
                       className="form-control"
-                      value={editingBirthday.dateOfBirth ? String(Number(editingBirthday.dateOfBirth.split('-')[0] || '')) : ''}
+                      value={
+                        editingBirthday.dateOfBirth
+                          ? String(Number(editingBirthday.dateOfBirth.split('-')[0] || ''))
+                          : ''
+                      }
                       onChange={(e) => {
                         const day = editingBirthday.dateOfBirth?.split('-')[1] || ''
                         const month = e.target.value
-                        const dob = month && day ? `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` : ''
+                        const dob =
+                          month && day
+                            ? `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                            : ''
                         setEditingBirthday({ ...editingBirthday, dateOfBirth: dob })
                       }}
                     >
                       <option value="">Month</option>
                       {Array.from({ length: 12 }).map((_, idx) => (
-                        <option key={`edit-month-${idx + 1}`} value={idx + 1}>{idx + 1}</option>
+                        <option key={`edit-month-${idx + 1}`} value={idx + 1}>
+                          {idx + 1}
+                        </option>
                       ))}
                     </select>
                   </div>
                 </div>
-                <div className="form-actions">
-                  <button className="btn" type="button" onClick={() => setEditingBirthday(null)}>
-                    Cancel
-                  </button>
-                  <button className="btn btn-success" type="submit">
-                    Save
-                  </button>
+                <div className="detail-row">
+                  <span>Mobile</span>
+                  <strong>{selectedBirthday.mobile || '-'}</strong>
                 </div>
-              </form>
-            </div>
-          </div>
+                <div className="detail-row">
+                  <span>Email</span>
+                  <strong>{selectedBirthday.email || '-'}</strong>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {showAdd && (
         <div className="modal-overlay active" onClick={() => setShowAdd(false)}>

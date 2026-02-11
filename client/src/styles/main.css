@@ -2398,10 +2398,10 @@
 
             .table-container .mobile-grid-table tbody tr {
                 background: #ffffff;
-                border: 1px solid #eaeaea;
-                border-radius: 12px;
-                padding: 16px;
-                box-shadow: var(--shadow);
+                border: 1px solid rgba(15, 118, 110, 0.12);
+                border-radius: 16px;
+                padding: 16px 18px;
+                box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
             }
 
             .dark-theme .table-container .mobile-grid-table tbody tr {
@@ -2413,7 +2413,7 @@
                 display: flex;
                 justify-content: space-between;
                 gap: 12px;
-                padding: 8px 0;
+                padding: 10px 0;
                 border: none;
             }
 
@@ -2438,6 +2438,9 @@
                 font-weight: 600;
                 color: var(--gray-color);
                 flex: 0 0 45%;
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+                font-size: 0.72rem;
             }
 
             .table-container .mobile-grid-table tbody td[data-label="Name"],
@@ -2447,13 +2450,16 @@
                 align-items: center;
                 text-align: center;
                 font-weight: 700;
+                font-size: 1.05rem;
+                color: #0f172a;
             }
 
             .table-container .mobile-grid-table tbody td[data-label="Name"]::before,
             .table-container .mobile-grid-table tbody td[data-label="Cell Name"]::before,
             .table-container .mobile-grid-table tbody td[data-label="Cell"]::before {
                 flex: 0 0 auto;
-                margin-bottom: 4px;
+                margin-bottom: 6px;
+                color: #64748b;
             }
 
             .settings-grid {
