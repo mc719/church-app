@@ -126,6 +126,7 @@ function FirstTimers() {
     if (!token) return
     const updates = inlineEdits[item.id] || {}
     const payload = {
+      photoData: updates.photoData ?? item.photoData ?? '',
       name: updates.name ?? item.name ?? item.full_name ?? '',
       surname: updates.surname ?? item.surname ?? '',
       gender: updates.gender ?? item.gender ?? '',
@@ -288,6 +289,27 @@ function FirstTimers() {
     setShowAddFirstTimer(false)
   }
 
+  const handleAddPhotoUpload = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setAddForm((prev) => ({ ...prev, photoData: reader.result }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleDetailPhotoUpload = (event) => {
+    if (!selectedFirstTimer) return
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      updateInline(selectedFirstTimer.id, 'photoData', reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
   return (
     <div className="first-timers-page">
       <div className="first-timers-layout">
@@ -398,6 +420,22 @@ function FirstTimers() {
 
               {detailTab === 'details' && (
                 <div className="detail-grid first-timer-detail-grid">
+                  <div className="detail-row">
+                    <span>Photo</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="first-timer-avatar">
+                        {(inlineEdits[selectedFirstTimer.id]?.photoData || selectedFirstTimer.photoData) ? (
+                          <img
+                            src={inlineEdits[selectedFirstTimer.id]?.photoData || selectedFirstTimer.photoData}
+                            alt={selectedFirstTimer.name || 'First-timer'}
+                          />
+                        ) : (
+                          <i className="fas fa-user"></i>
+                        )}
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleDetailPhotoUpload} />
+                    </div>
+                  </div>
                   <div className="detail-row">
                     <span>Title</span>
                     <input
@@ -530,6 +568,10 @@ function FirstTimers() {
             </div>
             <div className="modal-body">
               <form onSubmit={handleAddFirstTimer}>
+                <div className="form-group">
+                  <label>Photo</label>
+                  <input type="file" accept="image/*" onChange={handleAddPhotoUpload} />
+                </div>
                 <div className="form-group">
                   <label>Title</label>
                   <select
