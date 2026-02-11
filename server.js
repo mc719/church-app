@@ -926,7 +926,7 @@ app.get("/api/departments", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/departments", requireAuth, async (req, res) => {
+app.post("/api/departments", requireAuthOrAccessCode, async (req, res) => {
   try {
     const { name, hodTitle, hodName, hodMobile } = req.body || {};
     if (!name || !String(name).trim()) {

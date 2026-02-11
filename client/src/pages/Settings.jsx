@@ -229,6 +229,26 @@ function Settings() {
             </table>
           </div>
         </div>
+
+        <div className="settings-card">
+          <div className="section-header" style={{ marginTop: 0 }}>
+            <h2>External Forms</h2>
+          </div>
+          <p style={{ color: 'var(--gray-color)', marginBottom: '16px' }}>
+            Share these links to collect submissions without logging in.
+          </p>
+          <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+            <a className="btn btn-success" href="/new-cell" target="_blank" rel="noreferrer">
+              New Cell Form
+            </a>
+            <a className="btn btn-success" href="/ft-form" target="_blank" rel="noreferrer">
+              First-Timer Form
+            </a>
+            <a className="btn btn-success" href="/new-department" target="_blank" rel="noreferrer">
+              Department Form
+            </a>
+          </div>
+        </div>
       </div>
 
       {editingRole && (

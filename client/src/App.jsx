@@ -20,6 +20,7 @@ import Placeholder from './pages/Placeholder.jsx'
 import Members from './pages/Members.jsx'
 import NewCellForm from './pages/NewCellForm.jsx'
 import FirstTimerForm from './pages/FirstTimerForm.jsx'
+import NewDepartmentForm from './pages/NewDepartmentForm.jsx'
 
 function App() {
   const [showAddCell, setShowAddCell] = useState(false)
@@ -54,6 +55,7 @@ function App() {
       <Routes>
         <Route path="new-cell" element={<NewCellForm />} />
         <Route path="ft-form" element={<FirstTimerForm />} />
+        <Route path="new-department" element={<NewDepartmentForm />} />
         <Route path="login" element={hasToken ? <Navigate to="/" replace /> : <Login />} />
         <Route element={hasToken ? <AppLayout /> : <Navigate to="/login" replace />}>
           <Route index element={<Dashboard onAddCell={modalContext.openAddCell} />} />
