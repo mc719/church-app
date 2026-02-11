@@ -149,6 +149,42 @@ function Cells() {
     [reports, activeCellId]
   )
 
+  const cellStats = useMemo(() => {
+    const totalMembers = cellMembers.length
+    const totalReports = cellReports.length
+    const sortedReports = [...cellReports].sort((a, b) => {
+      const aDate = new Date(a.date || a.report_date || a.reportDate || 0).getTime()
+      const bDate = new Date(b.date || b.report_date || b.reportDate || 0).getTime()
+      return bDate - aDate
+    })
+    const lastReport = sortedReports[0]
+    const now = Date.now()
+    const recentCount = cellReports.filter((report) => {
+      const date = report.date || report.report_date || report.reportDate
+      if (!date) return false
+      const ms = new Date(date).getTime()
+      if (Number.isNaN(ms)) return false
+      return now - ms <= 30 * 24 * 60 * 60 * 1000
+    }).length
+    let statusKey = 'inactive'
+    let statusLabel = 'Inactive'
+    if (recentCount >= 4) {
+      statusKey = 'active'
+      statusLabel = 'Active'
+    } else if (recentCount >= 3) {
+      statusKey = 'progress'
+      statusLabel = 'Making Progress'
+    }
+    return {
+      totalMembers,
+      totalReports,
+      lastReport,
+      recentCount,
+      statusKey,
+      statusLabel
+    }
+  }, [cellMembers, cellReports])
+
   const meetingOptions = useMemo(() => ([
     'Prayer and Planning',
     'Bible Study 1',
@@ -446,15 +482,53 @@ function Cells() {
       )}
       {activeCell && (
         <div className="cell-details">
-          <div className="page-actions page-actions-below" style={{ justifyContent: 'flex-end', marginBottom: '16px' }}>
-            <button className="btn" type="button" onClick={() => setEditingCell({ ...activeCell })}>
-              <i className="fas fa-edit"></i> Edit Cell
-            </button>
-            <button className="btn btn-danger" type="button" onClick={() => setDeletingCell(activeCell)}>
-              <i className="fas fa-trash"></i> Delete Cell
-            </button>
+          <div className="cell-hero">
+            <div className="cell-hero-main">
+              <div className="cell-hero-title">
+                <h1>{activeCell.name || 'Cell'}</h1>
+                <span className={`status-pill status-${cellStats.statusKey}`}>{cellStats.statusLabel}</span>
+              </div>
+              <div className="cell-hero-meta">
+                <span><i className="fas fa-calendar-day"></i> {activeCell.day || '-'}</span>
+                <span><i className="fas fa-clock"></i> {activeCell.time || '-'}</span>
+                <span><i className="fas fa-map-marker-alt"></i> {activeCell.venue || '-'}</span>
+              </div>
+            </div>
+            <div className="cell-hero-actions">
+              <button className="btn ghost-btn" type="button" onClick={() => setEditingCell({ ...activeCell })}>
+                <i className="fas fa-edit"></i> Edit
+              </button>
+              <button className="btn ghost-btn danger" type="button" onClick={() => setDeletingCell(activeCell)}>
+                <i className="fas fa-trash"></i> Delete
+              </button>
+            </div>
           </div>
-          <div className="cell-summary-card">
+
+          <div className="cell-stats-row">
+            <div className="cell-stat-card">
+              <div className="cell-stat-icon"><i className="fas fa-users"></i></div>
+              <div>
+                <div className="cell-stat-label">Members</div>
+                <div className="cell-stat-value">{cellStats.totalMembers}</div>
+              </div>
+            </div>
+            <div className="cell-stat-card">
+              <div className="cell-stat-icon"><i className="fas fa-file-alt"></i></div>
+              <div>
+                <div className="cell-stat-label">Reports</div>
+                <div className="cell-stat-value">{cellStats.totalReports}</div>
+              </div>
+            </div>
+            <div className="cell-stat-card">
+              <div className="cell-stat-icon"><i className="fas fa-calendar-check"></i></div>
+              <div>
+                <div className="cell-stat-label">Last Report</div>
+                <div className="cell-stat-value">{cellStats.lastReport ? formatDate(cellStats.lastReport.date || cellStats.lastReport.report_date || cellStats.lastReport.reportDate) : '-'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="cell-summary-card cell-summary-hero">
             <div className="cell-summary-grid">
               <div>
                 <div className="cell-summary-label">Day of Meeting</div>
