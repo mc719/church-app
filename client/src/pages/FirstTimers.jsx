@@ -127,6 +127,7 @@ function FirstTimers() {
     if (!token) return
     const updates = inlineEdits[item.id] || {}
     const payload = {
+      title: updates.title ?? item.title ?? '',
       photoData: updates.photoData ?? item.photoData ?? '',
       name: updates.name ?? item.name ?? item.full_name ?? '',
       surname: updates.surname ?? item.surname ?? '',
@@ -162,6 +163,7 @@ function FirstTimers() {
     if (!res.ok) return
     const updated = await res.json()
     setFirstTimers((prev) => prev.map((item) => (String(item.id) === String(updated.id) ? updated : item)))
+    setSelectedFirstTimer(updated)
     setInlineEdits((prev) => {
       const next = { ...prev }
       delete next[item.id]

@@ -22,6 +22,22 @@ const originalFetch = window.fetch.bind(window)
 window.fetch = async (input, init) => {
   const response = await originalFetch(input, init)
   const url = typeof input === 'string' ? input : input?.url || ''
+  const method = (init?.method || 'GET').toUpperCase()
+
+  if (!response.ok && method !== 'GET') {
+    try {
+      const cloned = response.clone()
+      const data = await cloned.json()
+      if (data?.error) {
+        showToast(data.error)
+      } else {
+        showToast(`Request failed (${response.status})`)
+      }
+    } catch {
+      showToast(`Request failed (${response.status})`)
+    }
+  }
+
   if (response.status === 401 && !url.includes('/api/login') && !url.includes('/api/access/verify')) {
     localStorage.removeItem('token')
     localStorage.removeItem('username')
