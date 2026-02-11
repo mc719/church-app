@@ -147,126 +147,195 @@ function Members() {
     setEditingMember(null)
   }
 
+  useEffect(() => {
+    if (!pageMembers.length) return
+    if (selectedMember && pageMembers.some((m) => String(m.id) === String(selectedMember.id))) return
+    setSelectedMember({ ...pageMembers[0] })
+    setDetailTab('details')
+  }, [pageMembers, selectedMember])
+
   return (
     <div className="members-page">
-      <div className="page-actions" style={{ justifyContent: 'flex-end', marginBottom: '16px', marginTop: '12px' }}>
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Search members..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="table-container members-table-container">
-        <table id="allMembersTable" className="mobile-grid-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Name</th>
-              <th>Gender</th>
-              <th>Mobile</th>
-              <th>Email</th>
-              <th>Cell Name</th>
-              <th>Cell Role</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="members-layout">
+        <div className="members-list-panel">
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Search members..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+            />
+          </div>
+          <div className="members-list">
             {pageMembers.length === 0 && (
-              <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
-                  No members found.
-                </td>
-              </tr>
+              <div className="dashboard-note">No members found.</div>
             )}
-            {pageMembers.map((member) => (
-              <tr
-                key={member.id}
-                style={{ cursor: 'pointer' }}
-                onClick={() => {
-                  setSelectedMember({ ...member })
-                  setDetailTab('details')
-                }}
-              >
-                <td data-label="Title">{member.title || '-'}</td>
-                <td data-label="Name">{member.name || '-'}</td>
-                <td data-label="Gender">{member.gender || '-'}</td>
-                <td data-label="Mobile">
-                  {member.mobile ? (
-                    <a href={`tel:${member.mobile}`}>{member.mobile}</a>
-                  ) : (
-                    '-'
-                  )}
-                </td>
-                <td data-label="Email">
-                  {member.email ? (
-                    <a href={`mailto:${member.email}`}>{member.email}</a>
-                  ) : (
-                    '-'
-                  )}
-                </td>
-                <td data-label="Cell Name">{member.cellName || '-'}</td>
-                <td data-label="Cell Role">{member.role || '-'}</td>
-                <td data-label="Actions">
-                  <div className="action-buttons">
-                    <button
-                      className="action-btn edit-btn"
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        setEditingMember({ ...member })
-                      }}
-                    >
-                      <i className="fas fa-edit"></i> Edit
-                    </button>
-                    <button
-                      className="action-btn delete-btn"
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        setDeletingMember(member)
-                      }}
-                    >
-                      <i className="fas fa-trash"></i> Delete
-                    </button>
+            {pageMembers.map((member) => {
+              const isActive = selectedMember && String(selectedMember.id) === String(member.id)
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  className={`member-row${isActive ? ' active' : ''}`}
+                  onClick={() => {
+                    setSelectedMember({ ...member })
+                    setDetailTab('details')
+                  }}
+                >
+                  <div className="member-row-main">
+                    <div className="member-row-name">
+                      {member.title ? `${member.title} ` : ''}{member.name || 'Member'}
+                    </div>
+                    <div className="member-row-meta">
+                      <span>{member.role || 'Member'}</span>
+                      <span>•</span>
+                      <span>{member.cellName || 'No Cell'}</span>
+                    </div>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  <div className="member-row-actions">
+                    <span className="member-row-tag">{member.gender || '-'}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          <div className="table-pagination">
+            <button
+              className="btn"
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            >
+              Prev
+            </button>
+            <span className="pagination-label">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              className="btn"
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            >
+              Next
+            </button>
+          </div>
+          <div className="members-count">
+            Showing <span id="membersCount">{filtered.length}</span> members
+          </div>
+        </div>
 
-      <div className="table-pagination">
-        <button
-          className="btn"
-          type="button"
-          disabled={currentPage === 1}
-          onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-        >
-          Prev
-        </button>
-        <span className="pagination-label">
-          Page {currentPage} of {totalPages}
-        </span>
-        <button
-          className="btn"
-          type="button"
-          disabled={currentPage === totalPages}
-          onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-        >
-          Next
-        </button>
-      </div>
+        <div className="members-detail-panel">
+          {!selectedMember && (
+            <div className="dashboard-note">Select a member to view details.</div>
+          )}
+          {selectedMember && (
+            <div className="member-detail-card">
+              <div className="member-detail-header">
+                <div>
+                  <h2>
+                    {selectedMember.title ? `${selectedMember.title} ` : ''}
+                    {selectedMember.name || 'Member'}
+                  </h2>
+                  <div className="member-detail-meta">
+                    <span>{selectedMember.role || 'Member'}</span>
+                    <span>•</span>
+                    <span>{selectedMember.cellName || 'No Cell'}</span>
+                  </div>
+                </div>
+                <div className="member-detail-actions">
+                  <button
+                    className="btn ghost-btn"
+                    type="button"
+                    onClick={() => setEditingMember({ ...selectedMember })}
+                  >
+                    <i className="fas fa-edit"></i> Edit
+                  </button>
+                  <button
+                    className="btn ghost-btn danger"
+                    type="button"
+                    onClick={() => setDeletingMember(selectedMember)}
+                  >
+                    <i className="fas fa-trash"></i> Delete
+                  </button>
+                </div>
+              </div>
 
-      <div style={{ textAlign: 'center', marginTop: '20px', color: 'var(--gray-color)' }}>
-        Showing <span id="membersCount">{filtered.length}</span> members
+              <div className="cell-tabs" style={{ marginBottom: '12px' }}>
+                <button
+                  className={`cell-tab-btn${detailTab === 'details' ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDetailTab('details')}
+                >
+                  Details
+                </button>
+                <button
+                  className={`cell-tab-btn${detailTab === 'cell' ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDetailTab('cell')}
+                >
+                  Cell Info
+                </button>
+                <button
+                  className={`cell-tab-btn${detailTab === 'dept' ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDetailTab('dept')}
+                >
+                  Dept.
+                </button>
+                <button
+                  className={`cell-tab-btn${detailTab === 'attendance' ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDetailTab('attendance')}
+                >
+                  Attendance
+                </button>
+              </div>
+
+              {detailTab === 'details' && (
+                <div className="detail-grid">
+                  <div className="detail-row"><span>Title</span><strong>{selectedMember.title || '-'}</strong></div>
+                  <div className="detail-row"><span>Name</span><strong>{selectedMember.name || '-'}</strong></div>
+                  <div className="detail-row"><span>Mobile</span><strong>{selectedMember.mobile || '-'}</strong></div>
+                  <div className="detail-row"><span>Email</span><strong>{selectedMember.email || '-'}</strong></div>
+                  <div className="detail-row"><span>Gender</span><strong>{selectedMember.gender || '-'}</strong></div>
+                </div>
+              )}
+
+              {detailTab === 'cell' && (
+                <div className="detail-grid">
+                  <div className="detail-row"><span>Cell Name</span><strong>{selectedMember.cellName || '-'}</strong></div>
+                  <div className="detail-row"><span>Cell Role</span><strong>{selectedMember.role || '-'}</strong></div>
+                  <div className="detail-row"><span>Cell Venue</span><strong>{selectedMember.cellVenue || '-'}</strong></div>
+                  <div className="detail-row"><span>Cell Day</span><strong>{selectedMember.cellDay || '-'}</strong></div>
+                  <div className="detail-row"><span>Cell Time</span><strong>{selectedMember.cellTime || '-'}</strong></div>
+                </div>
+              )}
+
+              {detailTab === 'dept' && (
+                <div className="detail-grid">
+                  <div className="detail-row"><span>Department</span><strong>{departmentLookup.get(String(selectedMember.departmentId || selectedMember.department_id))?.name || '-'}</strong></div>
+                </div>
+              )}
+
+              {detailTab === 'attendance' && (
+                <div className="detail-grid">
+                  {attendanceLoading && <div className="dashboard-note">Loading attendance...</div>}
+                  {!attendanceLoading && (
+                    <>
+                      <div className="detail-row"><span>Present</span><strong>{attendanceSummary?.present ?? 0}</strong></div>
+                      <div className="detail-row"><span>Absent</span><strong>{attendanceSummary?.absent ?? 0}</strong></div>
+                      <div className="detail-row"><span>Total Reports</span><strong>{attendanceSummary?.records?.length ?? 0}</strong></div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {editingMember && (
@@ -387,130 +456,6 @@ function Members() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedMember && (
-        <div className="modal-overlay active" onClick={() => setSelectedMember(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Member Details</h3>
-              <button className="close-modal" type="button" onClick={() => setSelectedMember(null)}>
-                &times;
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="cell-tabs" style={{ marginBottom: '12px' }}>
-                <button
-                  className={`cell-tab-btn${detailTab === 'details' ? ' active' : ''}`}
-                  type="button"
-                  onClick={() => setDetailTab('details')}
-                >
-                  Details
-                </button>
-                <button
-                  className={`cell-tab-btn${detailTab === 'cell' ? ' active' : ''}`}
-                  type="button"
-                  onClick={() => setDetailTab('cell')}
-                >
-                  Cell Info
-                </button>
-                <button
-                  className={`cell-tab-btn${detailTab === 'dept' ? ' active' : ''}`}
-                  type="button"
-                  onClick={() => setDetailTab('dept')}
-                >
-                  Dept.
-                </button>
-                <button
-                  className={`cell-tab-btn${detailTab === 'attendance' ? ' active' : ''}`}
-                  type="button"
-                  onClick={() => setDetailTab('attendance')}
-                >
-                  Attendance
-                </button>
-              </div>
-
-              {detailTab === 'details' && (
-                <div className="table-container">
-                  <table className="mobile-grid-table">
-                    <tbody>
-                      <tr><td data-label="Title">{selectedMember.title || '-'}</td></tr>
-                      <tr><td data-label="Name">{selectedMember.name || '-'}</td></tr>
-                      <tr><td data-label="Mobile">{selectedMember.mobile || '-'}</td></tr>
-                      <tr><td data-label="Email">{selectedMember.email || '-'}</td></tr>
-                      <tr><td data-label="Gender">{selectedMember.gender || '-'}</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {detailTab === 'cell' && (
-                <div className="table-container">
-                  <table className="mobile-grid-table">
-                    <tbody>
-                      <tr><td data-label="Cell Name">{selectedMember.cellName || '-'}</td></tr>
-                      <tr><td data-label="Cell Role">{selectedMember.role || '-'}</td></tr>
-                      <tr><td data-label="Cell Venue">{selectedMember.cellVenue || '-'}</td></tr>
-                      <tr><td data-label="Cell Day">{selectedMember.cellDay || '-'}</td></tr>
-                      <tr><td data-label="Cell Time">{selectedMember.cellTime || '-'}</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {detailTab === 'dept' && (
-                <div className="table-container">
-                  <table className="mobile-grid-table">
-                    <tbody>
-                      {(() => {
-                        const deptId = selectedMember.departmentId ? String(selectedMember.departmentId) : ''
-                        const dept = deptId ? departmentLookup.get(deptId) : null
-                        const name = selectedMember.departmentName || dept?.name || '-'
-                        const hod = selectedMember.departmentHead || dept?.hodName || '-'
-                        const hodMobile = selectedMember.departmentHeadMobile || dept?.hodMobile || '-'
-                        return (
-                          <>
-                            <tr><td data-label="Department">{name || '-'}</td></tr>
-                            <tr><td data-label="HOD">{hod || '-'}</td></tr>
-                            <tr><td data-label="HOD Mobile">{hodMobile || '-'}</td></tr>
-                          </>
-                        )
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {detailTab === 'attendance' && (
-                <div className="table-container">
-                  {attendanceLoading ? (
-                    <div style={{ color: 'var(--gray-color)' }}>Loading attendance...</div>
-                  ) : (
-                    <table className="mobile-grid-table">
-                      <tbody>
-                        <tr><td data-label="Present">{attendanceSummary?.present ?? 0}</td></tr>
-                        <tr><td data-label="Absent">{attendanceSummary?.absent ?? 0}</td></tr>
-                        <tr><td data-label="Total">{attendanceSummary?.total ?? 0}</td></tr>
-                        {attendanceRecords.length === 0 && (
-                          <tr><td data-label="Records">No attendance records yet.</td></tr>
-                        )}
-                        {attendanceRecords.slice(0, 5).map((record) => (
-                          <tr key={record.reportId}>
-                            <td data-label="Record">
-                              {(record.reportDate ? new Date(record.reportDate).toLocaleDateString() : 'Report')}
-                              {' - '}
-                              {record.present ? 'Present' : 'Absent'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>
