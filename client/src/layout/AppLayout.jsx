@@ -36,6 +36,7 @@ function AppLayout() {
   const [logoTitle, setLogoTitle] = useState('Christ Embassy')
   const [logoSubtitle, setLogoSubtitle] = useState('Church Cell Data')
   const [showGreeting, setShowGreeting] = useState(true)
+  const [greetingName, setGreetingName] = useState(() => localStorage.getItem('username') || 'User')
   const location = useLocation()
   const navigate = useNavigate()
   const notificationsRef = useRef(null)
@@ -341,6 +342,27 @@ function AppLayout() {
     return () => clearTimeout(timer)
   }, [])
 
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const loadGreetingName = async () => {
+      try {
+        const res = await fetch('/api/profile/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const profile = await res.json()
+        const name =
+          (profile?.fullName && String(profile.fullName).trim()) ||
+          (profile?.username && String(profile.username).trim()) ||
+          localStorage.getItem('username') ||
+          'User'
+        setGreetingName(name)
+      } catch {}
+    }
+    loadGreetingName()
+  }, [])
+
   const handleToggleNotifications = (event) => {
     event.stopPropagation()
     setNotificationsOpen((prev) => !prev)
@@ -592,7 +614,7 @@ function AppLayout() {
         {showGreeting && (
           <div className="greeting-toast" role="status" aria-live="polite">
             <i className="fas fa-hand-sparkles"></i>
-            <span>{getGreeting()}, welcome back.</span>
+            <span>{getGreeting()}, {greetingName}.</span>
           </div>
         )}
         <div className="page-header app-global-header">
