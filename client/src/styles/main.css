@@ -2635,6 +2635,174 @@
             }
 
 
+/* Mobile UX upgrade layer (Options 1-5 baseline) */
+:root {
+    --text-base: 16px;
+    --text-sm: 0.875rem;
+    --text-lg: 1.125rem;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --mobile-bottom-nav-height: 68px;
+    --touch-target: 44px;
+}
+
+body {
+    font-size: var(--text-base);
+}
+
+.mobile-bottom-nav {
+    display: none;
+}
+
+.greeting-toast {
+    position: sticky;
+    top: 8px;
+    z-index: 70;
+    margin: 0 auto 10px;
+    width: fit-content;
+    max-width: calc(100% - 24px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.12);
+    border: 1px solid rgba(15, 118, 110, 0.26);
+    color: #0f172a;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+    animation: greetingIn 220ms ease-out;
+}
+
+.dark-theme .greeting-toast {
+    background: rgba(30, 64, 175, 0.2);
+    border-color: rgba(96, 165, 250, 0.35);
+    color: #e2e8f0;
+}
+
+@keyframes greetingIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Option 1 + 4 + 5: better mobile table cards + paint optimization */
+@media (max-width: 768px) {
+    .table-container .mobile-grid-table tbody tr {
+        content-visibility: auto;
+        contain-intrinsic-size: 220px;
+        border-radius: 16px;
+    }
+
+    .table-container .mobile-grid-table tbody td {
+        min-height: var(--touch-target);
+        align-items: center;
+    }
+
+    .table-container .mobile-grid-table tbody td[data-label="Actions"] {
+        padding-top: 12px;
+    }
+
+    .table-container .mobile-grid-table tbody td[data-label="Actions"] .action-buttons {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .table-container .mobile-grid-table tbody td[data-label="Actions"] .action-btn {
+        min-height: var(--touch-target);
+        flex: 1 1 calc(50% - 8px);
+    }
+
+    .main-content {
+        padding-bottom: calc(var(--mobile-bottom-nav-height) + 34px);
+    }
+}
+
+/* Option 2: sticky actions container for pages that opt-in */
+@media (max-width: 768px) {
+    .mobile-sticky-actions {
+        position: sticky;
+        left: 0;
+        right: 0;
+        bottom: calc(var(--mobile-bottom-nav-height) + 12px);
+        z-index: 65;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(15, 118, 110, 0.15);
+        border-radius: 14px;
+        padding: 10px;
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 8px;
+    }
+
+    .dark-theme .mobile-sticky-actions {
+        background: rgba(15, 23, 42, 0.94);
+        border-color: rgba(148, 163, 184, 0.25);
+    }
+}
+
+/* Option 3: bottom nav */
+@media (max-width: 1024px) {
+    .mobile-bottom-nav {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: var(--mobile-bottom-nav-height);
+        z-index: 80;
+        background: rgba(15, 23, 42, 0.97);
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(8px);
+    }
+
+    .mobile-bottom-item {
+        display: flex;
+        min-height: var(--touch-target);
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 2px;
+        color: rgba(226, 232, 240, 0.76);
+        font-size: 0.68rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        border: none;
+        background: transparent;
+        font-family: inherit;
+    }
+
+    .mobile-bottom-item i {
+        font-size: 1rem;
+    }
+
+    .mobile-bottom-item.active {
+        color: #ffffff;
+        background: rgba(59, 130, 246, 0.2);
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --text-base: 15px;
+        --text-sm: 0.8125rem;
+        --text-lg: 1rem;
+    }
+}
+
 
 
 

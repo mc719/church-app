@@ -134,7 +134,7 @@ function FoundationSchool() {
         ))}
       </div>
 
-      <div className="cell-tabs foundation-tabs">
+      <div className="cell-tabs foundation-tabs mobile-sticky-actions">
         <button className={`cell-tab-btn${tab === 'students' ? ' active' : ''}`} type="button" onClick={() => setTab('students')}>
           Students
         </button>

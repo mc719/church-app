@@ -567,14 +567,14 @@ function Cells() {
             </button>
             </div>
             {activeTab === 'members' && (
-              <div className="cell-tabs-actions">
+              <div className="cell-tabs-actions mobile-sticky-actions">
                 <button className="btn btn-success" type="button" onClick={() => setShowAddMember(true)}>
                   <i className="fas fa-user-plus"></i> Add Member
                 </button>
               </div>
             )}
             {activeTab === 'reports' && (
-              <div className="cell-tabs-actions">
+              <div className="cell-tabs-actions mobile-sticky-actions">
                 <button className="btn btn-success" type="button" onClick={() => setShowAddReport(true)}>
                   <i className="fas fa-plus"></i> Add Report
                 </button>
@@ -629,7 +629,7 @@ function Cells() {
 
           {activeTab === 'reports' && (
             <>
-              <div className="page-actions" style={{ justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="page-actions mobile-sticky-actions" style={{ justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                 <div className="search-box">
                   <input
                     type="text"

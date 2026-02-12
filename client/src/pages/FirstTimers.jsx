@@ -413,9 +413,11 @@ function FirstTimers() {
                 Archive
               </button>
             </div>
-            <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
-              <i className="fas fa-user-plus"></i> Add New First-Timer
-            </button>
+            <div className="mobile-sticky-actions">
+              <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
+                <i className="fas fa-user-plus"></i> Add New First-Timer
+              </button>
+            </div>
           </div>
           <div className="first-timers-list">
             {filteredFirstTimers.length === 0 && <div className="dashboard-note">No first-timers found.</div>}
@@ -591,7 +593,7 @@ function FirstTimers() {
                   Follow-up Records
                 </button>
                 {detailTab === 'followups' && (
-                  <div className="cell-tabs-actions">
+                  <div className="cell-tabs-actions mobile-sticky-actions">
                     <button className="btn btn-success" type="button" onClick={() => setShowAddFollowUp(true)}>
                       <i className="fas fa-plus"></i> Add Record
                     </button>

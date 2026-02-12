@@ -478,7 +478,7 @@ function Dashboard({ onAddCell }) {
 
       <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>All Cell Groups</h2>
-        <div className="page-actions">
+        <div className="page-actions mobile-sticky-actions">
           <button
             className="btn btn-success"
             type="button"

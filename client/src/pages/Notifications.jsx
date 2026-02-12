@@ -191,7 +191,7 @@ function Notifications() {
         >
           Send Notification
         </button>
-        <div className="cell-tabs-actions">
+        <div className="cell-tabs-actions mobile-sticky-actions">
           <button className="btn btn-danger" type="button" onClick={() => setShowDeleteConfirm(true)}>
             <i className="fas fa-trash"></i> Delete Selected
           </button>
@@ -339,7 +339,7 @@ function Notifications() {
                   <option value="warning">Warning</option>
                 </select>
               </div>
-              <div className="form-actions">
+              <div className="form-actions mobile-sticky-actions">
                 <button type="submit" className="btn btn-success">
                   <i className="fas fa-paper-plane"></i> Send
                 </button>

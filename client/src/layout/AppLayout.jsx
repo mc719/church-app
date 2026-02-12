@@ -33,6 +33,7 @@ function AppLayout() {
   const [logoSrc, setLogoSrc] = useState(() => localStorage.getItem('logoImage') || '')
   const [logoTitle, setLogoTitle] = useState('Christ Embassy')
   const [logoSubtitle, setLogoSubtitle] = useState('Church Cell Data')
+  const [showGreeting, setShowGreeting] = useState(true)
   const location = useLocation()
   const navigate = useNavigate()
   const notificationsRef = useRef(null)
@@ -40,6 +41,8 @@ function AppLayout() {
 
   const navClass = ({ isActive }) => `nav-item${isActive ? ' active' : ''}`
   const pageTitle = pageMeta[location.pathname]?.label || defaultPages.find((p) => p.id === location.pathname)?.label || 'Dashboard'
+  const isHomeActive = location.pathname === '/'
+  const isProfileActive = location.pathname === '/profile'
 
   useEffect(() => {
     const isDark = theme === 'dark'
@@ -317,6 +320,19 @@ function AppLayout() {
     (note) => !(note.readAt || note.read_at)
   )
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 18) return 'Good afternoon'
+    return 'Good evening'
+  }
+
+  useEffect(() => {
+    setShowGreeting(true)
+    const timer = setTimeout(() => setShowGreeting(false), 5000)
+    return () => clearTimeout(timer)
+  }, [])
+
   const handleToggleNotifications = (event) => {
     event.stopPropagation()
     setNotificationsOpen((prev) => !prev)
@@ -488,6 +504,12 @@ function AppLayout() {
       </button>
 
       <div className="main-content">
+        {showGreeting && (
+          <div className="greeting-toast" role="status" aria-live="polite">
+            <i className="fas fa-hand-sparkles"></i>
+            <span>{getGreeting()}, welcome back.</span>
+          </div>
+        )}
         <div className="page-header app-global-header">
           <div className="app-header-title">
             <h1>{pageTitle}</h1>
@@ -561,6 +583,21 @@ function AppLayout() {
           </div>
         </div>
       )}
+
+      <nav className="mobile-bottom-nav mobile-bottom-nav--three" aria-label="Mobile navigation">
+        <NavLink to="/" className={`mobile-bottom-item${isHomeActive ? ' active' : ''}`}>
+          <i className="fas fa-home"></i>
+          <span>Home</span>
+        </NavLink>
+        <button type="button" className={`mobile-bottom-item${sidebarOpen ? ' active' : ''}`} onClick={handleToggleSidebar}>
+          <i className="fas fa-bars"></i>
+          <span>Menu</span>
+        </button>
+        <NavLink to="/profile" className={`mobile-bottom-item${isProfileActive ? ' active' : ''}`}>
+          <i className="fas fa-user"></i>
+          <span>Profile</span>
+        </NavLink>
+      </nav>
     </>
   )
 }
