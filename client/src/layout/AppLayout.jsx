@@ -16,6 +16,7 @@ function AppLayout() {
     { id: '/settings', label: 'Settings', icon: 'fas fa-cog', section: 'admin' }
   ]), [])
 
+  const [mainOpen, setMainOpen] = useState(() => window.innerWidth > 768)
   const [cellGroupsOpen, setCellGroupsOpen] = useState(() => window.innerWidth > 768)
   const [departmentsOpen, setDepartmentsOpen] = useState(() => window.innerWidth > 768)
   const [adminOpen, setAdminOpen] = useState(() => window.innerWidth > 768)
@@ -207,6 +208,7 @@ function AppLayout() {
     const handleResize = () => {
       setIsMobileNav(window.innerWidth <= 1024)
       if (window.innerWidth <= 768) {
+        setMainOpen(false)
         setCellGroupsOpen(false)
         setDepartmentsOpen(false)
         setAdminOpen(false)
@@ -277,6 +279,7 @@ function AppLayout() {
 
   const sectionVisible = (section) => sectionVisibility[section] !== false
   const mainPages = defaultPages.filter((p) => p.section === 'main' && isVisible(p.id) && sectionVisible('Main'))
+  const mobileMainPages = mainPages.filter((p) => p.id !== '/')
   const baseCellPages = defaultPages.filter((p) => p.section === 'cells' && isVisible(p.id) && sectionVisible('Cell Groups'))
   const cellPages = [...cellLinks]
   const departmentPages = [...departmentLinks]
@@ -508,23 +511,35 @@ function AppLayout() {
       </div>
 
       {mobileMenuOpen && (
-        <div className="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Mobile menu">
-          <div className="mobile-menu-sheet-header">
-            <h3>Menu</h3>
-            <button type="button" className="close-modal" onClick={handleCloseSidebar}>&times;</button>
-          </div>
-          <div className="mobile-menu-sheet-content">
-            <div className="mobile-menu-group">
-              <h4>Main</h4>
-              {mainPages.map((page) => {
-                const meta = getPageMeta(page)
-                return (
-                  <NavLink key={`m-${page.id}`} className={navClass} to={page.id} onClick={handleCloseSidebar}>
-                    <i className={meta.icon}></i>
-                    <span>{meta.label}</span>
-                  </NavLink>
-                )
-              })}
+        <div className="mobile-menu-backdrop" onClick={handleCloseSidebar}>
+          <div
+            className="mobile-menu-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile menu"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mobile-menu-sheet-header">
+              <h3>Menu</h3>
+              <button type="button" className="close-modal" onClick={handleCloseSidebar}>&times;</button>
+            </div>
+            <div className="mobile-menu-sheet-content">
+            <div className={`mobile-menu-group accordion-section${mainOpen ? ' open' : ''}`}>
+              <button className="nav-section-title accordion-toggle" type="button" onClick={() => setMainOpen((prev) => !prev)}>
+                <span>Main</span>
+                <i className={`fas fa-chevron-down accordion-caret${mainOpen ? ' open' : ''}`}></i>
+              </button>
+              <div className={`accordion-content${mainOpen ? ' open' : ''}`}>
+                {mobileMainPages.map((page) => {
+                  const meta = getPageMeta(page)
+                  return (
+                    <NavLink key={`m-${page.id}`} className={navClass} to={page.id} onClick={handleCloseSidebar}>
+                      <i className={meta.icon}></i>
+                      <span>{meta.label}</span>
+                    </NavLink>
+                  )
+                })}
+              </div>
             </div>
 
             <div className={`mobile-menu-group accordion-section${cellGroupsOpen ? ' open' : ''}`}>
@@ -579,6 +594,7 @@ function AppLayout() {
                   )
                 })}
               </div>
+            </div>
             </div>
           </div>
         </div>
