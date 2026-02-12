@@ -227,10 +227,11 @@ async function createNotification({ title, message, type = "info", userId = null
       `ALTER TABLE first_timers
           ADD COLUMN IF NOT EXISTS title TEXT,
           ADD COLUMN IF NOT EXISTS surname TEXT,
-          ADD COLUMN IF NOT EXISTS gender TEXT,
+                ADD COLUMN IF NOT EXISTS gender TEXT,
          ADD COLUMN IF NOT EXISTS address TEXT,
          ADD COLUMN IF NOT EXISTS postcode TEXT,
          ADD COLUMN IF NOT EXISTS email TEXT,
+         ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
          ADD COLUMN IF NOT EXISTS photo_data TEXT,
          ADD COLUMN IF NOT EXISTS birthday_month SMALLINT,
          ADD COLUMN IF NOT EXISTS birthday_day SMALLINT,
@@ -242,7 +243,10 @@ async function createNotification({ title, message, type = "info", userId = null
        ADD COLUMN IF NOT EXISTS contact_pref JSONB DEFAULT '[]'::jsonb,
        ADD COLUMN IF NOT EXISTS visit BOOLEAN,
        ADD COLUMN IF NOT EXISTS visit_when TEXT,
-       ADD COLUMN IF NOT EXISTS prayer_requests JSONB DEFAULT '[]'::jsonb`
+       ADD COLUMN IF NOT EXISTS prayer_requests JSONB DEFAULT '[]'::jsonb,
+       ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE,
+       ADD COLUMN IF NOT EXISTS in_foundation_school BOOLEAN NOT NULL DEFAULT FALSE,
+       ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual'`
   );
 
   await pool.query(
@@ -1624,9 +1628,9 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
       );
       if (existing.rows.length === 0) {
         await pool.query(
-          `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id, invited_by)
-           VALUES ($1,$2,NOW(),$3,$4,$5,$6)`,
-          [name, mobile || null, "amber", "Not Yet", cellId || null, null]
+          `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id, invited_by, source)
+           VALUES ($1,$2,NOW(),$3,$4,$5,$6,$7)`,
+          [name, mobile || null, "amber", "Not Yet", cellId || null, null, "cell"]
         );
       }
     }
@@ -1735,9 +1739,9 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
       );
       if (existing.rows.length === 0) {
         await pool.query(
-          `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id, invited_by)
-           VALUES ($1,$2,NOW(),$3,$4,$5,$6)`,
-          [member.name, member.mobile || null, "amber", "Not Yet", member.cellId || null, null]
+          `INSERT INTO first_timers (name, mobile, date_joined, status, foundation_school, cell_id, invited_by, source)
+           VALUES ($1,$2,NOW(),$3,$4,$5,$6,$7)`,
+          [member.name, member.mobile || null, "amber", "Not Yet", member.cellId || null, null, "cell"]
         );
       }
     }
@@ -1875,6 +1879,20 @@ app.get("/api/reports", requireAuth, async (req, res) => {
 // GET FIRST-TIMERS (PROTECTED)
 app.get("/api/first-timers", requireAuth, async (req, res) => {
   try {
+      const includeArchived = String(req.query.includeArchived || "").toLowerCase() === "true";
+      const archivedOnly = String(req.query.archived || "").toLowerCase() === "true";
+      const foundationSchoolOnly = String(req.query.foundationSchool || "").toLowerCase() === "true";
+      const where = [];
+      const params = [];
+      if (archivedOnly) {
+        where.push("ft.archived = TRUE");
+      } else if (!includeArchived) {
+        where.push("COALESCE(ft.archived, FALSE) = FALSE");
+      }
+      if (foundationSchoolOnly) {
+        where.push("COALESCE(ft.in_foundation_school, FALSE) = TRUE");
+      }
+      const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
       const result = await pool.query(
           `SELECT ft.id::text as id,
                   ft.title,
@@ -1901,11 +1919,19 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
               ft.status,
               ft.foundation_school as "foundationSchool",
               ft.invited_by as "invitedBy",
+              COALESCE(ft.archived, FALSE) as archived,
+              COALESCE(ft.in_foundation_school, FALSE) as "inFoundationSchool",
+              COALESCE(ft.source, 'manual') as source,
+              ft.department_id::text as "departmentId",
+              d.name as "departmentName",
               ft.cell_id::text as "cellId",
               c.name as "cellName"
        FROM first_timers ft
        LEFT JOIN cells c ON c.id = ft.cell_id
-       ORDER BY ft.date_joined DESC NULLS LAST, ft.id DESC`
+       LEFT JOIN departments d ON d.id = ft.department_id
+       ${whereSql}
+       ORDER BY ft.date_joined DESC NULLS LAST, ft.id DESC`,
+      params
     );
     res.json(result.rows);
   } catch (err) {
@@ -1941,6 +1967,7 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
       status,
       foundationSchool,
       cellId,
+      departmentId,
       invitedBy
     } = req.body || {};
 
@@ -1975,10 +2002,16 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
               ft.status,
               ft.foundation_school as "foundationSchool",
               ft.invited_by as "invitedBy",
+              COALESCE(ft.archived, FALSE) as archived,
+              COALESCE(ft.in_foundation_school, FALSE) as "inFoundationSchool",
+              COALESCE(ft.source, 'manual') as source,
+              ft.department_id::text as "departmentId",
+              d.name as "departmentName",
               ft.cell_id::text as "cellId",
               c.name as "cellName"
        FROM first_timers ft
        LEFT JOIN cells c ON c.id = ft.cell_id
+       LEFT JOIN departments d ON d.id = ft.department_id
        WHERE ft.name = $1
          AND ft.mobile IS NOT DISTINCT FROM $2
          AND ft.cell_id IS NOT DISTINCT FROM $3
@@ -1994,9 +2027,9 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
            title, name, surname, gender, mobile, email, photo_data, address, postcode,
          birthday_month, birthday_day, age_group, marital_status, born_again, speak_tongues,
          find_out, contact_pref, visit, visit_when, prayer_requests,
-         date_joined, status, foundation_school, cell_id, invited_by
+         date_joined, status, foundation_school, cell_id, department_id, invited_by, source
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17::jsonb,$18,$19,$20::jsonb,$21,$22,$23,$24,$25)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17::jsonb,$18,$19,$20::jsonb,$21,$22,$23,$24,$25,$26,$27)
        RETURNING id::text as id,
                  title,
                  name,
@@ -2022,6 +2055,10 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
                  status,
                  foundation_school as "foundationSchool",
                  invited_by as "invitedBy",
+                 COALESCE(archived, FALSE) as archived,
+                 COALESCE(in_foundation_school, FALSE) as "inFoundationSchool",
+                 COALESCE(source, 'manual') as source,
+                 department_id::text as "departmentId",
                  cell_id::text as "cellId"`,
       [
         title || null,
@@ -2048,7 +2085,9 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
         status || "amber",
         foundationSchool || "Not Yet",
         cellId || null,
-        invitedBy || null
+        departmentId || null,
+        invitedBy || null,
+        cellId ? "cell" : "manual"
       ]
     );
 
@@ -2111,6 +2150,7 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
         status,
         foundationSchool,
         cellId,
+        departmentId,
         invitedBy
     } = req.body || {};
 
@@ -2145,8 +2185,9 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
            status = COALESCE($22, status),
            foundation_school = COALESCE($23, foundation_school),
            cell_id = COALESCE($24, cell_id),
-           invited_by = COALESCE($25, invited_by)
-       WHERE id = $26
+           department_id = COALESCE($25, department_id),
+           invited_by = COALESCE($26, invited_by)
+       WHERE id = $27
        RETURNING id::text as id,
                  title,
                  name,
@@ -2172,6 +2213,10 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
                  status,
                  foundation_school as "foundationSchool",
                  invited_by as "invitedBy",
+                 COALESCE(archived, FALSE) as archived,
+                 COALESCE(in_foundation_school, FALSE) as "inFoundationSchool",
+                 COALESCE(source, 'manual') as source,
+                 department_id::text as "departmentId",
                  cell_id::text as "cellId"`,
       [
         title ?? null,
@@ -2198,6 +2243,7 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
         status ?? null,
         foundationSchool ?? null,
         cellId ?? null,
+        departmentId ?? null,
         invitedBy ?? null,
         req.params.id
       ]
@@ -2223,6 +2269,140 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update first-timer" });
+  }
+});
+
+// FIRST-TIMER DECISION ACTIONS (PROTECTED)
+app.put("/api/first-timers/:id/decision", requireAuth, async (req, res) => {
+  try {
+    const { action, cellId, departmentId } = req.body || {};
+    if (!action) {
+      return res.status(400).json({ error: "Action is required" });
+    }
+
+    const existing = await pool.query(
+      `SELECT id::text as id, name, email, mobile, title, gender, source, cell_id::text as "cellId"
+       FROM first_timers
+       WHERE id = $1
+       LIMIT 1`,
+      [req.params.id]
+    );
+    if (!existing.rows.length) {
+      return res.status(404).json({ error: "First-timer not found" });
+    }
+    const firstTimer = existing.rows[0];
+
+    let updateSql = "";
+    let updateParams = [];
+    if (action === "archive") {
+      updateSql = `UPDATE first_timers SET archived = TRUE WHERE id = $1`;
+      updateParams = [req.params.id];
+    } else if (action === "unarchive") {
+      updateSql = `UPDATE first_timers SET archived = FALSE WHERE id = $1`;
+      updateParams = [req.params.id];
+    } else if (action === "assignCell") {
+      if (!cellId) return res.status(400).json({ error: "cellId is required" });
+      if (String(firstTimer.source || "").toLowerCase() === "cell") {
+        return res.status(400).json({ error: "This first-timer already came from a cell" });
+      }
+      updateSql = `UPDATE first_timers SET cell_id = $1 WHERE id = $2`;
+      updateParams = [cellId, req.params.id];
+    } else if (action === "assignDepartment") {
+      if (!departmentId) return res.status(400).json({ error: "departmentId is required" });
+      updateSql = `UPDATE first_timers SET department_id = $1 WHERE id = $2`;
+      updateParams = [departmentId, req.params.id];
+    } else if (action === "assignFoundationSchool") {
+      updateSql = `UPDATE first_timers SET in_foundation_school = TRUE, foundation_school = 'Yes' WHERE id = $1`;
+      updateParams = [req.params.id];
+    } else {
+      return res.status(400).json({ error: "Unsupported action" });
+    }
+
+    await pool.query(updateSql, updateParams);
+
+    if (action === "assignCell" || action === "assignDepartment") {
+      const targetCellId = action === "assignCell" ? cellId : (firstTimer.cellId || null);
+      const targetDepartmentId = action === "assignDepartment" ? departmentId : null;
+      const existingMember = await pool.query(
+        `SELECT id
+         FROM members
+         WHERE LOWER(name) = LOWER($1)
+           AND mobile IS NOT DISTINCT FROM $2
+         LIMIT 1`,
+        [firstTimer.name || "", firstTimer.mobile || null]
+      );
+
+      if (existingMember.rows.length) {
+        await pool.query(
+          `UPDATE members
+           SET cell_id = COALESCE($1, cell_id),
+               department_id = COALESCE($2, department_id),
+               role = COALESCE(role, 'First-Timer')
+           WHERE id = $3`,
+          [targetCellId, targetDepartmentId, existingMember.rows[0].id]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO members (cell_id, department_id, title, name, gender, mobile, email, role, joined_date, is_first_timer)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),TRUE)`,
+          [
+            targetCellId || null,
+            targetDepartmentId || null,
+            firstTimer.title || null,
+            firstTimer.name || "",
+            firstTimer.gender || null,
+            firstTimer.mobile || null,
+            firstTimer.email || null,
+            "First-Timer"
+          ]
+        );
+      }
+    }
+
+    const result = await pool.query(
+      `SELECT ft.id::text as id,
+              ft.title,
+              ft.name,
+              ft.surname,
+              ft.gender,
+              ft.mobile,
+              ft.email,
+              ft.photo_data as "photoData",
+              ft.address,
+              ft.postcode,
+              ft.date_joined as "dateJoined",
+              ft.birthday_month as "birthdayMonth",
+              ft.birthday_day as "birthdayDay",
+              ft.age_group as "ageGroup",
+              ft.marital_status as "maritalStatus",
+              ft.born_again as "bornAgain",
+              ft.speak_tongues as "speakTongues",
+              COALESCE(ft.find_out, '[]'::jsonb) as "findOut",
+              COALESCE(ft.contact_pref, '[]'::jsonb) as "contactPref",
+              ft.visit,
+              ft.visit_when as "visitWhen",
+              COALESCE(ft.prayer_requests, '[]'::jsonb) as "prayerRequests",
+              ft.status,
+              ft.foundation_school as "foundationSchool",
+              ft.invited_by as "invitedBy",
+              COALESCE(ft.archived, FALSE) as archived,
+              COALESCE(ft.in_foundation_school, FALSE) as "inFoundationSchool",
+              COALESCE(ft.source, 'manual') as source,
+              ft.department_id::text as "departmentId",
+              d.name as "departmentName",
+              ft.cell_id::text as "cellId",
+              c.name as "cellName"
+       FROM first_timers ft
+       LEFT JOIN cells c ON c.id = ft.cell_id
+       LEFT JOIN departments d ON d.id = ft.department_id
+       WHERE ft.id = $1`,
+      [req.params.id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to apply decision" });
   }
 });
 
@@ -2902,8 +3082,8 @@ app.get(/.*/, (req, res) => {
 // ===============================
 // 7) START SERVER (ALWAYS LAST)
 // ===============================
-ensureFirstTimerSchema()
-  .then(() => ensureUserProfilesSchema())
+ensureUserProfilesSchema()
+  .then(() => ensureFirstTimerSchema())
   .then(() => seedProfilesForExistingUsers())
   .then(() => {
     app.listen(PORT, () => {

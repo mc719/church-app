@@ -6,9 +6,14 @@ const API_BASE = '/api'
 function FirstTimers() {
   const [firstTimers, setFirstTimers] = useState([])
   const [followUps, setFollowUps] = useState([])
+  const [cells, setCells] = useState([])
+  const [departments, setDepartments] = useState([])
   const [search, setSearch] = useState('')
+  const [listTab, setListTab] = useState('active')
   const [selectedFirstTimer, setSelectedFirstTimer] = useState(null)
   const [detailTab, setDetailTab] = useState('details')
+  const [decidingFirstTimer, setDecidingFirstTimer] = useState(null)
+  const [decisionForm, setDecisionForm] = useState({ cellId: '', departmentId: '' })
   const [deletingFirstTimer, setDeletingFirstTimer] = useState(null)
   const [editingFollowUp, setEditingFollowUp] = useState(null)
   const [deletingFollowUp, setDeletingFollowUp] = useState(null)
@@ -41,16 +46,22 @@ function FirstTimers() {
     const headers = { Authorization: `Bearer ${token}` }
 
     Promise.all([
-      fetch(`${API_BASE}/first-timers`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/follow-ups`, { headers }).then((r) => (r.ok ? r.json() : []))
+      fetch(`${API_BASE}/first-timers?includeArchived=true`, { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/follow-ups`, { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/cells`, { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/departments`, { headers }).then((r) => (r.ok ? r.json() : []))
     ])
-      .then(([firstTimersData, followUpsData]) => {
+      .then(([firstTimersData, followUpsData, cellsData, departmentsData]) => {
         setFirstTimers(Array.isArray(firstTimersData) ? firstTimersData : [])
         setFollowUps(Array.isArray(followUpsData) ? followUpsData : [])
+        setCells(Array.isArray(cellsData) ? cellsData : [])
+        setDepartments(Array.isArray(departmentsData) ? departmentsData : [])
       })
       .catch(() => {
         setFirstTimers([])
         setFollowUps([])
+        setCells([])
+        setDepartments([])
       })
   }, [])
 
@@ -70,8 +81,13 @@ function FirstTimers() {
 
   const filteredFirstTimers = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return firstTimers
-    return firstTimers.filter((item) => {
+    const scopedList = firstTimers.filter((item) =>
+      listTab === 'archive'
+        ? !!item.archived
+        : (!item.archived && !item.inFoundationSchool)
+    )
+    if (!term) return scopedList
+    return scopedList.filter((item) => {
       const values = [
         item.title,
         item.name,
@@ -88,7 +104,7 @@ function FirstTimers() {
         .toLowerCase()
       return values.includes(term)
     })
-  }, [firstTimers, search])
+  }, [firstTimers, search, listTab])
 
   const filteredFollowUps = useMemo(() => {
     if (!selectedFirstTimer?.id) return []
@@ -120,6 +136,34 @@ function FirstTimers() {
     if (!res.ok) return
     setFirstTimers((prev) => prev.filter((item) => String(item.id) !== String(deletingFirstTimer.id)))
     setDeletingFirstTimer(null)
+  }
+
+  const applyDecision = async (action) => {
+    if (!decidingFirstTimer) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const payload = { action }
+    if (action === 'assignCell') payload.cellId = decisionForm.cellId || null
+    if (action === 'assignDepartment') payload.departmentId = decisionForm.departmentId || null
+    const res = await fetch(`${API_BASE}/first-timers/${decidingFirstTimer.id}/decision`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) return
+    const updated = await res.json()
+    setFirstTimers((prev) => prev.map((item) => (String(item.id) === String(updated.id) ? updated : item)))
+    if (selectedFirstTimer && String(selectedFirstTimer.id) === String(updated.id)) {
+      setSelectedFirstTimer(updated)
+    }
+    if (action === 'archive' || action === 'unarchive') {
+      setListTab(action === 'archive' ? 'archive' : 'active')
+    }
+    setDecidingFirstTimer(null)
+    setDecisionForm({ cellId: '', departmentId: '' })
   }
 
   const handleInlineSave = async (item) => {
@@ -353,6 +397,22 @@ function FirstTimers() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <div className="cell-tabs">
+              <button
+                className={`cell-tab-btn${listTab === 'active' ? ' active' : ''}`}
+                type="button"
+                onClick={() => setListTab('active')}
+              >
+                First-Timers
+              </button>
+              <button
+                className={`cell-tab-btn${listTab === 'archive' ? ' active' : ''}`}
+                type="button"
+                onClick={() => setListTab('archive')}
+              >
+                Archive
+              </button>
+            </div>
             <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
               <i className="fas fa-user-plus"></i> Add New First-Timer
             </button>
@@ -394,7 +454,22 @@ function FirstTimers() {
                       </div>
                     </div>
                   </div>
-                  <span className="first-timer-row-tag">{item.gender || '-'}</span>
+                  <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
+                    <span className="first-timer-row-tag">{item.gender || '-'}</span>
+                    <button
+                      type="button"
+                      className="action-btn edit-btn"
+                      onClick={() => {
+                        setDecidingFirstTimer(item)
+                        setDecisionForm({
+                          cellId: item.cellId || '',
+                          departmentId: item.departmentId || ''
+                        })
+                      }}
+                    >
+                      Decide
+                    </button>
+                  </div>
                 </button>
               )
             })}
@@ -402,6 +477,62 @@ function FirstTimers() {
         </div>
 
         <div className="first-timers-detail-panel">
+          {listTab === 'archive' ? (
+            <div className="table-container">
+              <table className="mobile-grid-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Mobile</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredFirstTimers.length === 0 && (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '32px' }}>No archived first-timers.</td>
+                    </tr>
+                  )}
+                  {filteredFirstTimers.map((item) => (
+                    <tr key={item.id}>
+                      <td data-label="Name">{item.title ? `${item.title} ` : ''}{item.name || ''} {item.surname || ''}</td>
+                      <td data-label="Mobile">{item.mobile || '-'}</td>
+                      <td data-label="Status">{item.status || '-'}</td>
+                      <td data-label="Actions">
+                        <div className="action-buttons">
+                          <button
+                            type="button"
+                            className="action-btn edit-btn"
+                            onClick={() => {
+                              setListTab('active')
+                              setSelectedFirstTimer({ ...item, archived: false })
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="action-btn delete-btn"
+                            onClick={() => {
+                              setDecidingFirstTimer(item)
+                              setDecisionForm({
+                                cellId: item.cellId || '',
+                                departmentId: item.departmentId || ''
+                              })
+                            }}
+                          >
+                            Unarchive
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+          <>
           {!selectedFirstTimer && <div className="dashboard-note">Select a first-timer to view details.</div>}
           {selectedFirstTimer && (
             <>
@@ -418,6 +549,19 @@ function FirstTimers() {
                   </div>
                 </div>
                 <div className="member-detail-actions">
+                  <button
+                    className="btn ghost-btn"
+                    type="button"
+                    onClick={() => {
+                      setDecidingFirstTimer(selectedFirstTimer)
+                      setDecisionForm({
+                        cellId: selectedFirstTimer.cellId || '',
+                        departmentId: selectedFirstTimer.departmentId || ''
+                      })
+                    }}
+                  >
+                    <i className="fas fa-check-circle"></i> Decide
+                  </button>
                   <button className="btn ghost-btn" type="button" onClick={() => handleInlineSave(selectedFirstTimer)}>
                     <i className="fas fa-save"></i> Save
                   </button>
@@ -606,9 +750,93 @@ function FirstTimers() {
               )}
             </>
           )}
+          </>
+          )}
         </div>
       </div>
 
+
+      {decidingFirstTimer && (
+        <div className="modal-overlay active" onClick={() => setDecidingFirstTimer(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Decide: {decidingFirstTimer.name || 'First-Timer'}</h3>
+              <button className="close-modal" type="button" onClick={() => setDecidingFirstTimer(null)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Archive</label>
+                <button className="btn btn-warning" type="button" onClick={() => applyDecision('archive')}>
+                  Archive
+                </button>
+              </div>
+              <div className="form-group">
+                <label>Assign Cell</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-control"
+                    value={decisionForm.cellId}
+                    onChange={(e) => setDecisionForm((prev) => ({ ...prev, cellId: e.target.value }))}
+                    disabled={String(decidingFirstTimer.source || '').toLowerCase() === 'cell'}
+                  >
+                    <option value="">Select cell</option>
+                    {cells.map((cell) => (
+                      <option key={cell.id} value={cell.id}>{cell.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!decisionForm.cellId || String(decidingFirstTimer.source || '').toLowerCase() === 'cell'}
+                    onClick={() => applyDecision('assignCell')}
+                  >
+                    Assign
+                  </button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Assign Department</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-control"
+                    value={decisionForm.departmentId}
+                    onChange={(e) => setDecisionForm((prev) => ({ ...prev, departmentId: e.target.value }))}
+                  >
+                    <option value="">Select department</option>
+                    {departments.map((department) => (
+                      <option key={department.id} value={department.id}>{department.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!decisionForm.departmentId}
+                    onClick={() => applyDecision('assignDepartment')}
+                  >
+                    Assign
+                  </button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Assign Foundation School</label>
+                <button className="btn btn-success" type="button" onClick={() => applyDecision('assignFoundationSchool')}>
+                  Move to Foundation School
+                </button>
+              </div>
+              {decidingFirstTimer.archived && (
+                <div className="form-group">
+                  <label>Restore</label>
+                  <button className="btn" type="button" onClick={() => applyDecision('unarchive')}>
+                    Unarchive
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddFirstTimer && (
         <div className="modal-overlay active" onClick={() => setShowAddFirstTimer(false)}>

@@ -8,6 +8,7 @@ import Login from './pages/Login.jsx'
 import Reports from './pages/Reports.jsx'
 import Cells from './pages/Cells.jsx'
 import FirstTimers from './pages/FirstTimers.jsx'
+import FoundationSchool from './pages/FoundationSchool.jsx'
 import Birthdays from './pages/Birthdays.jsx'
 import Notifications from './pages/Notifications.jsx'
 import AccessManagement from './pages/AccessManagement.jsx'
@@ -63,6 +64,7 @@ function App() {
           <Route path="cells" element={<Cells />} />
           <Route path="reports" element={<Reports />} />
           <Route path="first-timers" element={<FirstTimers />} />
+          <Route path="foundation-school" element={<FoundationSchool />} />
           <Route path="birthdays" element={<Birthdays />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="departments" element={<Departments />} />

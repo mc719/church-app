@@ -6,6 +6,7 @@ function AppLayout() {
     { id: '/', label: 'Dashboard', icon: 'fas fa-home', section: 'main' },
     { id: '/members', label: 'Members', icon: 'fas fa-users', section: 'main' },
     { id: '/first-timers', label: 'First-Timers', icon: 'fas fa-user-check', section: 'main' },
+    { id: '/foundation-school', label: 'Foundation School', icon: 'fas fa-school', section: 'main' },
     { id: '/birthdays', label: 'Birthdays', icon: 'fas fa-birthday-cake', section: 'main' },
     { id: '/cells', label: 'All Cells', icon: 'fas fa-layer-group', section: 'cells' },
     { id: '/notifications', label: 'Notifications', icon: 'fas fa-bell', section: 'admin' },
