@@ -300,23 +300,45 @@ function FirstTimers() {
   const handleAddPhotoUpload = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      setAddForm((prev) => ({ ...prev, photoData: reader.result }))
-    }
-    reader.readAsDataURL(file)
+    compressImage(file).then((dataUrl) => {
+      setAddForm((prev) => ({ ...prev, photoData: dataUrl }))
+    })
   }
 
   const handleDetailPhotoUpload = (event) => {
     if (!selectedFirstTimer) return
     const file = event.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      updateInline(selectedFirstTimer.id, 'photoData', reader.result)
-    }
-    reader.readAsDataURL(file)
+    compressImage(file).then((dataUrl) => {
+      updateInline(selectedFirstTimer.id, 'photoData', dataUrl)
+    })
   }
+
+  // Keep photo payloads small enough for JSON transport and faster render.
+  const compressImage = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onerror = () => reject(new Error('Failed to read image'))
+      reader.onload = () => {
+        const img = new Image()
+        img.onerror = () => reject(new Error('Failed to process image'))
+        img.onload = () => {
+          const maxSize = 640
+          const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1)
+          const width = Math.max(1, Math.round(img.width * ratio))
+          const height = Math.max(1, Math.round(img.height * ratio))
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return reject(new Error('Failed to create image context'))
+          ctx.drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', 0.78))
+        }
+        img.src = String(reader.result || '')
+      }
+      reader.readAsDataURL(file)
+    }).catch(() => '')
 
   return (
     <div className="first-timers-page">

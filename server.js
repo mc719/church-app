@@ -17,7 +17,8 @@ const PORT = process.env.PORT || 5050;
 // ===============================
 // 3) GLOBAL MIDDLEWARE
 // ===============================
-app.use(express.json());
+app.use(express.json({ limit: "8mb" }));
+app.use(express.urlencoded({ extended: true, limit: "8mb" }));
 app.use("/old", (req, res) => {
   res.status(404).send("Not found");
 });
