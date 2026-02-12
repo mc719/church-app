@@ -16,10 +16,10 @@ function AppLayout() {
     { id: '/settings', label: 'Settings', icon: 'fas fa-cog', section: 'admin' }
   ]), [])
 
-  const [mainOpen, setMainOpen] = useState(() => window.innerWidth > 768)
-  const [cellGroupsOpen, setCellGroupsOpen] = useState(() => window.innerWidth > 768)
-  const [departmentsOpen, setDepartmentsOpen] = useState(() => window.innerWidth > 768)
-  const [adminOpen, setAdminOpen] = useState(() => window.innerWidth > 768)
+  const [mainOpen, setMainOpen] = useState(() => window.innerWidth > 1024)
+  const [cellGroupsOpen, setCellGroupsOpen] = useState(() => window.innerWidth > 1024)
+  const [departmentsOpen, setDepartmentsOpen] = useState(() => window.innerWidth > 1024)
+  const [adminOpen, setAdminOpen] = useState(() => window.innerWidth > 1024)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isMobileNav, setIsMobileNav] = useState(() => window.innerWidth <= 1024)
@@ -207,7 +207,7 @@ function AppLayout() {
   useEffect(() => {
     const handleResize = () => {
       setIsMobileNav(window.innerWidth <= 1024)
-      if (window.innerWidth <= 768) {
+      if (window.innerWidth <= 1024) {
         setMainOpen(false)
         setCellGroupsOpen(false)
         setDepartmentsOpen(false)
@@ -287,7 +287,16 @@ function AppLayout() {
 
   const handleToggleSidebar = () => {
     if (isMobileNav) {
-      setMobileMenuOpen((prev) => !prev)
+      setMobileMenuOpen((prev) => {
+        const next = !prev
+        if (next) {
+          setMainOpen(false)
+          setCellGroupsOpen(false)
+          setDepartmentsOpen(false)
+          setAdminOpen(false)
+        }
+        return next
+      })
       return
     }
     setSidebarOpen((prev) => !prev)
@@ -520,7 +529,19 @@ function AppLayout() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mobile-menu-sheet-header">
-              <h3>Menu</h3>
+              <div className="mobile-menu-brand">
+                {logoSrc ? (
+                  <img src={logoSrc} alt="Logo" className="mobile-menu-logo" />
+                ) : (
+                  <div className="mobile-menu-logo-placeholder">
+                    <i className="fas fa-church"></i>
+                  </div>
+                )}
+                <div className="mobile-menu-brand-text">
+                  <div className="mobile-menu-title">{logoTitle}</div>
+                  <div className="mobile-menu-subtitle">{logoSubtitle}</div>
+                </div>
+              </div>
               <button type="button" className="close-modal" onClick={handleCloseSidebar}>&times;</button>
             </div>
             <div className="mobile-menu-sheet-content">
