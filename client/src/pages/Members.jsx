@@ -136,6 +136,7 @@ function Members() {
         email: editingMember.email,
         role: editingMember.role,
         isFirstTimer: editingMember.isFirstTimer,
+        foundationSchool: editingMember.foundationSchool,
         departmentId: editingMember.departmentId || null,
         dobMonth: editingMember.dobMonth,
         dobDay: editingMember.dobDay
@@ -305,6 +306,7 @@ function Members() {
                   <div className="detail-row"><span>Mobile</span><strong>{selectedMember.mobile || '-'}</strong></div>
                   <div className="detail-row"><span>Email</span><strong>{selectedMember.email || '-'}</strong></div>
                   <div className="detail-row"><span>Gender</span><strong>{selectedMember.gender || '-'}</strong></div>
+                  <div className="detail-row"><span>Foundation School</span><strong>{selectedMember.foundationSchool ? 'Yes' : 'No'}</strong></div>
                 </div>
               )}
 
@@ -427,6 +429,19 @@ function Members() {
                     value={editingMember.isFirstTimer ? 'yes' : 'no'}
                     onChange={(e) =>
                       setEditingMember({ ...editingMember, isFirstTimer: e.target.value === 'yes' })
+                    }
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Foundation School?</label>
+                  <select
+                    className="form-control"
+                    value={editingMember.foundationSchool ? 'yes' : 'no'}
+                    onChange={(e) =>
+                      setEditingMember({ ...editingMember, foundationSchool: e.target.value === 'yes' })
                     }
                   >
                     <option value="no">No</option>

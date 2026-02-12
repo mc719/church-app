@@ -1,0 +1,70 @@
+.foundation-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.foundation-hero {
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.12), rgba(37, 99, 235, 0.08));
+  border: 1px solid rgba(59, 130, 246, 0.18);
+}
+
+.foundation-hero h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.foundation-hero p {
+  margin: 6px 0 0;
+  color: var(--gray-color);
+}
+
+.foundation-class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.foundation-class-card {
+  border-radius: 12px;
+  border: 1px solid rgba(14, 116, 144, 0.2);
+  background: rgba(14, 116, 144, 0.08);
+  padding: 10px;
+}
+
+.foundation-class-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.foundation-class-count {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--gray-color);
+}
+
+.foundation-tabs {
+  margin-top: 2px;
+}
+
+.graduate-badge,
+.student-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.graduate-badge {
+  background: rgba(22, 163, 74, 0.16);
+  color: #166534;
+}
+
+.student-badge {
+  background: rgba(245, 158, 11, 0.16);
+  color: #92400e;
+}

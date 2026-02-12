@@ -246,7 +246,12 @@ async function createNotification({ title, message, type = "info", userId = null
        ADD COLUMN IF NOT EXISTS prayer_requests JSONB DEFAULT '[]'::jsonb,
        ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE,
        ADD COLUMN IF NOT EXISTS in_foundation_school BOOLEAN NOT NULL DEFAULT FALSE,
-       ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual'`
+       ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual',
+       ADD COLUMN IF NOT EXISTS foundation_class TEXT,
+       ADD COLUMN IF NOT EXISTS exam_status TEXT,
+       ADD COLUMN IF NOT EXISTS graduation_date DATE,
+       ADD COLUMN IF NOT EXISTS graduated_year INTEGER,
+       ADD COLUMN IF NOT EXISTS is_graduate BOOLEAN NOT NULL DEFAULT FALSE`
   );
 
   await pool.query(
@@ -258,6 +263,11 @@ async function createNotification({ title, message, type = "info", userId = null
   await pool.query(
     `ALTER TABLE members
        ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL`
+  );
+
+  await pool.query(
+    `ALTER TABLE members
+       ADD COLUMN IF NOT EXISTS foundation_school BOOLEAN NOT NULL DEFAULT FALSE`
   );
 
   await pool.query(
@@ -1541,6 +1551,7 @@ app.get("/api/members", requireAuth, async (req, res) => {
               m.email,
               m.role,
               m.is_first_timer as "isFirstTimer",
+              m.foundation_school as "foundationSchool",
               m.dob_month as "dobMonth",
               m.dob_day as "dobDay",
               CASE
@@ -1575,12 +1586,12 @@ app.get("/api/members", requireAuth, async (req, res) => {
 // ADD MEMBER (AUTH OR ACCESS CODE)
 app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { cellId, departmentId, title, name, gender, mobile, email, role, isFirstTimer, dateOfBirth, dobMonth, dobDay } = req.body;
+    const { cellId, departmentId, title, name, gender, mobile, email, role, isFirstTimer, foundationSchool, dateOfBirth, dobMonth, dobDay } = req.body;
     const parsedDob = parseMonthDay(dateOfBirth || (dobMonth && dobDay ? `${dobMonth}-${dobDay}` : ""));
 
     const result = await pool.query(
-      `INSERT INTO members (cell_id, department_id, title, name, gender, mobile, email, role, is_first_timer, dob_month, dob_day, date_of_birth, joined_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULL, NOW())
+      `INSERT INTO members (cell_id, department_id, title, name, gender, mobile, email, role, is_first_timer, foundation_school, dob_month, dob_day, date_of_birth, joined_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULL, NOW())
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  department_id::text as "departmentId",
@@ -1591,6 +1602,7 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
                  email,
                  role,
                  is_first_timer as "isFirstTimer",
+                 foundation_school as "foundationSchool",
                  dob_month as "dobMonth",
                  dob_day as "dobDay",
                  CASE
@@ -1599,7 +1611,7 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
                    ELSE NULL
                  END as "dateOfBirth",
                  joined_date as "joinedDate"`,
-      [cellId, departmentId, title, name, gender, mobile, email, role, !!isFirstTimer, parsedDob.month, parsedDob.day]
+      [cellId, departmentId, title, name, gender, mobile, email, role, !!isFirstTimer, !!foundationSchool, parsedDob.month, parsedDob.day]
     );
 
     const member = result.rows[0];
@@ -1655,7 +1667,7 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE MEMBER (PROTECTED)
 app.put("/api/members/:id", requireAuth, async (req, res) => {
   try {
-    const { title, name, gender, mobile, email, role, isFirstTimer, cellId, departmentId, dateOfBirth, dobMonth, dobDay } = req.body;
+    const { title, name, gender, mobile, email, role, isFirstTimer, foundationSchool, cellId, departmentId, dateOfBirth, dobMonth, dobDay } = req.body;
     const parsedDob = parseMonthDay(dateOfBirth || (dobMonth && dobDay ? `${dobMonth}-${dobDay}` : ""));
     const hasDobInput = Object.prototype.hasOwnProperty.call(req.body || {}, "dateOfBirth")
       || Object.prototype.hasOwnProperty.call(req.body || {}, "dobMonth")
@@ -1671,10 +1683,11 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
            cell_id = COALESCE($7, cell_id),
            department_id = COALESCE($8, department_id),
            is_first_timer = COALESCE($9, is_first_timer),
-           dob_month = COALESCE($10, dob_month),
-           dob_day = COALESCE($11, dob_day),
+           foundation_school = COALESCE($10, foundation_school),
+           dob_month = COALESCE($11, dob_month),
+           dob_day = COALESCE($12, dob_day),
            date_of_birth = NULL
-       WHERE id = $12
+       WHERE id = $13
        RETURNING id::text as id,
                  cell_id::text as "cellId",
                  department_id::text as "departmentId",
@@ -1685,6 +1698,7 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
                  email,
                  role,
                  is_first_timer as "isFirstTimer",
+                 foundation_school as "foundationSchool",
                  dob_month as "dobMonth",
                  dob_day as "dobDay",
                  CASE
@@ -1703,6 +1717,7 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
         cellId ?? null,
         departmentId ?? null,
         typeof isFirstTimer === "boolean" ? isFirstTimer : null,
+        typeof foundationSchool === "boolean" ? foundationSchool : null,
         hasDobInput ? parsedDob.month : null,
         hasDobInput ? parsedDob.day : null,
         req.params.id
@@ -1918,6 +1933,11 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
               COALESCE(ft.prayer_requests, '[]'::jsonb) as "prayerRequests",
               ft.status,
               ft.foundation_school as "foundationSchool",
+              ft.foundation_class as "foundationClass",
+              ft.exam_status as "examStatus",
+              ft.graduation_date as "graduationDate",
+              ft.graduated_year as "graduatedYear",
+              COALESCE(ft.is_graduate, FALSE) as "isGraduate",
               ft.invited_by as "invitedBy",
               COALESCE(ft.archived, FALSE) as archived,
               COALESCE(ft.in_foundation_school, FALSE) as "inFoundationSchool",
@@ -1966,6 +1986,11 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
       dateJoined,
       status,
       foundationSchool,
+      foundationClass,
+      examStatus,
+      graduationDate,
+      graduatedYear,
+      isGraduate,
       cellId,
       departmentId,
       invitedBy
@@ -2001,6 +2026,11 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
               COALESCE(ft.prayer_requests, '[]'::jsonb) as "prayerRequests",
               ft.status,
               ft.foundation_school as "foundationSchool",
+              ft.foundation_class as "foundationClass",
+              ft.exam_status as "examStatus",
+              ft.graduation_date as "graduationDate",
+              ft.graduated_year as "graduatedYear",
+              COALESCE(ft.is_graduate, FALSE) as "isGraduate",
               ft.invited_by as "invitedBy",
               COALESCE(ft.archived, FALSE) as archived,
               COALESCE(ft.in_foundation_school, FALSE) as "inFoundationSchool",
@@ -2027,9 +2057,9 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
            title, name, surname, gender, mobile, email, photo_data, address, postcode,
          birthday_month, birthday_day, age_group, marital_status, born_again, speak_tongues,
          find_out, contact_pref, visit, visit_when, prayer_requests,
-         date_joined, status, foundation_school, cell_id, department_id, invited_by, source
+         date_joined, status, foundation_school, foundation_class, exam_status, graduation_date, graduated_year, is_graduate, cell_id, department_id, invited_by, source
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17::jsonb,$18,$19,$20::jsonb,$21,$22,$23,$24,$25,$26,$27)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17::jsonb,$18,$19,$20::jsonb,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
        RETURNING id::text as id,
                  title,
                  name,
@@ -2054,6 +2084,11 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
                  COALESCE(prayer_requests, '[]'::jsonb) as "prayerRequests",
                  status,
                  foundation_school as "foundationSchool",
+                 foundation_class as "foundationClass",
+                 exam_status as "examStatus",
+                 graduation_date as "graduationDate",
+                 graduated_year as "graduatedYear",
+                 COALESCE(is_graduate, FALSE) as "isGraduate",
                  invited_by as "invitedBy",
                  COALESCE(archived, FALSE) as archived,
                  COALESCE(in_foundation_school, FALSE) as "inFoundationSchool",
@@ -2084,6 +2119,11 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
         dateJoined || null,
         status || "amber",
         foundationSchool || "Not Yet",
+        foundationClass || null,
+        examStatus || null,
+        graduationDate || null,
+        graduatedYear || null,
+        toBooleanOrNull(isGraduate) ?? false,
         cellId || null,
         departmentId || null,
         invitedBy || null,
@@ -2114,6 +2154,15 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
       });
     } catch (profileErr) {
       console.error("Profile sync failed after first-timer update:", profileErr);
+    }
+
+    if (toBooleanOrNull(isGraduate) === true) {
+      await pool.query(
+        `UPDATE members
+         SET foundation_school = TRUE
+         WHERE LOWER(email) = LOWER($1)`,
+        [result.rows[0].email || ""]
+      );
     }
 
     res.json(result.rows[0]);
@@ -2149,6 +2198,11 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
         dateJoined,
         status,
         foundationSchool,
+        foundationClass,
+        examStatus,
+        graduationDate,
+        graduatedYear,
+        isGraduate,
         cellId,
         departmentId,
         invitedBy
@@ -2184,10 +2238,15 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
            date_joined = COALESCE($21, date_joined),
            status = COALESCE($22, status),
            foundation_school = COALESCE($23, foundation_school),
-           cell_id = COALESCE($24, cell_id),
-           department_id = COALESCE($25, department_id),
-           invited_by = COALESCE($26, invited_by)
-       WHERE id = $27
+           foundation_class = COALESCE($24, foundation_class),
+           exam_status = COALESCE($25, exam_status),
+           graduation_date = COALESCE($26, graduation_date),
+           graduated_year = COALESCE($27, graduated_year),
+           is_graduate = COALESCE($28, is_graduate),
+           cell_id = COALESCE($29, cell_id),
+           department_id = COALESCE($30, department_id),
+           invited_by = COALESCE($31, invited_by)
+       WHERE id = $32
        RETURNING id::text as id,
                  title,
                  name,
@@ -2212,6 +2271,11 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
                  COALESCE(prayer_requests, '[]'::jsonb) as "prayerRequests",
                  status,
                  foundation_school as "foundationSchool",
+                 foundation_class as "foundationClass",
+                 exam_status as "examStatus",
+                 graduation_date as "graduationDate",
+                 graduated_year as "graduatedYear",
+                 COALESCE(is_graduate, FALSE) as "isGraduate",
                  invited_by as "invitedBy",
                  COALESCE(archived, FALSE) as archived,
                  COALESCE(in_foundation_school, FALSE) as "inFoundationSchool",
@@ -2242,6 +2306,11 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
         dateJoined ?? null,
         status ?? null,
         foundationSchool ?? null,
+        foundationClass ?? null,
+        examStatus ?? null,
+        graduationDate ?? null,
+        graduatedYear ?? null,
+        typeof isGraduate === "boolean" ? isGraduate : null,
         cellId ?? null,
         departmentId ?? null,
         invitedBy ?? null,
@@ -2264,6 +2333,16 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
       address: result.rows[0].address,
       source: "first-timer-sync"
     });
+
+    if (typeof isGraduate === "boolean") {
+      await pool.query(
+        `UPDATE members
+         SET foundation_school = $1
+         WHERE (LOWER(email) = LOWER($2))
+            OR (LOWER(name) = LOWER($3) AND mobile IS NOT DISTINCT FROM $4)`,
+        [isGraduate, result.rows[0].email || "", result.rows[0].name || "", result.rows[0].mobile || null]
+      );
+    }
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -2314,6 +2393,20 @@ app.put("/api/first-timers/:id/decision", requireAuth, async (req, res) => {
     } else if (action === "assignFoundationSchool") {
       updateSql = `UPDATE first_timers SET in_foundation_school = TRUE, foundation_school = 'Yes' WHERE id = $1`;
       updateParams = [req.params.id];
+    } else if (action === "graduate") {
+      updateSql = `UPDATE first_timers
+                   SET in_foundation_school = TRUE,
+                       is_graduate = TRUE,
+                       graduated_year = EXTRACT(YEAR FROM NOW())::int,
+                       foundation_school = 'Yes'
+                   WHERE id = $1`;
+      updateParams = [req.params.id];
+    } else if (action === "ungraduate") {
+      updateSql = `UPDATE first_timers
+                   SET is_graduate = FALSE,
+                       graduated_year = NULL
+                   WHERE id = $1`;
+      updateParams = [req.params.id];
     } else {
       return res.status(400).json({ error: "Unsupported action" });
     }
@@ -2359,6 +2452,16 @@ app.put("/api/first-timers/:id/decision", requireAuth, async (req, res) => {
       }
     }
 
+    if (action === "graduate" || action === "ungraduate") {
+      await pool.query(
+        `UPDATE members
+         SET foundation_school = $1
+         WHERE (LOWER(email) = LOWER($2))
+            OR (LOWER(name) = LOWER($3) AND mobile IS NOT DISTINCT FROM $4)`,
+        [action === "graduate", firstTimer.email || "", firstTimer.name || "", firstTimer.mobile || null]
+      );
+    }
+
     const result = await pool.query(
       `SELECT ft.id::text as id,
               ft.title,
@@ -2384,6 +2487,11 @@ app.put("/api/first-timers/:id/decision", requireAuth, async (req, res) => {
               COALESCE(ft.prayer_requests, '[]'::jsonb) as "prayerRequests",
               ft.status,
               ft.foundation_school as "foundationSchool",
+              ft.foundation_class as "foundationClass",
+              ft.exam_status as "examStatus",
+              ft.graduation_date as "graduationDate",
+              ft.graduated_year as "graduatedYear",
+              COALESCE(ft.is_graduate, FALSE) as "isGraduate",
               ft.invited_by as "invitedBy",
               COALESCE(ft.archived, FALSE) as archived,
               COALESCE(ft.in_foundation_school, FALSE) as "inFoundationSchool",
