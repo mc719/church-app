@@ -126,6 +126,11 @@ function FirstTimers() {
     const token = localStorage.getItem('token')
     if (!token) return
     const updates = inlineEdits[item.id] || {}
+    const normalizeNullable = (value) => {
+      if (value === undefined || value === null) return null
+      if (typeof value === 'string' && !value.trim()) return null
+      return value
+    }
     const payload = {
       title: updates.title ?? item.title ?? '',
       photoData: updates.photoData ?? item.photoData ?? '',
@@ -149,7 +154,7 @@ function FirstTimers() {
       dateJoined: updates.dateJoined ?? item.dateJoined ?? item.joined_date ?? '',
       status: updates.status ?? item.status ?? '',
       foundationSchool: updates.foundationSchool ?? item.foundationSchool ?? '',
-      cellId: updates.cellId ?? item.cellId ?? '',
+      cellId: normalizeNullable(updates.cellId ?? item.cellId ?? null),
       invitedBy: updates.invitedBy ?? item.invitedBy ?? ''
     }
     const res = await fetch(`${API_BASE}/first-timers/${item.id}`, {
@@ -346,7 +351,14 @@ function FirstTimers() {
                 >
                   <div className="first-timer-row-left">
                     <div className="first-timer-avatar">
-                      {item.photoData ? <img src={item.photoData} alt={item.name || 'First-timer'} /> : <i className="fas fa-user"></i>}
+                      {((selectedFirstTimer && String(selectedFirstTimer.id) === String(item.id) && inlineEdits[item.id]?.photoData) || item.photoData) ? (
+                        <img
+                          src={(selectedFirstTimer && String(selectedFirstTimer.id) === String(item.id) && inlineEdits[item.id]?.photoData) || item.photoData}
+                          alt={item.name || 'First-timer'}
+                        />
+                      ) : (
+                        <i className="fas fa-user"></i>
+                      )}
                     </div>
                     <div className="first-timer-row-info">
                       <div className="first-timer-row-name">

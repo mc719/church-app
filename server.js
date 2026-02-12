@@ -2060,17 +2060,21 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
       );
     }
 
-    await syncProfileByEmail({
-      email: result.rows[0].email,
-      fullName: [result.rows[0].name, result.rows[0].surname].filter(Boolean).join(" ").trim() || result.rows[0].name,
-      phone: result.rows[0].mobile,
-      roleTitle: "First-Timer",
-      cellId: result.rows[0].cellId,
-      dobMonth: result.rows[0].birthdayMonth || null,
-      dobDay: result.rows[0].birthdayDay || null,
-      address: result.rows[0].address,
-      source: "first-timer-sync"
-    });
+    try {
+      await syncProfileByEmail({
+        email: result.rows[0].email,
+        fullName: [result.rows[0].name, result.rows[0].surname].filter(Boolean).join(" ").trim() || result.rows[0].name,
+        phone: result.rows[0].mobile,
+        roleTitle: "First-Timer",
+        cellId: result.rows[0].cellId,
+        dobMonth: result.rows[0].birthdayMonth || null,
+        dobDay: result.rows[0].birthdayDay || null,
+        address: result.rows[0].address,
+        source: "first-timer-sync"
+      });
+    } catch (profileErr) {
+      console.error("Profile sync failed after first-timer update:", profileErr);
+    }
 
     res.json(result.rows[0]);
   } catch (err) {
