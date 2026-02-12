@@ -20,6 +20,8 @@ function AppLayout() {
   const [departmentsOpen, setDepartmentsOpen] = useState(() => window.innerWidth > 768)
   const [adminOpen, setAdminOpen] = useState(() => window.innerWidth > 768)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isMobileNav, setIsMobileNav] = useState(() => window.innerWidth <= 1024)
   const [pageMeta, setPageMeta] = useState({})
   const [pageVisibility, setPageVisibility] = useState({})
   const [deletedPages, setDeletedPages] = useState([])
@@ -202,6 +204,7 @@ function AppLayout() {
 
   useEffect(() => {
     const handleResize = () => {
+      setIsMobileNav(window.innerWidth <= 1024)
       if (window.innerWidth <= 768) {
         setCellGroupsOpen(false)
         setDepartmentsOpen(false)
@@ -279,11 +282,16 @@ function AppLayout() {
   const adminPages = defaultPages.filter((p) => p.section === 'admin' && isVisible(p.id) && sectionVisible('Administrator'))
 
   const handleToggleSidebar = () => {
+    if (isMobileNav) {
+      setMobileMenuOpen((prev) => !prev)
+      return
+    }
     setSidebarOpen((prev) => !prev)
   }
 
   const handleCloseSidebar = () => {
     setSidebarOpen(false)
+    setMobileMenuOpen(false)
   }
 
   const handleLogout = () => {
@@ -368,7 +376,7 @@ function AppLayout() {
         <i className="fas fa-bars"></i>
       </button>
 
-      {sidebarOpen && <div className="sidebar-overlay" onClick={handleCloseSidebar}></div>}
+      {(sidebarOpen || mobileMenuOpen) && <div className="sidebar-overlay" onClick={handleCloseSidebar}></div>}
 
       <div className={`sidebar${sidebarOpen ? ' open' : ''}`} id="sidebar">
         <div className="logo-area" id="logoLink">
@@ -476,6 +484,83 @@ function AppLayout() {
           <span>Logout</span>
         </button>
       </div>
+
+      {mobileMenuOpen && (
+        <div className="mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Mobile menu">
+          <div className="mobile-menu-sheet-header">
+            <h3>Menu</h3>
+            <button type="button" className="close-modal" onClick={handleCloseSidebar}>&times;</button>
+          </div>
+          <div className="mobile-menu-sheet-content">
+            <div className="mobile-menu-group">
+              <h4>Main</h4>
+              {mainPages.map((page) => {
+                const meta = getPageMeta(page)
+                return (
+                  <NavLink key={`m-${page.id}`} className={navClass} to={page.id} onClick={handleCloseSidebar}>
+                    <i className={meta.icon}></i>
+                    <span>{meta.label}</span>
+                  </NavLink>
+                )
+              })}
+            </div>
+
+            <div className={`mobile-menu-group accordion-section${cellGroupsOpen ? ' open' : ''}`}>
+              <button className="nav-section-title accordion-toggle" type="button" onClick={() => setCellGroupsOpen((prev) => !prev)}>
+                <span>Cell Groups</span>
+                <i className={`fas fa-chevron-down accordion-caret${cellGroupsOpen ? ' open' : ''}`}></i>
+              </button>
+              <div className={`accordion-content${cellGroupsOpen ? ' open' : ''}`}>
+                {cellPages.map((page) => {
+                  const meta = getPageMeta(page)
+                  return (
+                    <NavLink key={`c-${page.id}`} className={navClass} to={page.id} onClick={handleCloseSidebar}>
+                      <i className={meta.icon}></i>
+                      <span>{meta.label}</span>
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className={`mobile-menu-group accordion-section${departmentsOpen ? ' open' : ''}`}>
+              <button className="nav-section-title accordion-toggle" type="button" onClick={() => setDepartmentsOpen((prev) => !prev)}>
+                <span>Departments</span>
+                <i className={`fas fa-chevron-down accordion-caret${departmentsOpen ? ' open' : ''}`}></i>
+              </button>
+              <div className={`accordion-content${departmentsOpen ? ' open' : ''}`}>
+                {departmentPages.map((page) => {
+                  const meta = getPageMeta(page)
+                  return (
+                    <NavLink key={`d-${page.id}`} className={navClass} to={page.id} onClick={handleCloseSidebar}>
+                      <i className={meta.icon}></i>
+                      <span>{meta.label}</span>
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className={`mobile-menu-group accordion-section${adminOpen ? ' open' : ''}`}>
+              <button className="nav-section-title accordion-toggle" type="button" onClick={() => setAdminOpen((prev) => !prev)}>
+                <span>Administrator</span>
+                <i className={`fas fa-chevron-down accordion-caret${adminOpen ? ' open' : ''}`}></i>
+              </button>
+              <div className={`accordion-content${adminOpen ? ' open' : ''}`}>
+                {adminPages.map((page) => {
+                  const meta = getPageMeta(page)
+                  return (
+                    <NavLink key={`a-${page.id}`} className={navClass} to={page.id} onClick={handleCloseSidebar}>
+                      <i className={meta.icon}></i>
+                      <span>{meta.label}</span>
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div
         className={`modal-overlay confirmation-modal${showLogoutModal ? ' active' : ''}`}
@@ -589,7 +674,7 @@ function AppLayout() {
           <i className="fas fa-home"></i>
           <span>Home</span>
         </NavLink>
-        <button type="button" className={`mobile-bottom-item${sidebarOpen ? ' active' : ''}`} onClick={handleToggleSidebar}>
+        <button type="button" className={`mobile-bottom-item${mobileMenuOpen ? ' active' : ''}`} onClick={handleToggleSidebar}>
           <i className="fas fa-bars"></i>
           <span>Menu</span>
         </button>
