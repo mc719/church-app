@@ -257,6 +257,67 @@ function safeString(value, maxLen = 255) {
   return String(value || "").trim().slice(0, maxLen);
 }
 
+function isValidEmail(value) {
+  if (!value) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
+}
+
+function isValidGender(value) {
+  if (!value) return true;
+  const allowed = new Set(["male", "female", "unknown"]);
+  return allowed.has(String(value).trim().toLowerCase());
+}
+
+function validateWritePayload(req, res, allowedKeys) {
+  const body = req.body || {};
+  const keys = Object.keys(body);
+  const unknown = keys.filter((key) => !allowedKeys.includes(key));
+  if (unknown.length) {
+    res.status(400).json({ error: `Unknown field(s): ${unknown.join(", ")}` });
+    return false;
+  }
+  return true;
+}
+
+function normalizeAttendeesInput(value) {
+  if (!value) return [];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") {
+          try {
+            return JSON.parse(item);
+          } catch {
+            return null;
+          }
+        }
+        return item;
+      })
+      .filter(Boolean)
+      .map((item) => ({
+        memberId: String(item.memberId || item.id || "").trim(),
+        name: safeString(item.name, 160),
+        present: item.present === true
+      }));
+  }
+  return [];
+}
+
+const allowedMeetingTypes = new Set([
+  "prayer and planning",
+  "bible study 1",
+  "bible study 2",
+  "outreach meeting"
+]);
+
 function requireAdmin(req, res, next) {
   const role = req.user?.role;
   if (role !== "superuser" && role !== "admin") {
@@ -1034,10 +1095,14 @@ app.get("/api/departments", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/departments", requireAuthOrAccessCode, async (req, res) => {
+app.post("/api/departments", rateLimit({ keyPrefix: "departments-create", windowMs: 60_000, max: 20 }), requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { name, hodTitle, hodName, hodMobile } = req.body || {};
-    if (!name || !String(name).trim()) {
+    if (!validateWritePayload(req, res, ["name", "hodTitle", "hodName", "hodMobile"])) return;
+    const name = safeString(req.body?.name, 180);
+    const hodTitle = safeString(req.body?.hodTitle, 40);
+    const hodName = safeString(req.body?.hodName, 180);
+    const hodMobile = safeString(req.body?.hodMobile, 40);
+    if (!name) {
       return res.status(400).json({ error: "Department name is required" });
     }
     const result = await pool.query(
@@ -1050,7 +1115,7 @@ app.post("/api/departments", requireAuthOrAccessCode, async (req, res) => {
                  hod_mobile as "hodMobile",
                  created_at as "createdAt",
                  updated_at as "updatedAt"`,
-      [String(name).trim(), hodTitle || null, hodName || null, hodMobile || null]
+      [name, hodTitle || null, hodName || null, hodMobile || null]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -1061,7 +1126,11 @@ app.post("/api/departments", requireAuthOrAccessCode, async (req, res) => {
 
 app.put("/api/departments/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { name, hodTitle, hodName, hodMobile } = req.body || {};
+    if (!validateWritePayload(req, res, ["name", "hodTitle", "hodName", "hodMobile"])) return;
+    const name = req.body?.name != null ? safeString(req.body.name, 180) : null;
+    const hodTitle = req.body?.hodTitle != null ? safeString(req.body.hodTitle, 40) : null;
+    const hodName = req.body?.hodName != null ? safeString(req.body.hodName, 180) : null;
+    const hodMobile = req.body?.hodMobile != null ? safeString(req.body.hodMobile, 40) : null;
     const result = await pool.query(
       `UPDATE departments
        SET name = COALESCE($1, name),
@@ -1260,9 +1329,17 @@ app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10
 });
 
 // ADD CELL (AUTH OR ACCESS CODE)
-app.post("/api/cells", requireAuthOrAccessCode, async (req, res) => {
+app.post("/api/cells", rateLimit({ keyPrefix: "cells-create", windowMs: 60_000, max: 20 }), requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { name, venue, day, time, description } = req.body;
+    if (!validateWritePayload(req, res, ["name", "venue", "day", "time", "description"])) return;
+    const name = safeString(req.body?.name, 160);
+    const venue = safeString(req.body?.venue, 200);
+    const day = safeString(req.body?.day, 80);
+    const time = safeString(req.body?.time, 40);
+    const description = safeString(req.body?.description, 3000);
+    if (!name) {
+      return res.status(400).json({ error: "Cell name is required" });
+    }
 
     const result = await pool.query(
       "INSERT INTO cells (name, venue, day, time, description) VALUES ($1,$2,$3,$4,$5) RETURNING id::text as id, name, venue, day, time, description",
@@ -1312,10 +1389,19 @@ app.get("/api/users", requireAuth, requireAdmin, async (req, res) => {
 
 app.post("/api/users", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { username, password, email, role, status, restrictedMenus } = req.body;
+    if (!validateWritePayload(req, res, ["username", "password", "email", "role", "status", "restrictedMenus"])) return;
+    const username = safeString(req.body?.username, 120);
+    const password = safeString(req.body?.password, 256);
+    const email = safeString(req.body?.email, 180).toLowerCase();
+    const role = safeString(req.body?.role, 80);
+    const status = typeof req.body?.status === "boolean" ? req.body.status : true;
+    const restrictedMenus = Array.isArray(req.body?.restrictedMenus) ? req.body.restrictedMenus.map((item) => safeString(item, 80)).filter(Boolean) : [];
 
     if (!username || !password || !email || !role) {
       return res.status(400).json({ error: "Username, email, password, and role are required" });
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: "Invalid email" });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -1343,11 +1429,20 @@ app.post("/api/users", requireAuth, requireAdmin, async (req, res) => {
 
 app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { username, password, email, role, status, restrictedMenus } = req.body;
+    if (!validateWritePayload(req, res, ["username", "password", "email", "role", "status", "restrictedMenus"])) return;
+    const username = req.body?.username != null ? safeString(req.body.username, 120) : null;
+    const password = req.body?.password != null ? safeString(req.body.password, 256) : null;
+    const email = req.body?.email != null ? safeString(req.body.email, 180).toLowerCase() : null;
+    const role = req.body?.role != null ? safeString(req.body.role, 80) : null;
+    const status = typeof req.body?.status === "boolean" ? req.body.status : null;
+    const restrictedMenus = Array.isArray(req.body?.restrictedMenus) ? req.body.restrictedMenus.map((item) => safeString(item, 80)).filter(Boolean) : null;
 
     let passwordHash = null;
     if (password) {
       passwordHash = await bcrypt.hash(password, 10);
+    }
+    if (email && !isValidEmail(email)) {
+      return res.status(400).json({ error: "Invalid email" });
     }
     const restrictedMenusJson = restrictedMenus ? JSON.stringify(restrictedMenus) : null;
 
@@ -1582,7 +1677,12 @@ app.get("/api/cells", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE CELL (PROTECTED)
 app.put("/api/cells/:id", requireAuth, async (req, res) => {
   try {
-    const { name, venue, day, time, description } = req.body;
+    if (!validateWritePayload(req, res, ["name", "venue", "day", "time", "description"])) return;
+    const name = req.body?.name != null ? safeString(req.body.name, 160) : null;
+    const venue = req.body?.venue != null ? safeString(req.body.venue, 200) : null;
+    const day = req.body?.day != null ? safeString(req.body.day, 80) : null;
+    const time = req.body?.time != null ? safeString(req.body.time, 40) : null;
+    const description = req.body?.description != null ? safeString(req.body.description, 3000) : null;
     const result = await pool.query(
       `UPDATE cells
        SET name = COALESCE($1, name),
@@ -1689,9 +1789,32 @@ app.get("/api/members", requireAuth, async (req, res) => {
 });
 
 // ADD MEMBER (AUTH OR ACCESS CODE)
-app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
+app.post("/api/members", rateLimit({ keyPrefix: "members-create", windowMs: 60_000, max: 40 }), requireAuthOrAccessCode, async (req, res) => {
   try {
-    const { cellId, departmentId, title, name, gender, mobile, email, role, isFirstTimer, foundationSchool, dateOfBirth, dobMonth, dobDay } = req.body;
+    if (!validateWritePayload(req, res, ["cellId", "departmentId", "title", "name", "gender", "mobile", "email", "role", "isFirstTimer", "foundationSchool", "dateOfBirth", "dobMonth", "dobDay"])) return;
+    const cellId = req.body?.cellId ?? null;
+    const departmentId = req.body?.departmentId ?? null;
+    const title = safeString(req.body?.title, 40);
+    const name = safeString(req.body?.name, 180);
+    const gender = safeString(req.body?.gender, 20);
+    const mobile = safeString(req.body?.mobile, 40);
+    const email = safeString(req.body?.email, 180).toLowerCase();
+    const role = safeString(req.body?.role, 100);
+    const isFirstTimer = req.body?.isFirstTimer;
+    const foundationSchool = req.body?.foundationSchool;
+    const dateOfBirth = req.body?.dateOfBirth;
+    const dobMonth = req.body?.dobMonth;
+    const dobDay = req.body?.dobDay;
+
+    if (!name) {
+      return res.status(400).json({ error: "Member name is required" });
+    }
+    if (email && !isValidEmail(email)) {
+      return res.status(400).json({ error: "Invalid email" });
+    }
+    if (!isValidGender(gender)) {
+      return res.status(400).json({ error: "Invalid gender" });
+    }
     const parsedDob = parseMonthDay(dateOfBirth || (dobMonth && dobDay ? `${dobMonth}-${dobDay}` : ""));
 
     const result = await pool.query(
@@ -1772,7 +1895,26 @@ app.post("/api/members", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE MEMBER (PROTECTED)
 app.put("/api/members/:id", requireAuth, async (req, res) => {
   try {
-    const { title, name, gender, mobile, email, role, isFirstTimer, foundationSchool, cellId, departmentId, dateOfBirth, dobMonth, dobDay } = req.body;
+    if (!validateWritePayload(req, res, ["title", "name", "gender", "mobile", "email", "role", "isFirstTimer", "foundationSchool", "cellId", "departmentId", "dateOfBirth", "dobMonth", "dobDay"])) return;
+    const title = req.body?.title != null ? safeString(req.body.title, 40) : null;
+    const name = req.body?.name != null ? safeString(req.body.name, 180) : null;
+    const gender = req.body?.gender != null ? safeString(req.body.gender, 20) : null;
+    const mobile = req.body?.mobile != null ? safeString(req.body.mobile, 40) : null;
+    const email = req.body?.email != null ? safeString(req.body.email, 180).toLowerCase() : null;
+    const role = req.body?.role != null ? safeString(req.body.role, 100) : null;
+    const isFirstTimer = req.body?.isFirstTimer;
+    const foundationSchool = req.body?.foundationSchool;
+    const cellId = req.body?.cellId;
+    const departmentId = req.body?.departmentId;
+    const dateOfBirth = req.body?.dateOfBirth;
+    const dobMonth = req.body?.dobMonth;
+    const dobDay = req.body?.dobDay;
+    if (email && !isValidEmail(email)) {
+      return res.status(400).json({ error: "Invalid email" });
+    }
+    if (gender && !isValidGender(gender)) {
+      return res.status(400).json({ error: "Invalid gender" });
+    }
     const parsedDob = parseMonthDay(dateOfBirth || (dobMonth && dobDay ? `${dobMonth}-${dobDay}` : ""));
     const hasDobInput = Object.prototype.hasOwnProperty.call(req.body || {}, "dateOfBirth")
       || Object.prototype.hasOwnProperty.call(req.body || {}, "dobMonth")
@@ -2066,8 +2208,14 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
 });
 
 // ADD FIRST-TIMER (PROTECTED OR ACCESS CODE)
-app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
+app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", windowMs: 60_000, max: 30 }), requireAuthOrAccessCode, async (req, res) => {
   try {
+    if (!validateWritePayload(req, res, [
+      "title", "name", "surname", "gender", "mobile", "email", "photoData", "address", "postcode", "birthday",
+      "ageGroup", "maritalStatus", "bornAgain", "speakTongues", "findOut", "contactPref", "visit", "visitWhen",
+      "prayerRequests", "dateJoined", "status", "foundationSchool", "foundationClass", "examStatus", "graduationDate",
+      "graduatedYear", "isGraduate", "cellId", "departmentId", "invitedBy"
+    ])) return;
     const {
       title,
       name,
@@ -2100,6 +2248,16 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
       departmentId,
       invitedBy
     } = req.body || {};
+
+    if (!safeString(name, 180)) {
+      return res.status(400).json({ error: "Name is required" });
+    }
+    if (email && !isValidEmail(email)) {
+      return res.status(400).json({ error: "Invalid email" });
+    }
+    if (!isValidGender(gender)) {
+      return res.status(400).json({ error: "Invalid gender" });
+    }
 
     const parsedBirthday = parseMonthDay(birthday);
     const safeFindOut = toTextArray(findOut);
@@ -2280,6 +2438,12 @@ app.post("/api/first-timers", requireAuthOrAccessCode, async (req, res) => {
 // UPDATE FIRST-TIMER (PROTECTED)
 app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
   try {
+      if (!validateWritePayload(req, res, [
+        "title", "name", "surname", "gender", "mobile", "email", "photoData", "address", "postcode", "birthday",
+        "ageGroup", "maritalStatus", "bornAgain", "speakTongues", "findOut", "contactPref", "visit", "visitWhen",
+        "prayerRequests", "dateJoined", "status", "foundationSchool", "foundationClass", "examStatus", "graduationDate",
+        "graduatedYear", "isGraduate", "cellId", "departmentId", "invitedBy"
+      ])) return;
       const {
         title,
         name,
@@ -2312,6 +2476,13 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
         departmentId,
         invitedBy
     } = req.body || {};
+
+    if (email && !isValidEmail(email)) {
+      return res.status(400).json({ error: "Invalid email" });
+    }
+    if (gender && !isValidGender(gender)) {
+      return res.status(400).json({ error: "Invalid gender" });
+    }
 
     const parsedBirthday = parseMonthDay(birthday);
     const safeFindOut = toTextArray(findOut);
@@ -2756,34 +2927,20 @@ app.delete("/api/follow-ups/:id", requireAuth, async (req, res) => {
 // ADD REPORT (PROTECTED)
 app.post("/api/reports", requireAuth, async (req, res) => {
   try {
-    const { cellId, date, venue, meetingType, description, attendees } = req.body;
-    const normalizeAttendees = (value) => {
-      if (!value) return [];
-      if (typeof value === "string") {
-        try {
-          const parsed = JSON.parse(value);
-          return Array.isArray(parsed) ? parsed : [];
-        } catch {
-          return [];
-        }
-      }
-      if (Array.isArray(value)) {
-        return value
-          .map((item) => {
-            if (typeof item === "string") {
-              try {
-                return JSON.parse(item);
-              } catch {
-                return null;
-              }
-            }
-            return item;
-          })
-          .filter(Boolean);
-      }
-      return [];
-    };
-    const normalizedAttendees = normalizeAttendees(attendees);
+    if (!validateWritePayload(req, res, ["cellId", "date", "venue", "meetingType", "description", "attendees"])) return;
+    const cellId = req.body?.cellId;
+    const date = req.body?.date;
+    const venue = safeString(req.body?.venue, 200);
+    const meetingType = safeString(req.body?.meetingType, 80);
+    const description = safeString(req.body?.description, 5000);
+    const attendees = req.body?.attendees;
+    if (!cellId || !date) {
+      return res.status(400).json({ error: "Cell and date are required" });
+    }
+    if (meetingType && !allowedMeetingTypes.has(meetingType.toLowerCase())) {
+      return res.status(400).json({ error: "Invalid meeting type" });
+    }
+    const normalizedAttendees = normalizeAttendeesInput(attendees);
     const attendeesJson = JSON.stringify(normalizedAttendees);
 
     const result = await pool.query(
@@ -2990,34 +3147,17 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
 // UPDATE REPORT (PROTECTED)
 app.put("/api/reports/:id", requireAuth, async (req, res) => {
   try {
-    const { date, venue, meetingType, description, attendees } = req.body;
-    const normalizeAttendees = (value) => {
-      if (!value) return [];
-      if (typeof value === "string") {
-        try {
-          const parsed = JSON.parse(value);
-          return Array.isArray(parsed) ? parsed : [];
-        } catch {
-          return [];
-        }
-      }
-      if (Array.isArray(value)) {
-        return value
-          .map((item) => {
-            if (typeof item === "string") {
-              try {
-                return JSON.parse(item);
-              } catch {
-                return null;
-              }
-            }
-            return item;
-          })
-          .filter(Boolean);
-      }
-      return [];
-    };
-    const normalizedAttendees = normalizeAttendees(attendees);
+    if (!validateWritePayload(req, res, ["date", "venue", "meetingType", "description", "attendees"])) return;
+    const date = req.body?.date ?? null;
+    const venue = req.body?.venue != null ? safeString(req.body.venue, 200) : null;
+    const meetingType = req.body?.meetingType != null ? safeString(req.body.meetingType, 80) : null;
+    const description = req.body?.description != null ? safeString(req.body.description, 5000) : null;
+    const attendees = req.body?.attendees;
+    if (meetingType && !allowedMeetingTypes.has(meetingType.toLowerCase())) {
+      return res.status(400).json({ error: "Invalid meeting type" });
+    }
+    const normalizedAttendees = normalizeAttendeesInput(attendees);
+    const attendeesJson = JSON.stringify(normalizedAttendees);
     const result = await pool.query(
       `UPDATE reports
        SET date = COALESCE($1, date),
