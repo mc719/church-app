@@ -6,6 +6,8 @@ const path = require("path");
 const { Pool } = require("pg");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const cors = require("cors");
+const helmet = require("helmet");
 require("dotenv").config();
 
 // ===============================
@@ -13,12 +15,44 @@ require("dotenv").config();
 // ===============================
 const app = express();
 const PORT = process.env.PORT || 5050;
+const isProduction = process.env.NODE_ENV === "production";
+
+if (isProduction && (!process.env.JWT_SECRET || !process.env.DATABASE_URL)) {
+  throw new Error("Missing required environment variables in production");
+}
 
 // ===============================
 // 3) GLOBAL MIDDLEWARE
 // ===============================
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true, limit: "8mb" }));
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.length === 0) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true
+  })
+);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+  })
+);
+
 app.use("/old", (req, res) => {
   res.status(404).send("Not found");
 });
@@ -152,7 +186,7 @@ function requireAuthOrAccessCode(req, res, next) {
   }
 }
 
-app.post("/api/access/verify", (req, res) => {
+app.post("/api/access/verify", rateLimit({ keyPrefix: "access-verify", windowMs: 60_000, max: 10 }), (req, res) => {
   const accessCode = normalizeAccessCode(req.body?.accessCode);
   const expectedAccessCode = normalizeAccessCode(ACCESS_CODE);
   if (!expectedAccessCode) {
@@ -168,6 +202,8 @@ app.post("/api/access/verify", (req, res) => {
 });
 
 const rateLimitStore = new Map();
+const loginAttemptStore = new Map();
+
 function rateLimit({ keyPrefix, windowMs, max }) {
   return (req, res, next) => {
     const key = `${keyPrefix}:${req.ip}`;
@@ -186,6 +222,41 @@ function rateLimit({ keyPrefix, windowMs, max }) {
   };
 }
 
+function loginAttemptKey(req, username) {
+  const ip = req.ip || "unknown-ip";
+  return `login-attempt:${ip}:${String(username || "").trim().toLowerCase()}`;
+}
+
+function isLoginLocked(req, username) {
+  const key = loginAttemptKey(req, username);
+  const lock = loginAttemptStore.get(key);
+  if (!lock) return false;
+  if (Date.now() > lock.lockUntil) {
+    loginAttemptStore.delete(key);
+    return false;
+  }
+  return true;
+}
+
+function recordLoginFailure(req, username) {
+  const key = loginAttemptKey(req, username);
+  const existing = loginAttemptStore.get(key) || { count: 0, lockUntil: 0 };
+  existing.count += 1;
+  if (existing.count >= 8) {
+    existing.lockUntil = Date.now() + 15 * 60 * 1000;
+  }
+  loginAttemptStore.set(key, existing);
+}
+
+function clearLoginFailures(req, username) {
+  const key = loginAttemptKey(req, username);
+  loginAttemptStore.delete(key);
+}
+
+function safeString(value, maxLen = 255) {
+  return String(value || "").trim().slice(0, maxLen);
+}
+
 function requireAdmin(req, res, next) {
   const role = req.user?.role;
   if (role !== "superuser" && role !== "admin") {
@@ -193,6 +264,27 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+app.use("/api", (req, res, next) => {
+  const method = req.method.toUpperCase();
+  const isWrite = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+  if (!isWrite) return next();
+
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    const entry = {
+      method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt,
+      userId: req.user?.userId || null,
+      role: req.user?.role || null,
+      ip: req.ip
+    };
+    console.info("[AUDIT]", JSON.stringify(entry));
+  });
+  next();
+});
 
 async function createSession(userId, req) {
   const ipAddress = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString();
@@ -851,7 +943,7 @@ app.get("/api/roles", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/roles", requireAuth, async (req, res) => {
+app.post("/api/roles", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name } = req.body || {};
     if (!name || !String(name).trim()) {
@@ -868,7 +960,7 @@ app.post("/api/roles", requireAuth, async (req, res) => {
   }
 });
 
-app.put("/api/roles/:id", requireAuth, async (req, res) => {
+app.put("/api/roles/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name } = req.body || {};
     if (!name || !String(name).trim()) {
@@ -888,7 +980,7 @@ app.put("/api/roles/:id", requireAuth, async (req, res) => {
   }
 });
 
-app.delete("/api/roles/:id", requireAuth, async (req, res) => {
+app.delete("/api/roles/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     const roleResult = await pool.query(
       "SELECT id::text as id, name FROM roles WHERE id = $1",
@@ -967,7 +1059,7 @@ app.post("/api/departments", requireAuthOrAccessCode, async (req, res) => {
   }
 });
 
-app.put("/api/departments/:id", requireAuth, async (req, res) => {
+app.put("/api/departments/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name, hodTitle, hodName, hodMobile } = req.body || {};
     const result = await pool.query(
@@ -997,7 +1089,7 @@ app.put("/api/departments/:id", requireAuth, async (req, res) => {
   }
 });
 
-app.delete("/api/departments/:id", requireAuth, async (req, res) => {
+app.delete("/api/departments/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     const id = req.params.id;
     const memberUsage = await pool.query(
@@ -1110,7 +1202,16 @@ app.post("/api/otp/login", rateLimit({ keyPrefix: "otp-login", windowMs: 60_000,
 // LOGIN ROUTE (PUBLIC)
 app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10 }), async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const username = safeString(req.body?.username, 120);
+    const password = safeString(req.body?.password, 256);
+
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password are required" });
+    }
+
+    if (isLoginLocked(req, username)) {
+      return res.status(429).json({ error: "Too many failed attempts. Try again later." });
+    }
 
     const result = await pool.query(
       "SELECT id, username, password_hash, role, status, restricted_menus FROM users WHERE username = $1",
@@ -1118,6 +1219,7 @@ app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10
     );
 
     if (result.rows.length === 0) {
+      recordLoginFailure(req, username);
       return res.status(401).json({ error: "Invalid username or password" });
     }
 
@@ -1129,8 +1231,11 @@ app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10
 
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
+      recordLoginFailure(req, username);
       return res.status(401).json({ error: "Invalid username or password" });
     }
+
+    clearLoginFailures(req, username);
 
     const token = jwt.sign(
       { userId: user.id, role: user.role, username: user.username },
@@ -1416,7 +1521,7 @@ app.get("/api/sessions", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.put("/api/sessions/:id/end", requireAuth, async (req, res) => {
+app.put("/api/sessions/:id/end", requireAuth, requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE sessions
@@ -1437,7 +1542,7 @@ app.put("/api/sessions/:id/end", requireAuth, async (req, res) => {
   }
 });
 
-app.put("/api/sessions/:id/metrics", requireAuth, async (req, res) => {
+app.put("/api/sessions/:id/metrics", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { idleMs, activeMs } = req.body || {};
     const result = await pool.query(
