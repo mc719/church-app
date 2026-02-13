@@ -17,8 +17,11 @@ function Notifications() {
   const [targeting, setTargeting] = useState(DEFAULT_TARGETING)
   const [usernameQuery, setUsernameQuery] = useState('')
   const [usernameResults, setUsernameResults] = useState([])
-  const [activeNotification, setActiveNotification] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [searchText, setSearchText] = useState('')
+  const [selectedNotificationId, setSelectedNotificationId] = useState('')
   const [form, setForm] = useState({
     roles: [],
     usernames: [],
@@ -37,12 +40,16 @@ function Notifications() {
       fetch(`${API_BASE}/settings/notification-targeting`, { headers }).then((r) => (r.ok ? r.json() : DEFAULT_TARGETING))
     ])
       .then(([notes, rolesData, settingsData]) => {
-        setNotifications(Array.isArray(notes) ? notes : [])
+        const list = Array.isArray(notes) ? notes : []
+        setNotifications(list)
         setRoles(Array.isArray(rolesData) ? rolesData : [])
         setTargeting({
           ...DEFAULT_TARGETING,
           ...(settingsData && typeof settingsData === 'object' ? settingsData : {})
         })
+        if (list.length > 0) {
+          setSelectedNotificationId(String(list[0].id))
+        }
       })
       .catch(() => {
         setNotifications([])
@@ -90,12 +97,36 @@ function Notifications() {
     return allRoles.filter((role) => allow.has(String(role.name || '').trim().toLowerCase()))
   }, [roles, targeting.allowedRoles])
 
+  const filteredNotifications = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    return notifications.filter((note) => {
+      const isRead = !!(note.readAt || note.read_at)
+      if (statusFilter === 'read' && !isRead) return false
+      if (statusFilter === 'unread' && isRead) return false
+      if (typeFilter !== 'all' && String(note.type || '').toLowerCase() !== typeFilter) return false
+      if (!q) return true
+      const haystack = `${note.title || ''} ${note.message || ''}`.toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [notifications, searchText, statusFilter, typeFilter])
+
+  const selectedNotification = useMemo(
+    () => filteredNotifications.find((note) => String(note.id) === String(selectedNotificationId)) || filteredNotifications[0] || null,
+    [filteredNotifications, selectedNotificationId]
+  )
+
+  useEffect(() => {
+    if (!selectedNotification && filteredNotifications.length) {
+      setSelectedNotificationId(String(filteredNotifications[0].id))
+    }
+  }, [filteredNotifications, selectedNotification])
+
   const toggleSelectAll = (checked) => {
     if (!checked) {
       setSelected(new Set())
       return
     }
-    setSelected(new Set(notifications.map((n) => String(n.id))))
+    setSelected(new Set(filteredNotifications.map((n) => String(n.id))))
   }
 
   const toggleSelect = (id, checked) => {
@@ -170,8 +201,8 @@ function Notifications() {
     )
   }
 
-  const openNotification = async (note) => {
-    setActiveNotification(note)
+  const selectNotification = async (note) => {
+    setSelectedNotificationId(String(note.id))
     if (note.readAt || note.read_at) return
     const token = localStorage.getItem('token')
     if (!token) return
@@ -209,10 +240,6 @@ function Notifications() {
     }))
   }
 
-  const closeNotification = () => {
-    setActiveNotification(null)
-  }
-
   return (
     <div className="notifications-page">
       <div className="cell-tabs">
@@ -221,82 +248,121 @@ function Notifications() {
           onClick={() => setActiveTab('list')}
           type="button"
         >
-          All Notifications
+          Inbox
         </button>
         <button
           className={`cell-tab-btn${activeTab === 'send' ? ' active' : ''}`}
           onClick={() => setActiveTab('send')}
           type="button"
         >
-          Send Notification
+          Compose
         </button>
         <div className="cell-tabs-actions mobile-sticky-actions">
-          <button className="btn btn-danger" type="button" onClick={() => setShowDeleteConfirm(true)}>
+          <button
+            className="btn btn-danger"
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={selected.size === 0}
+          >
             <i className="fas fa-trash"></i> Delete Selected
           </button>
         </div>
       </div>
 
       {activeTab === 'list' && (
-        <div className="cell-tab-content active">
-          <div className="table-container">
-            <table className="mobile-grid-table">
-              <thead>
-                <tr>
-                  <th>
+        <div className="notifications-shell">
+          <div className="notifications-list-panel">
+            <div className="notifications-toolbar">
+              <input
+                className="form-control"
+                placeholder="Search notifications..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+              <select className="form-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="all">All status</option>
+                <option value="unread">Unread</option>
+                <option value="read">Read</option>
+              </select>
+              <select className="form-control" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <option value="all">All types</option>
+                <option value="info">Info</option>
+                <option value="success">Success</option>
+                <option value="warning">Warning</option>
+              </select>
+            </div>
+            <div className="notifications-select-all">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={filteredNotifications.length > 0 && selected.size === filteredNotifications.length}
+                  onChange={(e) => toggleSelectAll(e.target.checked)}
+                />{' '}
+                Select all filtered
+              </label>
+              <span>{filteredNotifications.length} total</span>
+            </div>
+            <div className="notifications-list-scroll">
+              {filteredNotifications.length === 0 && (
+                <div className="notification-empty-state">No notifications found.</div>
+              )}
+              {filteredNotifications.map((note) => {
+                const isRead = !!(note.readAt || note.read_at)
+                const isActive = String(note.id) === String(selectedNotification?.id || '')
+                return (
+                  <div
+                    key={note.id}
+                    className={`notification-row-card${isRead ? ' read' : ' unread'}${isActive ? ' active' : ''}`}
+                    onClick={() => selectNotification(note)}
+                  >
                     <input
                       type="checkbox"
-                      checked={selected.size > 0 && selected.size === notifications.length}
-                      onChange={(e) => toggleSelectAll(e.target.checked)}
+                      checked={selected.has(String(note.id))}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => toggleSelect(note.id, e.target.checked)}
                     />
-                  </th>
-                  <th>Title</th>
-                  <th>Message</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {notifications.length === 0 && (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
-                      No notifications found.
-                    </td>
-                  </tr>
-                )}
-                {notifications.map((note) => (
-                  <tr key={note.id} onClick={() => openNotification(note)} style={{ cursor: 'pointer' }}>
-                    <td data-label="Select">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(String(note.id))}
-                        onChange={(e) => toggleSelect(note.id, e.target.checked)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td data-label="Title">{note.title}</td>
-                    <td data-label="Message">{note.message}</td>
-                    <td data-label="Status">{note.readAt || note.read_at ? 'Read' : 'Unread'}</td>
-                    <td data-label="Created">{note.createdAt ? new Date(note.createdAt).toLocaleString() : ''}</td>
-                    <td data-label="Actions">
-                      <div className="action-buttons">
-                        <button
-                          className="action-btn edit-btn"
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            markRead(note)
-                          }}
-                        >
-                          {note.readAt || note.read_at ? 'Mark Unread' : 'Mark Read'}
-                        </button>
+                    <div className="notification-row-main">
+                      <div className="notification-row-top">
+                        <strong>{note.title || 'Notification'}</strong>
+                        <span className={`notification-type-badge type-${String(note.type || 'info').toLowerCase()}`}>
+                          {String(note.type || 'info')}
+                        </span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <div className="notification-row-text">{note.message || ''}</div>
+                      <div className="notification-row-meta">
+                        <span>{isRead ? 'Read' : 'Unread'}</span>
+                        <span>{note.createdAt ? new Date(note.createdAt).toLocaleString() : ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="notifications-preview-panel">
+            {!selectedNotification && <div className="notification-empty-state">Select a notification to preview.</div>}
+            {selectedNotification && (
+              <div className="notification-preview-card">
+                <div className="notification-preview-header">
+                  <h3>{selectedNotification.title || 'Notification'}</h3>
+                  <button
+                    className="action-btn edit-btn"
+                    type="button"
+                    onClick={() => markRead(selectedNotification)}
+                  >
+                    {selectedNotification.readAt || selectedNotification.read_at ? 'Mark Unread' : 'Mark Read'}
+                  </button>
+                </div>
+                <div className="notification-preview-meta">
+                  <span className={`notification-type-badge type-${String(selectedNotification.type || 'info').toLowerCase()}`}>
+                    {String(selectedNotification.type || 'info')}
+                  </span>
+                  <span>{selectedNotification.createdAt ? new Date(selectedNotification.createdAt).toLocaleString() : ''}</span>
+                </div>
+                <div className="notification-preview-body">{selectedNotification.message || ''}</div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -409,22 +475,6 @@ function Notifications() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {activeNotification && (
-        <div className="modal-overlay active" onClick={closeNotification}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{activeNotification.title || 'Notification'}</h3>
-              <button className="close-modal" type="button" onClick={closeNotification}>
-                &times;
-              </button>
-            </div>
-            <div className="modal-body">
-              {activeNotification.message || ''}
-            </div>
           </div>
         </div>
       )}
