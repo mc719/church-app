@@ -58,6 +58,24 @@ app.use("/api", (req, res, next) => {
   next();
 });
 
+app.use("/api", (req, res, next) => {
+  res.on("finish", () => {
+    const status = res.statusCode;
+    if (status !== 403 && status < 500) return;
+    const minuteKey = `${status}:${new Date().toISOString().slice(0, 16)}`;
+    const nextCount = (apiStatusWindow.get(minuteKey) || 0) + 1;
+    apiStatusWindow.set(minuteKey, nextCount);
+    const threshold = status === 403 ? 30 : 10;
+    if (nextCount === threshold) {
+      console.warn(
+        "[SECURITY] API status spike",
+        JSON.stringify({ status, count: nextCount, windowMinute: minuteKey, path: req.originalUrl })
+      );
+    }
+  });
+  next();
+});
+
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -164,12 +182,43 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Missing token" });
   }
 
+  let payload;
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next(); // allow request to continue
+    payload = jwt.verify(token, JWT_SECRET);
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
+
+  pool
+    .query(
+      "SELECT id, username, role, status, token_version FROM users WHERE id = $1 LIMIT 1",
+      [payload.userId]
+    )
+    .then((result) => {
+      const user = result.rows[0];
+      if (!user) {
+        return res.status(401).json({ error: "Invalid token user" });
+      }
+      if (!user.status) {
+        return res.status(403).json({ error: "Account disabled" });
+      }
+      const tokenVersion = Number(payload.tokenVersion);
+      const currentVersion = Number(user.token_version || 1);
+      if (!Number.isFinite(tokenVersion) || tokenVersion !== currentVersion) {
+        return res.status(401).json({ error: "Session expired. Please sign in again." });
+      }
+      req.user = {
+        userId: String(user.id),
+        username: user.username,
+        role: user.role,
+        tokenVersion: currentVersion
+      };
+      next();
+    })
+    .catch((err) => {
+      console.error("Auth check failed:", err);
+      return res.status(500).json({ error: "Auth validation failed" });
+    });
 }
 
 function requireAuthOrAccessCode(req, res, next) {
@@ -190,12 +239,39 @@ function requireAuthOrAccessCode(req, res, next) {
     return res.status(401).json({ error: "Missing token or access code" });
   }
 
+  let payload;
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
+    payload = jwt.verify(token, JWT_SECRET);
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
+
+  pool
+    .query(
+      "SELECT id, username, role, status, token_version FROM users WHERE id = $1 LIMIT 1",
+      [payload.userId]
+    )
+    .then((result) => {
+      const user = result.rows[0];
+      if (!user) return res.status(401).json({ error: "Invalid token user" });
+      if (!user.status) return res.status(403).json({ error: "Account disabled" });
+      const tokenVersion = Number(payload.tokenVersion);
+      const currentVersion = Number(user.token_version || 1);
+      if (!Number.isFinite(tokenVersion) || tokenVersion !== currentVersion) {
+        return res.status(401).json({ error: "Session expired. Please sign in again." });
+      }
+      req.user = {
+        userId: String(user.id),
+        username: user.username,
+        role: user.role,
+        tokenVersion: currentVersion
+      };
+      next();
+    })
+    .catch((err) => {
+      console.error("Auth check failed:", err);
+      return res.status(500).json({ error: "Auth validation failed" });
+    });
 }
 
 app.post("/api/access/verify", rateLimit({ keyPrefix: "access-verify", windowMs: 60_000, max: 10 }), (req, res) => {
@@ -215,6 +291,7 @@ app.post("/api/access/verify", rateLimit({ keyPrefix: "access-verify", windowMs:
 
 const rateLimitStore = new Map();
 const loginAttemptStore = new Map();
+const apiStatusWindow = new Map();
 
 function rateLimit({ keyPrefix, windowMs, max }) {
   return (req, res, next) => {
@@ -256,6 +333,7 @@ function recordLoginFailure(req, username) {
   existing.count += 1;
   if (existing.count >= 8) {
     existing.lockUntil = Date.now() + 15 * 60 * 1000;
+    console.warn("[SECURITY] Login lockout triggered", JSON.stringify({ ip: req.ip, username: String(username || "").trim().toLowerCase() }));
   }
   loginAttemptStore.set(key, existing);
 }
@@ -541,6 +619,11 @@ async function ensureUserProfilesSchema() {
     `ALTER TABLE members
        ADD COLUMN IF NOT EXISTS address TEXT,
        ADD COLUMN IF NOT EXISTS postcode TEXT`
+  );
+
+  await pool.query(
+    `ALTER TABLE users
+       ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 1`
   );
 }
 
@@ -1248,7 +1331,7 @@ app.post("/api/otp/send", rateLimit({ keyPrefix: "otp-send", windowMs: 60_000, m
     }
 
   const result = await pool.query(
-    "SELECT id, username, role, status, email, restricted_menus FROM users WHERE email = $1",
+    "SELECT id, username, role, status, email, restricted_menus, token_version FROM users WHERE email = $1",
     [email]
   );
 
@@ -1302,8 +1385,8 @@ app.post("/api/otp/login", rateLimit({ keyPrefix: "otp-login", windowMs: 60_000,
   const user = record.user;
   otpStore.delete(email);
 
-  const token = jwt.sign(
-    { userId: user.id, role: user.role, username: user.username },
+    const token = jwt.sign(
+    { userId: user.id, role: user.role, username: user.username, tokenVersion: Number(user.token_version || 1) },
     JWT_SECRET,
     { expiresIn: "8h" }
   );
@@ -1334,7 +1417,7 @@ app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10
     }
 
     const result = await pool.query(
-      "SELECT id, username, password_hash, role, status, restricted_menus FROM users WHERE username = $1",
+      "SELECT id, username, password_hash, role, status, restricted_menus, token_version FROM users WHERE username = $1",
       [username]
     );
 
@@ -1358,7 +1441,7 @@ app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10
     clearLoginFailures(req, username);
 
     const token = jwt.sign(
-      { userId: user.id, role: user.role, username: user.username },
+      { userId: user.id, role: user.role, username: user.username, tokenVersion: Number(user.token_version || 1) },
       JWT_SECRET,
       { expiresIn: "8h" }
     );
@@ -1412,6 +1495,19 @@ app.post("/api/cells", rateLimit({ keyPrefix: "cells-create", windowMs: 60_000, 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to add cell" });
+  }
+});
+
+app.post("/api/auth/logout-all", requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      "UPDATE users SET token_version = COALESCE(token_version, 1) + 1 WHERE id = $1",
+      [req.user.userId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to invalidate sessions" });
   }
 });
 
@@ -1502,11 +1598,12 @@ app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
        SET username = COALESCE($1, username),
            email = COALESCE($2, email),
            password_hash = COALESCE($3, password_hash),
+           token_version = CASE WHEN $3 IS NOT NULL THEN COALESCE(token_version, 1) + 1 ELSE token_version END,
            role = COALESCE($4, role),
            status = COALESCE($5, status),
            restricted_menus = COALESCE($6, restricted_menus)
        WHERE id = $7
-       RETURNING id::text as id, username, email, role, status, restricted_menus as "restrictedMenus"`,
+       RETURNING id::text as id, username, email, role, status, restricted_menus as "restrictedMenus", token_version as "tokenVersion"`,
       [
         username ?? null,
         email ?? null,
@@ -3050,7 +3147,7 @@ app.post("/api/reports", requireAuth, requireStaff, async (req, res) => {
 });
 
 // BIRTHDAYS (PROTECTED)
-app.put("/api/birthdays/:id", requireAuth, async (req, res) => {
+app.put("/api/birthdays/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     const { birthday } = req.body || {};
     const parsed = parseMonthDay(birthday || "");
@@ -3084,7 +3181,7 @@ app.put("/api/birthdays/:id", requireAuth, async (req, res) => {
   }
 });
 
-app.delete("/api/birthdays/:id", requireAuth, async (req, res) => {
+app.delete("/api/birthdays/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE members
