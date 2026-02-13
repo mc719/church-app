@@ -93,6 +93,16 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard-page .table-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-page .table-container table {
+    min-width: 760px;
+  }
+
   .dashboard-kpis {
     grid-template-columns: 1fr;
   }

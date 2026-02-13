@@ -1,0 +1,49 @@
+name: Security CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  security-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      BASE_URL: ${{ secrets.SECURITY_TEST_BASE_URL }}
+      TEST_USERNAME: ${{ secrets.SECURITY_TEST_USERNAME }}
+      TEST_PASSWORD: ${{ secrets.SECURITY_TEST_PASSWORD }}
+      CORS_ORIGINS: ${{ secrets.SECURITY_TEST_CORS_ORIGINS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm install
+
+      - name: Syntax check server
+        run: node --check server.js
+
+      - name: Build client
+        run: npm --prefix client install && npm --prefix client run build
+
+      - name: Run security smoke tests
+        if: ${{ env.BASE_URL != '' && env.TEST_USERNAME != '' && env.TEST_PASSWORD != '' }}
+        run: npm run security:test
+
+      - name: Security smoke tests skipped (missing secrets)
+        if: ${{ env.BASE_URL == '' || env.TEST_USERNAME == '' || env.TEST_PASSWORD == '' }}
+        run: |
+          echo "Security smoke tests skipped."
+          echo "Set repo secrets: SECURITY_TEST_BASE_URL, SECURITY_TEST_USERNAME, SECURITY_TEST_PASSWORD, SECURITY_TEST_CORS_ORIGINS"
+
