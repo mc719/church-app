@@ -355,6 +355,23 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function isStaffRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  return (
+    normalized === "superuser" ||
+    normalized === "admin" ||
+    normalized === "cell leader" ||
+    normalized === "cell-leader"
+  );
+}
+
+function requireStaff(req, res, next) {
+  if (!isStaffRole(req.user?.role)) {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+  next();
+}
+
 app.use("/api", (req, res, next) => {
   const method = req.method.toUpperCase();
   const isWrite = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
@@ -1725,7 +1742,7 @@ app.get("/api/cells", requireAuthOrAccessCode, async (req, res) => {
 });
 
 // UPDATE CELL (PROTECTED)
-app.put("/api/cells/:id", requireAuth, async (req, res) => {
+app.put("/api/cells/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["name", "venue", "day", "time", "description"])) return;
     const name = req.body?.name != null ? safeString(req.body.name, 160) : null;
@@ -1775,7 +1792,7 @@ app.put("/api/cells/:id", requireAuth, async (req, res) => {
 });
 
 // DELETE CELL (PROTECTED)
-app.delete("/api/cells/:id", requireAuth, async (req, res) => {
+app.delete("/api/cells/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM cells WHERE id = $1 RETURNING id::text as id",
@@ -1943,7 +1960,7 @@ app.post("/api/members", rateLimit({ keyPrefix: "members-create", windowMs: 60_0
 });
 
 // UPDATE MEMBER (PROTECTED)
-app.put("/api/members/:id", requireAuth, async (req, res) => {
+app.put("/api/members/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["title", "name", "gender", "mobile", "email", "role", "isFirstTimer", "foundationSchool", "cellId", "departmentId", "dateOfBirth", "dobMonth", "dobDay"])) return;
     const title = req.body?.title != null ? safeString(req.body.title, 40) : null;
@@ -2076,7 +2093,7 @@ app.put("/api/members/:id", requireAuth, async (req, res) => {
 });
 
 // DELETE MEMBER (PROTECTED)
-app.delete("/api/members/:id", requireAuth, async (req, res) => {
+app.delete("/api/members/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM members WHERE id = $1 RETURNING id::text as id",
@@ -2490,7 +2507,7 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
 });
 
 // UPDATE FIRST-TIMER (PROTECTED)
-app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
+app.put("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => {
   try {
       if (!validateWritePayload(req, res, [
         "title", "name", "surname", "gender", "mobile", "email", "photoData", "address", "postcode", "birthday",
@@ -2686,7 +2703,7 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
 });
 
 // FIRST-TIMER DECISION ACTIONS (PROTECTED)
-app.put("/api/first-timers/:id/decision", requireAuth, async (req, res) => {
+app.put("/api/first-timers/:id/decision", requireAuth, requireStaff, async (req, res) => {
   try {
     const { action, cellId, departmentId } = req.body || {};
     if (!action) {
@@ -2849,7 +2866,7 @@ app.put("/api/first-timers/:id/decision", requireAuth, async (req, res) => {
 });
 
 // DELETE FIRST-TIMER (PROTECTED)
-app.delete("/api/first-timers/:id", requireAuth, async (req, res) => {
+app.delete("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM first_timers WHERE id = $1 RETURNING id::text as id",
@@ -2891,7 +2908,7 @@ app.get("/api/follow-ups", requireAuth, async (req, res) => {
 });
 
 // ADD FOLLOW-UP (PROTECTED)
-app.post("/api/follow-ups", requireAuth, async (req, res) => {
+app.post("/api/follow-ups", requireAuth, requireStaff, async (req, res) => {
   try {
     const { firstTimerId, date, time, comment, visitationArranged, visitationDate } = req.body;
     const result = await pool.query(
@@ -2922,7 +2939,7 @@ app.post("/api/follow-ups", requireAuth, async (req, res) => {
 });
 
 // UPDATE FOLLOW-UP (PROTECTED)
-app.put("/api/follow-ups/:id", requireAuth, async (req, res) => {
+app.put("/api/follow-ups/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     const { firstTimerId, date, time, comment, visitationArranged, visitationDate } = req.body;
     const result = await pool.query(
@@ -2964,7 +2981,7 @@ app.put("/api/follow-ups/:id", requireAuth, async (req, res) => {
 });
 
 // DELETE FOLLOW-UP (PROTECTED)
-app.delete("/api/follow-ups/:id", requireAuth, async (req, res) => {
+app.delete("/api/follow-ups/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM follow_ups WHERE id = $1 RETURNING id::text as id",
@@ -2983,7 +3000,7 @@ app.delete("/api/follow-ups/:id", requireAuth, async (req, res) => {
 });
 
 // ADD REPORT (PROTECTED)
-app.post("/api/reports", requireAuth, async (req, res) => {
+app.post("/api/reports", requireAuth, requireStaff, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["cellId", "date", "venue", "meetingType", "description", "attendees"])) return;
     const cellId = req.body?.cellId;
@@ -3203,7 +3220,7 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
 });
 
 // UPDATE REPORT (PROTECTED)
-app.put("/api/reports/:id", requireAuth, async (req, res) => {
+app.put("/api/reports/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["date", "venue", "meetingType", "description", "attendees"])) return;
     const date = req.body?.date ?? null;
@@ -3283,13 +3300,15 @@ app.get("/api/notifications", requireAuth, async (req, res) => {
 
 app.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
   try {
+    const role = String(req.user.role || "").toLowerCase();
+    const canManageGlobal = role === "superuser" || role === "admin";
     const result = await pool.query(
       `UPDATE notifications
        SET read_at = NOW()
        WHERE id = $1
-         AND (user_id IS NULL OR user_id = $2)
+         AND (user_id = $2 OR ($3 = TRUE AND user_id IS NULL))
        RETURNING id::text as id`,
-      [req.params.id, req.user.userId]
+      [req.params.id, req.user.userId, canManageGlobal]
     );
 
     if (result.rows.length === 0) {
@@ -3305,13 +3324,15 @@ app.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
 
 app.put("/api/notifications/:id/unread", requireAuth, async (req, res) => {
   try {
+    const role = String(req.user.role || "").toLowerCase();
+    const canManageGlobal = role === "superuser" || role === "admin";
     const result = await pool.query(
       `UPDATE notifications
        SET read_at = NULL
        WHERE id = $1
-         AND (user_id IS NULL OR user_id = $2)
+         AND (user_id = $2 OR ($3 = TRUE AND user_id IS NULL))
        RETURNING id::text as id`,
-      [req.params.id, req.user.userId]
+      [req.params.id, req.user.userId, canManageGlobal]
     );
 
     if (result.rows.length === 0) {
@@ -3327,12 +3348,14 @@ app.put("/api/notifications/:id/unread", requireAuth, async (req, res) => {
 
 app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
   try {
+    const role = String(req.user.role || "").toLowerCase();
+    const canManageGlobal = role === "superuser" || role === "admin";
     await pool.query(
       `UPDATE notifications
        SET read_at = NOW()
        WHERE read_at IS NULL
-         AND (user_id IS NULL OR user_id = $1)`,
-      [req.user.userId]
+         AND (user_id = $1 OR ($2 = TRUE AND user_id IS NULL))`,
+      [req.user.userId, canManageGlobal]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -3351,9 +3374,15 @@ app.delete("/api/notifications", requireAuth, async (req, res) => {
     const result = await pool.query(
       `DELETE FROM notifications
        WHERE id::text = ANY($1)
-         AND (user_id IS NULL OR user_id = $2)
+         AND (
+           user_id = $2
+           OR (
+             user_id IS NULL
+             AND ($3 = 'superuser' OR $3 = 'admin')
+           )
+         )
        RETURNING id::text as id`,
-      [list, req.user.userId]
+      [list, req.user.userId, String(req.user.role || "").toLowerCase()]
     );
     res.json({ deleted: result.rows.map(r => r.id) });
   } catch (err) {
@@ -3458,7 +3487,7 @@ app.post("/api/notifications/send", requireAuth, requireAdmin, async (req, res) 
 });
 
 // DELETE REPORT (PROTECTED)
-app.delete("/api/reports/:id", requireAuth, async (req, res) => {
+app.delete("/api/reports/:id", requireAuth, requireStaff, async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM reports WHERE id = $1 RETURNING id::text as id",
