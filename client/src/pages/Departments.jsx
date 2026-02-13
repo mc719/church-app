@@ -271,6 +271,7 @@ function Departments() {
   }, [assignSearch, members])
 
   const totalPages = Math.max(1, Math.ceil(departmentMembers.length / PAGE_SIZE))
+  const showPagination = departmentMembers.length > 10
   const currentPage = Math.min(page, totalPages)
   const startIndex = (currentPage - 1) * PAGE_SIZE
   const pageMembers = departmentMembers.slice(startIndex, startIndex + PAGE_SIZE)
@@ -450,7 +451,7 @@ function Departments() {
               </table>
             </div>
           )}
-          {activeTab === 'members' && (
+          {activeTab === 'members' && showPagination && (
             <div className="table-pagination">
               <button
                 className="btn"

@@ -45,6 +45,7 @@ function Sessions() {
   }, [filtered])
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const showPagination = sorted.length > 10
   const currentPage = Math.min(page, totalPages)
   const startIndex = (currentPage - 1) * PAGE_SIZE
   const pageSessions = sorted.slice(startIndex, startIndex + PAGE_SIZE)
@@ -176,27 +177,29 @@ function Sessions() {
         </table>
       </div>
 
-      <div className="table-pagination">
-        <button
-          className="btn"
-          type="button"
-          disabled={currentPage === 1}
-          onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-        >
-          Prev
-        </button>
-        <span className="pagination-label">
-          Page {currentPage} of {totalPages}
-        </span>
-        <button
-          className="btn"
-          type="button"
-          disabled={currentPage === totalPages}
-          onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-        >
-          Next
-        </button>
-      </div>
+      {showPagination && (
+        <div className="table-pagination">
+          <button
+            className="btn"
+            type="button"
+            disabled={currentPage === 1}
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+          >
+            Prev
+          </button>
+          <span className="pagination-label">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            className="btn"
+            type="button"
+            disabled={currentPage === totalPages}
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   )
 }

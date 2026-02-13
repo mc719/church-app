@@ -5,10 +5,24 @@ const API_BASE = '/api'
 const PAGE_SIZE = 20
 
 function Members() {
+  const emptyMember = {
+    title: '',
+    name: '',
+    gender: '',
+    mobile: '',
+    email: '',
+    role: '',
+    isFirstTimer: false,
+    foundationSchool: false,
+    departmentId: '',
+    dobDay: '',
+    dobMonth: ''
+  }
   const [members, setMembers] = useState([])
   const [departments, setDepartments] = useState([])
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [addingMember, setAddingMember] = useState(null)
   const [editingMember, setEditingMember] = useState(null)
   const [deletingMember, setDeletingMember] = useState(null)
   const [selectedMember, setSelectedMember] = useState(null)
@@ -93,6 +107,7 @@ function Members() {
   }, [members, search])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const showPagination = filtered.length > 10
   const currentPage = Math.min(page, totalPages)
   const startIndex = (currentPage - 1) * PAGE_SIZE
   const pageMembers = filtered.slice(startIndex, startIndex + PAGE_SIZE)
@@ -151,6 +166,39 @@ function Members() {
     setEditingMember(null)
   }
 
+  const handleAddMember = async (event) => {
+    event.preventDefault()
+    if (!addingMember) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        title: addingMember.title,
+        name: addingMember.name,
+        gender: addingMember.gender,
+        mobile: addingMember.mobile,
+        email: addingMember.email,
+        role: addingMember.role,
+        isFirstTimer: addingMember.isFirstTimer,
+        foundationSchool: addingMember.foundationSchool,
+        departmentId: addingMember.departmentId || null,
+        dobMonth: addingMember.dobMonth,
+        dobDay: addingMember.dobDay
+      })
+    })
+    if (!res.ok) return
+    const created = await res.json()
+    setMembers((prev) => [created, ...prev])
+    setSelectedMember({ ...created })
+    setDetailTab('details')
+    setAddingMember(null)
+  }
+
   useEffect(() => {
     if (!pageMembers.length) return
     if (selectedMember && pageMembers.some((m) => String(m.id) === String(selectedMember.id))) return
@@ -162,6 +210,11 @@ function Members() {
     <div className="members-page">
       <div className="members-layout">
         <div className="members-list-panel">
+          <div className="page-actions" style={{ justifyContent: 'flex-end', marginBottom: '10px' }}>
+            <button className="btn btn-success" type="button" onClick={() => setAddingMember({ ...emptyMember })}>
+              <i className="fas fa-user-plus"></i> Add Member
+            </button>
+          </div>
           <div className="search-box">
             <input
               type="text"
@@ -206,27 +259,29 @@ function Members() {
               )
             })}
           </div>
-          <div className="table-pagination">
-            <button
-              className="btn"
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            >
-              Prev
-            </button>
-            <span className="pagination-label">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              className="btn"
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            >
-              Next
-            </button>
-          </div>
+          {showPagination && (
+            <div className="table-pagination">
+              <button
+                className="btn"
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              >
+                Prev
+              </button>
+              <span className="pagination-label">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                className="btn"
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              >
+                Next
+              </button>
+            </div>
+          )}
           <div className="members-count">
             Showing <span id="membersCount">{filtered.length}</span> members
           </div>
@@ -467,6 +522,142 @@ function Members() {
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setEditingMember(null)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success" type="submit">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {addingMember && (
+        <div className="modal-overlay active" onClick={() => setAddingMember(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Member</h3>
+              <button className="close-modal" type="button" onClick={() => setAddingMember(null)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleAddMember}>
+                <div className="form-group">
+                  <label>Title</label>
+                  <select
+                    className="form-control"
+                    value={addingMember.title || ''}
+                    onChange={(e) => setAddingMember({ ...addingMember, title: e.target.value })}
+                  >
+                    <option value="">Select Title</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Dcn">Dcn</option>
+                    <option value="Dcns">Dcns</option>
+                    <option value="Pastor">Pastor</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    className="form-control"
+                    value={addingMember.name || ''}
+                    onChange={(e) => setAddingMember({ ...addingMember, name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Gender</label>
+                  <select
+                    className="form-control"
+                    value={addingMember.gender || ''}
+                    onChange={(e) => setAddingMember({ ...addingMember, gender: e.target.value })}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Mobile</label>
+                  <input
+                    className="form-control"
+                    value={addingMember.mobile || ''}
+                    onChange={(e) => setAddingMember({ ...addingMember, mobile: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    className="form-control"
+                    value={addingMember.email || ''}
+                    onChange={(e) => setAddingMember({ ...addingMember, email: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Cell Role</label>
+                  <input
+                    className="form-control"
+                    value={addingMember.role || ''}
+                    onChange={(e) => setAddingMember({ ...addingMember, role: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Department</label>
+                  <select
+                    className="form-control"
+                    value={addingMember.departmentId || ''}
+                    onChange={(e) => setAddingMember({ ...addingMember, departmentId: e.target.value })}
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>First-Timer?</label>
+                  <select
+                    className="form-control"
+                    value={addingMember.isFirstTimer ? 'yes' : 'no'}
+                    onChange={(e) => setAddingMember({ ...addingMember, isFirstTimer: e.target.value === 'yes' })}
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Foundation School?</label>
+                  <select
+                    className="form-control"
+                    value={addingMember.foundationSchool ? 'yes' : 'no'}
+                    onChange={(e) => setAddingMember({ ...addingMember, foundationSchool: e.target.value === 'yes' })}
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Date of Birth</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <input
+                      className="form-control"
+                      placeholder="Day"
+                      value={addingMember.dobDay || ''}
+                      onChange={(e) => setAddingMember({ ...addingMember, dobDay: e.target.value })}
+                    />
+                    <input
+                      className="form-control"
+                      placeholder="Month"
+                      value={addingMember.dobMonth || ''}
+                      onChange={(e) => setAddingMember({ ...addingMember, dobMonth: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="button" onClick={() => setAddingMember(null)}>
                     Cancel
                   </button>
                   <button className="btn btn-success" type="submit">
