@@ -607,8 +607,6 @@ function Dashboard({ onAddCell }) {
           </tbody>
         </table>
       </div>
-      <div className="table-pagination" id="cellsPagination"></div>
-
       <div className="dashboard-section">
         <div className="section-header">
           <h2>Recent Reports (Last 7 Days)</h2>
