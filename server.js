@@ -386,6 +386,60 @@ function validateWritePayload(req, res, allowedKeys) {
   return true;
 }
 
+const NOTIFICATION_TARGETING_KEY = "notification_targeting_config";
+const DEFAULT_NOTIFICATION_TARGETING_CONFIG = {
+  enableRoleTargeting: true,
+  enableUsernameTargeting: true,
+  allowedRoles: []
+};
+
+function normalizeNotificationTargetingConfig(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const enableRoleTargeting =
+    typeof source.enableRoleTargeting === "boolean"
+      ? source.enableRoleTargeting
+      : DEFAULT_NOTIFICATION_TARGETING_CONFIG.enableRoleTargeting;
+  const enableUsernameTargeting =
+    typeof source.enableUsernameTargeting === "boolean"
+      ? source.enableUsernameTargeting
+      : DEFAULT_NOTIFICATION_TARGETING_CONFIG.enableUsernameTargeting;
+  const allowedRoles = Array.isArray(source.allowedRoles)
+    ? Array.from(new Set(source.allowedRoles.map((role) => safeString(role, 80)).filter(Boolean)))
+    : [];
+  return {
+    enableRoleTargeting,
+    enableUsernameTargeting,
+    allowedRoles
+  };
+}
+
+async function getNotificationTargetingConfig() {
+  const result = await pool.query(
+    "SELECT value FROM app_settings WHERE key = $1 LIMIT 1",
+    [NOTIFICATION_TARGETING_KEY]
+  );
+  if (!result.rows.length || !result.rows[0].value) {
+    return { ...DEFAULT_NOTIFICATION_TARGETING_CONFIG };
+  }
+  try {
+    const parsed = JSON.parse(result.rows[0].value);
+    return normalizeNotificationTargetingConfig(parsed);
+  } catch {
+    return { ...DEFAULT_NOTIFICATION_TARGETING_CONFIG };
+  }
+}
+
+async function saveNotificationTargetingConfig(config) {
+  const normalized = normalizeNotificationTargetingConfig(config);
+  await pool.query(
+    `INSERT INTO app_settings (key, value)
+     VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [NOTIFICATION_TARGETING_KEY, JSON.stringify(normalized)]
+  );
+  return normalized;
+}
+
 function normalizeAttendeesInput(value) {
   if (!value) return [];
   if (typeof value === "string") {
@@ -1121,6 +1175,27 @@ app.post("/api/settings/logo", requireAuth, requireAdmin, async (req, res) => {
     res.status(500).json({ error: "Failed to save logo" });
   }
 });
+app.get("/api/settings/notification-targeting", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const config = await getNotificationTargetingConfig();
+    res.json(config);
+  } catch (err) {
+    console.error("Failed to load notification targeting settings:", err);
+    res.status(500).json({ error: "Failed to load notification targeting settings" });
+  }
+});
+
+app.put("/api/settings/notification-targeting", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    if (!validateWritePayload(req, res, ["enableRoleTargeting", "enableUsernameTargeting", "allowedRoles"])) return;
+    const config = await saveNotificationTargetingConfig(req.body || {});
+    res.json(config);
+  } catch (err) {
+    console.error("Failed to save notification targeting settings:", err);
+    res.status(500).json({ error: "Failed to save notification targeting settings" });
+  }
+});
+
 app.get("/api/test", (req, res) => {
   res.json({ message: "Server is working 🎉" });
 });
@@ -1531,6 +1606,31 @@ app.get("/api/users", requireAuth, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load users" });
+  }
+});
+
+app.get("/api/users/search", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const query = safeString(req.query?.q, 120);
+    if (!query) {
+      return res.json([]);
+    }
+    const like = `%${query}%`;
+    const result = await pool.query(
+      `SELECT id::text as id,
+              username,
+              email,
+              role
+       FROM users
+       WHERE username ILIKE $1 OR email ILIKE $1
+       ORDER BY username ASC
+       LIMIT 20`,
+      [like]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to search users" });
   }
 });
 
@@ -3490,88 +3590,98 @@ app.delete("/api/notifications", requireAuth, async (req, res) => {
 
 app.post("/api/notifications/send", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { targetType, targetValue, title, message, type, roles, targetIds } = req.body || {};
+    if (!validateWritePayload(req, res, ["title", "message", "type", "roles", "targetIds", "usernames", "targetType", "targetValue"])) return;
+    const { targetType, targetValue } = req.body || {};
+    const title = safeString(req.body?.title, 200);
+    const message = safeString(req.body?.message, 6000);
+    const type = safeString(req.body?.type, 30) || "info";
+    let roleList = Array.isArray(req.body?.roles) ? req.body.roles.map((role) => safeString(role, 80)).filter(Boolean) : [];
+    let targetList = Array.isArray(req.body?.targetIds) ? req.body.targetIds.map((id) => String(id).trim()).filter(Boolean) : [];
+    const usernameList = Array.isArray(req.body?.usernames) ? req.body.usernames.map((name) => safeString(name, 120)).filter(Boolean) : [];
 
     if (!title || !message) {
       return res.status(400).json({ error: "Title and message are required" });
     }
 
-    let userIds = [];
+    if (targetType === "role" && targetValue) {
+      roleList = [safeString(targetValue, 80)].filter(Boolean);
+    }
+    if (targetType === "individual" && targetValue) {
+      const explicitId = String(targetValue).trim();
+      if (explicitId) targetList.push(explicitId);
+    }
 
-    if (Array.isArray(targetIds) || Array.isArray(roles)) {
-      const roleList = Array.isArray(roles) ? roles.filter(Boolean) : [];
-      const targetList = Array.isArray(targetIds) ? targetIds.filter(Boolean) : [];
+    if (!roleList.length && !targetList.length && !usernameList.length) {
+      return res.status(400).json({ error: "Select at least one role or username target" });
+    }
 
-      if (!roleList.length && !targetList.length) {
-        return res.status(400).json({ error: "Select at least one role or target" });
-      }
+    const targetingConfig = await getNotificationTargetingConfig();
+    if (roleList.length && !targetingConfig.enableRoleTargeting) {
+      return res.status(403).json({ error: "Role targeting is disabled in settings" });
+    }
+    if (usernameList.length && !targetingConfig.enableUsernameTargeting) {
+      return res.status(403).json({ error: "Username targeting is disabled in settings" });
+    }
 
-      if (targetList.length) {
-        const result = await pool.query(
-          `SELECT id
-           FROM users
-           WHERE id::text = ANY($1)`,
-          [targetList]
-        );
-        userIds = result.rows.map(r => r.id);
-      } else if (roleList.length) {
-        const result = await pool.query(
-          `SELECT DISTINCT u.id
-           FROM users u
-           WHERE u.role = ANY($1)
-           UNION
-           SELECT DISTINCT u2.id
-           FROM members m
-           JOIN users u2 ON u2.email = m.email
-           WHERE m.role = ANY($1)`,
-          [roleList]
-        );
-        userIds = result.rows.map(r => r.id);
-      }
-    } else {
-      if (!targetType) {
-        return res.status(400).json({ error: "Target type is required" });
-      }
-
-      if (targetType === "individual") {
-        const result = await pool.query("SELECT id FROM users WHERE id = $1", [targetValue]);
-        userIds = result.rows.map(r => r.id);
-      } else if (targetType === "role") {
-        const result = await pool.query("SELECT id FROM users WHERE role = $1", [targetValue]);
-        userIds = result.rows.map(r => r.id);
-      } else if (targetType === "title") {
-        const result = await pool.query(
-          `SELECT u.id
-           FROM members m
-           JOIN users u ON u.email = m.email
-           WHERE m.title = $1`,
-          [targetValue]
-        );
-        userIds = result.rows.map(r => r.id);
-      } else if (targetType === "group") {
-        const result = await pool.query(
-          `SELECT u.id
-           FROM members m
-           JOIN users u ON u.email = m.email
-           WHERE m.cell_id = $1`,
-          [targetValue]
-        );
-        userIds = result.rows.map(r => r.id);
-      } else {
-        return res.status(400).json({ error: "Unsupported target type" });
+    const allowedRoleSet = new Set(
+      (targetingConfig.allowedRoles || []).map((role) => String(role).trim().toLowerCase()).filter(Boolean)
+    );
+    if (allowedRoleSet.size) {
+      const disallowed = roleList.find((role) => !allowedRoleSet.has(String(role).trim().toLowerCase()));
+      if (disallowed) {
+        return res.status(403).json({ error: `Role "${disallowed}" is not allowed for notification targeting` });
       }
     }
 
-    const uniqueUserIds = Array.from(new Set(userIds.map(id => id?.toString()).filter(Boolean)));
+    const userIds = [];
+    if (targetList.length) {
+      const directUsers = await pool.query(
+        `SELECT id::text as id
+         FROM users
+         WHERE id::text = ANY($1)`,
+        [Array.from(new Set(targetList))]
+      );
+      userIds.push(...directUsers.rows.map((row) => row.id));
+    }
+
+    if (usernameList.length) {
+      const usernamesNormalized = Array.from(
+        new Set(usernameList.map((name) => String(name).trim().toLowerCase()).filter(Boolean))
+      );
+      const usernameUsers = await pool.query(
+        `SELECT id::text as id
+         FROM users
+         WHERE LOWER(username) = ANY($1)`,
+        [usernamesNormalized]
+      );
+      userIds.push(...usernameUsers.rows.map((row) => row.id));
+    }
+
+    if (roleList.length) {
+      const roleUsers = await pool.query(
+        `SELECT DISTINCT u.id::text as id
+         FROM users u
+         WHERE u.role = ANY($1)
+         UNION
+         SELECT DISTINCT u2.id::text as id
+         FROM members m
+         JOIN users u2 ON LOWER(u2.email) = LOWER(m.email)
+         WHERE m.role = ANY($1)`,
+        [Array.from(new Set(roleList))]
+      );
+      userIds.push(...roleUsers.rows.map((row) => row.id));
+    }
+
+    const uniqueUserIds = Array.from(new Set(userIds.map((id) => String(id).trim()).filter(Boolean)));
     if (!uniqueUserIds.length) {
-      return res.status(404).json({ error: "No users found for target" });
+      return res.status(404).json({ error: "No users found for selected target(s)" });
     }
 
     for (const userId of uniqueUserIds) {
       await createNotification({
         title,
         message,
-        type: type || "info",
+        type,
         userId
       });
     }

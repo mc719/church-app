@@ -11,6 +11,11 @@ function Settings() {
   const [newRole, setNewRole] = useState('')
   const [editingRole, setEditingRole] = useState(null)
   const [deletingRole, setDeletingRole] = useState(null)
+  const [notificationTargeting, setNotificationTargeting] = useState({
+    enableRoleTargeting: true,
+    enableUsernameTargeting: true,
+    allowedRoles: []
+  })
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -30,6 +35,20 @@ function Settings() {
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setRoles(Array.isArray(data) ? data : []))
       .catch(() => setRoles([]))
+
+    fetch(`${API_BASE}/settings/notification-targeting`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data || typeof data !== 'object') return
+        setNotificationTargeting({
+          enableRoleTargeting: data.enableRoleTargeting !== false,
+          enableUsernameTargeting: data.enableUsernameTargeting !== false,
+          allowedRoles: Array.isArray(data.allowedRoles) ? data.allowedRoles : []
+        })
+      })
+      .catch(() => {})
   }, [])
 
   const handleLogoUpload = async (event) => {
@@ -125,6 +144,19 @@ function Settings() {
     }
     setRoles((prev) => prev.filter((role) => String(role.id) !== String(deletingRole.id)))
     setDeletingRole(null)
+  }
+
+  const saveNotificationTargeting = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    await fetch(`${API_BASE}/settings/notification-targeting`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(notificationTargeting)
+    })
   }
 
   return (
@@ -247,6 +279,70 @@ function Settings() {
             <a className="btn btn-success" href="/new-department" target="_blank" rel="noreferrer">
               Department Form
             </a>
+          </div>
+        </div>
+
+        <div className="settings-card">
+          <div className="section-header" style={{ marginTop: 0 }}>
+            <h2>Notification Targeting</h2>
+          </div>
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={notificationTargeting.enableRoleTargeting}
+                onChange={(e) =>
+                  setNotificationTargeting((prev) => ({
+                    ...prev,
+                    enableRoleTargeting: e.target.checked
+                  }))
+                }
+              />{' '}
+              Enable role targeting
+            </label>
+          </div>
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={notificationTargeting.enableUsernameTargeting}
+                onChange={(e) =>
+                  setNotificationTargeting((prev) => ({
+                    ...prev,
+                    enableUsernameTargeting: e.target.checked
+                  }))
+                }
+              />{' '}
+              Enable username targeting
+            </label>
+          </div>
+          <div className="form-group">
+            <label>Allowed roles for notification targeting</label>
+            <select
+              className="form-control"
+              multiple
+              value={notificationTargeting.allowedRoles}
+              onChange={(e) =>
+                setNotificationTargeting((prev) => ({
+                  ...prev,
+                  allowedRoles: Array.from(e.target.selectedOptions).map((item) => item.value)
+                }))
+              }
+            >
+              {roles.map((role) => (
+                <option key={role.id} value={role.name}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+            <small style={{ color: 'var(--gray-color)' }}>
+              Leave empty to allow all roles.
+            </small>
+          </div>
+          <div className="form-actions">
+            <button className="btn btn-success" type="button" onClick={saveNotificationTargeting}>
+              Save Targeting Settings
+            </button>
           </div>
         </div>
       </div>

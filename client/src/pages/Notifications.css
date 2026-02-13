@@ -5,3 +5,58 @@
 .notifications-page .cell-tabs-actions {
   margin-left: auto;
 }
+
+.notifications-page .notification-send-form-wrap {
+  padding: 24px;
+}
+
+.notifications-page .notification-help-text {
+  display: block;
+  margin-top: 6px;
+  color: var(--gray-color);
+  font-size: 12px;
+}
+
+.notifications-page .notification-target-results {
+  margin-top: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.notifications-page .notification-target-result {
+  width: 100%;
+  border: 0;
+  background: var(--card-bg);
+  color: var(--text-color);
+  padding: 8px 10px;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.notifications-page .notification-target-result + .notification-target-result {
+  border-top: 1px solid var(--border-color);
+}
+
+.notifications-page .notification-target-result small {
+  color: var(--gray-color);
+}
+
+.notifications-page .notification-target-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.notifications-page .notification-target-chip {
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-color);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}

@@ -1,21 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './Notifications.css'
 
 const API_BASE = '/api'
+
+const DEFAULT_TARGETING = {
+  enableRoleTargeting: true,
+  enableUsernameTargeting: true,
+  allowedRoles: []
+}
 
 function Notifications() {
   const [activeTab, setActiveTab] = useState('list')
   const [notifications, setNotifications] = useState([])
   const [selected, setSelected] = useState(new Set())
-  const [users, setUsers] = useState([])
-  const [members, setMembers] = useState([])
   const [roles, setRoles] = useState([])
-  const [targets, setTargets] = useState([])
+  const [targeting, setTargeting] = useState(DEFAULT_TARGETING)
+  const [usernameQuery, setUsernameQuery] = useState('')
+  const [usernameResults, setUsernameResults] = useState([])
   const [activeNotification, setActiveNotification] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [form, setForm] = useState({
     roles: [],
-    targets: [],
+    usernames: [],
     title: '',
     message: '',
     type: 'info'
@@ -27,49 +33,62 @@ function Notifications() {
     const headers = { Authorization: `Bearer ${token}` }
     Promise.all([
       fetch(`${API_BASE}/notifications`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/users`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/members`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/roles`, { headers }).then((r) => (r.ok ? r.json() : []))
+      fetch(`${API_BASE}/roles`, { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/settings/notification-targeting`, { headers }).then((r) => (r.ok ? r.json() : DEFAULT_TARGETING))
     ])
-      .then(([notes, usersData, membersData, rolesData]) => {
+      .then(([notes, rolesData, settingsData]) => {
         setNotifications(Array.isArray(notes) ? notes : [])
-        setUsers(Array.isArray(usersData) ? usersData : [])
-        setMembers(Array.isArray(membersData) ? membersData : [])
         setRoles(Array.isArray(rolesData) ? rolesData : [])
+        setTargeting({
+          ...DEFAULT_TARGETING,
+          ...(settingsData && typeof settingsData === 'object' ? settingsData : {})
+        })
       })
       .catch(() => {
         setNotifications([])
-        setUsers([])
-        setMembers([])
         setRoles([])
+        setTargeting(DEFAULT_TARGETING)
       })
   }, [])
 
-    useEffect(() => {
-    const roleTargets = []
-    const roles = form.roles || []
-    roles.forEach((roleName) => {
-      const normalized = String(roleName || '').trim().toLowerCase()
-      if (normalized === 'cell leader') {
-        members
-          .filter((m) => String(m.role || '').trim().toLowerCase() === 'cell leader')
-          .forEach((m) => {
-            const user = users.find((u) => u.email && m.email && u.email === m.email)
-            if (!user) return
-            const cellLabel = m.cellName ? ` - ${m.cellName}` : ''
-            roleTargets.push({ id: user.id, label: `${m.name}${cellLabel} (Cell Leader)` })
-          })
-      } else {
-        users
-          .filter((u) => String(u.role || '').trim().toLowerCase() === normalized)
-          .forEach((u) => {
-            roleTargets.push({ id: u.id, label: `${u.username} (${roleName})` })
-          })
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token || !targeting.enableUsernameTargeting) {
+      setUsernameResults([])
+      return
+    }
+    const q = usernameQuery.trim()
+    if (q.length < 2) {
+      setUsernameResults([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(q)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) {
+          setUsernameResults([])
+          return
+        }
+        const rows = await res.json()
+        const picked = new Set(form.usernames.map((name) => String(name).toLowerCase()))
+        setUsernameResults(
+          (Array.isArray(rows) ? rows : []).filter((row) => !picked.has(String(row.username || '').toLowerCase()))
+        )
+      } catch {
+        setUsernameResults([])
       }
-    })
-    setTargets(roleTargets)
-    setForm((prev) => ({ ...prev, targets: [] }))
-  }, [form.roles, users, members])
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [usernameQuery, form.usernames, targeting.enableUsernameTargeting])
+
+  const availableRoles = useMemo(() => {
+    const allow = new Set((targeting.allowedRoles || []).map((role) => String(role).trim().toLowerCase()))
+    const allRoles = Array.isArray(roles) ? roles : []
+    if (!allow.size) return allRoles
+    return allRoles.filter((role) => allow.has(String(role.name || '').trim().toLowerCase()))
+  }, [roles, targeting.allowedRoles])
 
   const toggleSelectAll = (checked) => {
     if (!checked) {
@@ -122,12 +141,14 @@ function Notifications() {
         message: form.message,
         type: form.type,
         roles: form.roles,
-        targetIds: form.targets
+        usernames: form.usernames
       })
     })
     if (!res.ok) return
     await res.json().catch(() => null)
-    setForm({ roles: [], targets: [], title: '', message: '', type: 'info' })
+    setForm({ roles: [], usernames: [], title: '', message: '', type: 'info' })
+    setUsernameQuery('')
+    setUsernameResults([])
     setActiveTab('list')
   }
 
@@ -143,7 +164,7 @@ function Notifications() {
     setNotifications((prev) =>
       prev.map((n) =>
         String(n.id) === String(note.id)
-          ? { ...n, readAt: (note.readAt || note.read_at) ? null : new Date().toISOString() }
+          ? { ...n, readAt: note.readAt || note.read_at ? null : new Date().toISOString() }
           : n
       )
     )
@@ -168,6 +189,24 @@ function Notifications() {
         )
       )
     } catch {}
+  }
+
+  const addUsernameTarget = (username) => {
+    if (!username) return
+    setForm((prev) => {
+      const next = new Set(prev.usernames)
+      next.add(username)
+      return { ...prev, usernames: Array.from(next) }
+    })
+    setUsernameQuery('')
+    setUsernameResults([])
+  }
+
+  const removeUsernameTarget = (username) => {
+    setForm((prev) => ({
+      ...prev,
+      usernames: prev.usernames.filter((item) => item !== username)
+    }))
   }
 
   const closeNotification = () => {
@@ -264,49 +303,74 @@ function Notifications() {
 
       {activeTab === 'send' && (
         <div className="cell-tab-content active">
-          <div className="table-container" style={{ padding: '24px' }}>
+          <div className="table-container notification-send-form-wrap">
             <form onSubmit={handleSend}>
               <div className="form-group">
-                <label>Send To (Roles) *</label>
+                <label>Send To Roles</label>
                 <select
                   className="form-control"
                   multiple
                   value={form.roles}
+                  disabled={!targeting.enableRoleTargeting}
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
                       roles: Array.from(e.target.selectedOptions).map((o) => o.value)
                     }))
                   }
-                  required
                 >
-                  {roles.map((role) => (
+                  {availableRoles.map((role) => (
                     <option key={role.id} value={role.name}>
                       {role.name}
                     </option>
                   ))}
                 </select>
+                {!targeting.enableRoleTargeting && (
+                  <small className="notification-help-text">Role targeting is disabled in Settings.</small>
+                )}
               </div>
+
               <div className="form-group">
-                <label>Target *</label>
-                <select
+                <label>Send To Usernames</label>
+                <input
+                  type="text"
                   className="form-control"
-                  multiple
-                  value={form.targets}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      targets: Array.from(e.target.selectedOptions).map((o) => o.value)
-                    }))
-                  }
-                  required
-                >
-                  {targets.length === 0 && <option value="" disabled>No targets</option>}
-                  {targets.map((target) => (
-                    <option key={target.id} value={target.id}>{target.label}</option>
-                  ))}
-                </select>
+                  placeholder={targeting.enableUsernameTargeting ? 'Type at least 2 characters...' : 'Username targeting disabled'}
+                  value={usernameQuery}
+                  disabled={!targeting.enableUsernameTargeting}
+                  onChange={(e) => setUsernameQuery(e.target.value)}
+                />
+                {targeting.enableUsernameTargeting && usernameResults.length > 0 && (
+                  <div className="notification-target-results">
+                    {usernameResults.map((row) => (
+                      <button
+                        className="notification-target-result"
+                        key={row.id}
+                        type="button"
+                        onClick={() => addUsernameTarget(row.username)}
+                      >
+                        <span>{row.username}</span>
+                        <small>{row.role || 'User'}</small>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {form.usernames.length > 0 && (
+                  <div className="notification-target-chips">
+                    {form.usernames.map((username) => (
+                      <button
+                        className="notification-target-chip"
+                        key={username}
+                        type="button"
+                        onClick={() => removeUsernameTarget(username)}
+                      >
+                        {username} <span>&times;</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
               <div className="form-group">
                 <label>Title *</label>
                 <input
@@ -392,5 +456,3 @@ function Notifications() {
 }
 
 export default Notifications
-
-
