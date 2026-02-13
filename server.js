@@ -34,17 +34,29 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.length === 0) return true;
+  return allowedOrigins.includes(origin);
+}
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.length === 0) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("Not allowed by CORS"));
+      if (isAllowedOrigin(origin)) return callback(null, true);
+      return callback(null, false);
     },
     credentials: true
   })
 );
+
+app.use("/api", (req, res, next) => {
+  const origin = req.headers.origin;
+  if (!isAllowedOrigin(origin)) {
+    return res.status(403).json({ error: "CORS origin blocked" });
+  }
+  next();
+});
 
 app.use(
   helmet({
@@ -255,6 +267,23 @@ function clearLoginFailures(req, username) {
 
 function safeString(value, maxLen = 255) {
   return String(value || "").trim().slice(0, maxLen);
+}
+
+function validateDataUrlImage(dataUrl, maxBytes = 2 * 1024 * 1024) {
+  if (dataUrl == null || dataUrl === "") {
+    return { ok: true };
+  }
+  const value = String(dataUrl).trim();
+  const match = value.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=]+)$/i);
+  if (!match) {
+    return { ok: false, error: "Invalid image format. Allowed: png, jpg/jpeg, webp" };
+  }
+  const base64Payload = match[2];
+  const bytes = Buffer.byteLength(base64Payload, "base64");
+  if (bytes > maxBytes) {
+    return { ok: false, error: "Image too large (max 2MB)" };
+  }
+  return { ok: true, bytes };
 }
 
 function isValidEmail(value) {
@@ -970,9 +999,14 @@ app.get("/api/settings/logo", async (req, res) => {
 // Save logo (admin only)
 app.post("/api/settings/logo", requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!validateWritePayload(req, res, ["logo"])) return;
     const { logo } = req.body || {};
     if (!logo) {
       return res.status(400).json({ error: "Logo is required" });
+    }
+    const logoValidation = validateDataUrlImage(logo);
+    if (!logoValidation.ok) {
+      return res.status(400).json({ error: logoValidation.error });
     }
     const result = await pool.query(
       `INSERT INTO app_settings (key, value)
@@ -1535,6 +1569,14 @@ app.get("/api/profile/me", requireAuth, async (req, res) => {
 
 app.put("/api/profile/me", requireAuth, async (req, res) => {
   try {
+    if (!validateWritePayload(req, res, [
+      "title", "fullName", "phone", "roleTitle", "cellId", "dateOfBirth", "address", "postcode", "photoData",
+      "email", "cellName", "cellVenue", "cellLeader", "cellLeaderMobile", "departmentName", "hodName", "hodMobile"
+    ])) return;
+    const photoCheck = validateDataUrlImage(req.body?.photoData);
+    if (!photoCheck.ok) {
+      return res.status(400).json({ error: photoCheck.error });
+    }
     await applyProfileUpdate(req.user.userId, req.body || {}, "self");
     const profile = await getProfileView(req.user.userId);
     if (!profile) {
@@ -1563,6 +1605,14 @@ app.get("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => 
 
 app.put("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => {
   try {
+    if (!validateWritePayload(req, res, [
+      "title", "fullName", "phone", "roleTitle", "cellId", "dateOfBirth", "address", "postcode", "photoData",
+      "email", "cellName", "cellVenue", "cellLeader", "cellLeaderMobile", "departmentName", "hodName", "hodMobile"
+    ])) return;
+    const photoCheck = validateDataUrlImage(req.body?.photoData);
+    if (!photoCheck.ok) {
+      return res.status(400).json({ error: photoCheck.error });
+    }
     await applyProfileUpdate(req.params.userId, req.body || {}, "manual");
     const profile = await getProfileView(req.params.userId);
     if (!profile) {
@@ -2248,6 +2298,10 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
       departmentId,
       invitedBy
     } = req.body || {};
+    const photoCheck = validateDataUrlImage(photoData);
+    if (!photoCheck.ok) {
+      return res.status(400).json({ error: photoCheck.error });
+    }
 
     if (!safeString(name, 180)) {
       return res.status(400).json({ error: "Name is required" });
@@ -2476,6 +2530,10 @@ app.put("/api/first-timers/:id", requireAuth, async (req, res) => {
         departmentId,
         invitedBy
     } = req.body || {};
+    const photoCheck = validateDataUrlImage(photoData);
+    if (!photoCheck.ok) {
+      return res.status(400).json({ error: photoCheck.error });
+    }
 
     if (email && !isValidEmail(email)) {
       return res.status(400).json({ error: "Invalid email" });
