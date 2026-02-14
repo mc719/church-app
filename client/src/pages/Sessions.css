@@ -1,3 +1,51 @@
+.sessions-page .sessions-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sessions-page .sessions-kpi-card {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--card-bg);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sessions-page .sessions-kpi-card span {
+  font-size: 12px;
+  color: var(--gray-color);
+}
+
+.sessions-page .sessions-kpi-card strong {
+  font-size: 1.2rem;
+}
+
+.sessions-page .sessions-kpi-card.active {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.sessions-page .sessions-kpi-card.ended {
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.sessions-page .sessions-kpi-card.suspicious {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.sessions-page .sessions-actions {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sessions-page .sessions-filter {
+  min-width: 160px;
+}
+
 .sessions-page .table-pagination {
   display: flex;
   align-items: center;
@@ -44,4 +92,82 @@
 .status-ended {
   background: rgba(239, 68, 68, 0.15);
   color: #dc2626;
+}
+
+.status-suspicious {
+  background: rgba(245, 158, 11, 0.2);
+  color: #b45309;
+}
+
+.status-normal {
+  background: rgba(148, 163, 184, 0.2);
+  color: #334155;
+}
+
+.sessions-ended-label {
+  color: var(--gray-color);
+  font-size: 0.85rem;
+}
+
+.sessions-mobile-list {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .sessions-page .sessions-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .sessions-page .sessions-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sessions-page .sessions-filter {
+    min-width: 0;
+  }
+
+  .sessions-page .table-container {
+    display: none;
+  }
+
+  .sessions-mobile-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .sessions-mobile-card {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg);
+    padding: 10px;
+  }
+
+  .sessions-mobile-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sessions-mobile-meta {
+    margin-top: 6px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    color: var(--gray-color);
+    font-size: 0.82rem;
+  }
+
+  .sessions-mobile-time {
+    margin-top: 6px;
+    font-size: 0.82rem;
+    color: var(--gray-color);
+  }
+
+  .sessions-mobile-actions {
+    margin-top: 8px;
+  }
 }

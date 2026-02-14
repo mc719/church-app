@@ -4,10 +4,54 @@ import './Sessions.css'
 const API_BASE = '/api'
 const PAGE_SIZE = 20
 
+function parseUserAgent(ua = '') {
+  let browser = 'Unknown'
+  let os = 'Unknown'
+  let device = 'Desktop'
+
+  if (ua.includes('Edg/')) browser = 'Edge'
+  else if (ua.includes('Chrome/')) browser = 'Chrome'
+  else if (ua.includes('Firefox/')) browser = 'Firefox'
+  else if (ua.includes('Safari/') && !ua.includes('Chrome/')) browser = 'Safari'
+
+  if (ua.includes('Windows')) os = 'Windows'
+  else if (ua.includes('Mac OS X')) os = 'macOS'
+  else if (ua.includes('Android')) {
+    os = 'Android'
+    device = 'Mobile'
+  } else if (ua.includes('iPhone') || ua.includes('iPad')) {
+    os = 'iOS'
+    device = 'Mobile'
+  } else if (ua.includes('Linux')) os = 'Linux'
+
+  if (ua.includes('Mobile')) device = 'Mobile'
+  if (ua.includes('Tablet') || ua.includes('iPad')) device = 'Tablet'
+  return { browser, os, device }
+}
+
+function getRisk(session) {
+  const loginAt = new Date(session.loginTime || session.login_time || 0)
+  const isActive = !(session.logoutTime || session.logout_time)
+  const unknownStack =
+    (session.browser || parseUserAgent(session.userAgent || '').browser) === 'Unknown' ||
+    (session.os || parseUserAgent(session.userAgent || '').os) === 'Unknown'
+  const missingIp = !session.ipAddress || session.ipAddress === '-'
+  const oldActive =
+    isActive &&
+    !Number.isNaN(loginAt.getTime()) &&
+    Date.now() - loginAt.getTime() > 24 * 60 * 60 * 1000
+
+  if (oldActive || (isActive && (unknownStack || missingIp))) return 'suspicious'
+  if (isActive) return 'active'
+  return 'ended'
+}
+
 function Sessions() {
   const [sessions, setSessions] = useState([])
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [deviceFilter, setDeviceFilter] = useState('all')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -18,15 +62,46 @@ function Sessions() {
       .catch(() => setSessions([]))
   }, [])
 
+  const enriched = useMemo(() => {
+    return sessions.map((session) => {
+      const parsed = parseUserAgent(session.userAgent || '')
+      const status = session.logoutTime || session.logout_time ? 'ended' : 'active'
+      const risk = getRisk(session)
+      return {
+        ...session,
+        parsedBrowser: session.browser || parsed.browser,
+        parsedOs: session.os || parsed.os,
+        parsedDevice: parsed.device,
+        status,
+        risk
+      }
+    })
+  }, [sessions])
+
+  const stats = useMemo(() => {
+    return enriched.reduce(
+      (acc, session) => {
+        acc.total += 1
+        if (session.status === 'active') acc.active += 1
+        if (session.status === 'ended') acc.ended += 1
+        if (session.risk === 'suspicious') acc.suspicious += 1
+        return acc
+      },
+      { total: 0, active: 0, ended: 0, suspicious: 0 }
+    )
+  }, [enriched])
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return sessions
-    return sessions.filter((session) => {
+    return enriched.filter((session) => {
+      if (statusFilter !== 'all' && session.status !== statusFilter) return false
+      if (deviceFilter !== 'all' && session.parsedDevice.toLowerCase() !== deviceFilter) return false
+      if (!term) return true
       const values = [
         session.username,
         session.ipAddress,
-        session.browser,
-        session.os,
+        session.parsedBrowser,
+        session.parsedOs,
         session.timezone
       ]
         .filter(Boolean)
@@ -34,7 +109,7 @@ function Sessions() {
         .toLowerCase()
       return values.includes(term)
     })
-  }, [sessions, search])
+  }, [enriched, search, statusFilter, deviceFilter])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -57,44 +132,27 @@ function Sessions() {
     return date.toLocaleString()
   }
 
-  const parseUserAgent = (ua = '') => {
-    let browser = 'Unknown'
-    let os = 'Unknown'
-    let device = 'Desktop'
-
-    if (ua.includes('Edg/')) browser = 'Edge'
-    else if (ua.includes('Chrome/')) browser = 'Chrome'
-    else if (ua.includes('Firefox/')) browser = 'Firefox'
-    else if (ua.includes('Safari/') && !ua.includes('Chrome/')) browser = 'Safari'
-
-    if (ua.includes('Windows')) os = 'Windows'
-    else if (ua.includes('Mac OS X')) os = 'macOS'
-    else if (ua.includes('Android')) { os = 'Android'; device = 'Mobile' }
-    else if (ua.includes('iPhone') || ua.includes('iPad')) { os = 'iOS'; device = 'Mobile' }
-    else if (ua.includes('Linux')) os = 'Linux'
-
-    if (ua.includes('Mobile')) device = 'Mobile'
-    if (ua.includes('Tablet') || ua.includes('iPad')) device = 'Tablet'
-    return { browser, os, device }
+  const riskLabel = (risk) => {
+    if (risk === 'suspicious') return 'Suspicious'
+    if (risk === 'active') return 'Normal'
+    return 'Normal'
   }
 
   const handleExport = () => {
     const rows = [
-      ['User', 'Start Time', 'Logout Time', 'IP Address', 'Browser', 'OS', 'Device', 'Timezone', 'Status'],
-      ...sorted.map((session) => {
-        const ua = parseUserAgent(session.userAgent || '')
-        return [
-          session.username || '',
-          formatDateTime(session.loginTime || session.login_time),
-          formatDateTime(session.logoutTime || session.logout_time),
-          session.ipAddress || '',
-          session.browser || ua.browser,
-          session.os || ua.os,
-          ua.device,
-          session.timezone || '',
-          session.logoutTime ? 'Ended' : 'Active'
-        ]
-      })
+      ['User', 'Start Time', 'Logout Time', 'IP Address', 'Browser', 'OS', 'Device', 'Timezone', 'Status', 'Risk'],
+      ...sorted.map((session) => [
+        session.username || '',
+        formatDateTime(session.loginTime || session.login_time),
+        formatDateTime(session.logoutTime || session.logout_time),
+        session.ipAddress || '',
+        session.parsedBrowser || '',
+        session.parsedOs || '',
+        session.parsedDevice || '',
+        session.timezone || '',
+        session.status === 'active' ? 'Active' : 'Ended',
+        riskLabel(session.risk)
+      ])
     ]
     const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -106,9 +164,45 @@ function Sessions() {
     URL.revokeObjectURL(url)
   }
 
+  const endSession = async (sessionId) => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/sessions/${sessionId}/end`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    setSessions((prev) =>
+      prev.map((session) =>
+        String(session.id) === String(sessionId)
+          ? { ...session, logoutTime: new Date().toISOString() }
+          : session
+      )
+    )
+  }
+
   return (
     <div className="sessions-page">
-      <div className="page-actions" style={{ justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+      <div className="sessions-kpi-grid">
+        <div className="sessions-kpi-card">
+          <span>Total Sessions</span>
+          <strong>{stats.total}</strong>
+        </div>
+        <div className="sessions-kpi-card active">
+          <span>Active</span>
+          <strong>{stats.active}</strong>
+        </div>
+        <div className="sessions-kpi-card ended">
+          <span>Ended</span>
+          <strong>{stats.ended}</strong>
+        </div>
+        <div className="sessions-kpi-card suspicious">
+          <span>Suspicious</span>
+          <strong>{stats.suspicious}</strong>
+        </div>
+      </div>
+
+      <div className="page-actions sessions-actions">
         <div className="search-box">
           <input
             type="text"
@@ -120,6 +214,31 @@ function Sessions() {
             }}
           />
         </div>
+        <select
+          className="form-control sessions-filter"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value)
+            setPage(1)
+          }}
+        >
+          <option value="all">All status</option>
+          <option value="active">Active</option>
+          <option value="ended">Ended</option>
+        </select>
+        <select
+          className="form-control sessions-filter"
+          value={deviceFilter}
+          onChange={(e) => {
+            setDeviceFilter(e.target.value)
+            setPage(1)
+          }}
+        >
+          <option value="all">All devices</option>
+          <option value="desktop">Desktop</option>
+          <option value="mobile">Mobile</option>
+          <option value="tablet">Tablet</option>
+        </select>
         <button className="btn" type="button" onClick={handleExport}>
           Export CSV
         </button>
@@ -131,50 +250,90 @@ function Sessions() {
             <tr>
               <th>User</th>
               <th>Start Time</th>
+              <th>Last Activity</th>
               <th>Logout Time</th>
               <th>IP Address</th>
               <th>Browser</th>
               <th>OS</th>
               <th>Device</th>
-              <th>Timezone</th>
               <th>Status</th>
+              <th>Risk</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {pageSessions.length === 0 && (
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
+                <td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
                   No sessions recorded yet.
                 </td>
               </tr>
             )}
             {pageSessions.map((session) => (
               <tr key={session.id}>
-                {(() => {
-                  const ua = parseUserAgent(session.userAgent || '')
-                  const status = session.logoutTime ? 'Ended' : 'Active'
-                  return (
-                    <>
-                      <td data-label="User">{session.username || '-'}</td>
-                      <td data-label="Start Time">{formatDateTime(session.loginTime || session.login_time)}</td>
-                      <td data-label="Logout Time">{formatDateTime(session.logoutTime || session.logout_time)}</td>
-                      <td data-label="IP Address">{session.ipAddress || '-'}</td>
-                      <td data-label="Browser">{session.browser || ua.browser}</td>
-                      <td data-label="OS">{session.os || ua.os}</td>
-                      <td data-label="Device">{ua.device}</td>
-                      <td data-label="Timezone">{session.timezone || '-'}</td>
-                      <td data-label="Status">
-                        <span className={`status-badge ${status === 'Active' ? 'status-active' : 'status-ended'}`}>
-                          {status}
-                        </span>
-                      </td>
-                    </>
-                  )
-                })()}
+                <td data-label="User">{session.username || '-'}</td>
+                <td data-label="Start Time">{formatDateTime(session.loginTime || session.login_time)}</td>
+                <td data-label="Last Activity">{formatDateTime(session.lastActivity || session.last_activity)}</td>
+                <td data-label="Logout Time">{formatDateTime(session.logoutTime || session.logout_time)}</td>
+                <td data-label="IP Address">{session.ipAddress || '-'}</td>
+                <td data-label="Browser">{session.parsedBrowser}</td>
+                <td data-label="OS">{session.parsedOs}</td>
+                <td data-label="Device">{session.parsedDevice}</td>
+                <td data-label="Status">
+                  <span className={`status-badge ${session.status === 'active' ? 'status-active' : 'status-ended'}`}>
+                    {session.status === 'active' ? 'Active' : 'Ended'}
+                  </span>
+                </td>
+                <td data-label="Risk">
+                  <span className={`status-badge ${session.risk === 'suspicious' ? 'status-suspicious' : 'status-normal'}`}>
+                    {riskLabel(session.risk)}
+                  </span>
+                </td>
+                <td data-label="Actions">
+                  <div className="action-buttons">
+                    {session.status === 'active' ? (
+                      <button
+                        className="action-btn delete-btn"
+                        type="button"
+                        onClick={() => endSession(session.id)}
+                      >
+                        End
+                      </button>
+                    ) : (
+                      <span className="sessions-ended-label">Closed</span>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="sessions-mobile-list">
+        {pageSessions.map((session) => (
+          <div key={`mobile-${session.id}`} className="sessions-mobile-card">
+            <div className="sessions-mobile-head">
+              <strong>{session.username || '-'}</strong>
+              <span className={`status-badge ${session.status === 'active' ? 'status-active' : 'status-ended'}`}>
+                {session.status === 'active' ? 'Active' : 'Ended'}
+              </span>
+            </div>
+            <div className="sessions-mobile-meta">
+              <span>{session.parsedBrowser}</span>
+              <span>{session.parsedOs}</span>
+              <span>{session.parsedDevice}</span>
+            </div>
+            <div className="sessions-mobile-time">{formatDateTime(session.loginTime || session.login_time)}</div>
+            <div className="sessions-mobile-actions">
+              {session.status === 'active' && (
+                <button className="btn btn-danger" type="button" onClick={() => endSession(session.id)}>
+                  End Session
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
 
       {showPagination && (
