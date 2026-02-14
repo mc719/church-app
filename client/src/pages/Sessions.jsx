@@ -29,6 +29,28 @@ function parseUserAgent(ua = '') {
   return { browser, os, device }
 }
 
+function deriveLocationFromIp(ip = '') {
+  const value = String(ip || '').trim()
+  if (!value) return 'Unknown'
+  if (value === '::1' || value === '127.0.0.1') return 'Localhost'
+  if (
+    value.startsWith('10.') ||
+    value.startsWith('192.168.') ||
+    value.startsWith('172.16.') ||
+    value.startsWith('172.17.') ||
+    value.startsWith('172.18.') ||
+    value.startsWith('172.19.') ||
+    value.startsWith('172.2') ||
+    value.startsWith('172.30.') ||
+    value.startsWith('172.31.') ||
+    value.startsWith('fd') ||
+    value.startsWith('fc')
+  ) {
+    return 'Private Network'
+  }
+  return 'Public Network'
+}
+
 function getRisk(session) {
   const loginAt = new Date(session.loginTime || session.login_time || 0)
   const isActive = !(session.logoutTime || session.logout_time)
@@ -72,6 +94,7 @@ function Sessions() {
         parsedBrowser: session.browser || parsed.browser,
         parsedOs: session.os || parsed.os,
         parsedDevice: parsed.device,
+        location: deriveLocationFromIp(session.ipAddress),
         status,
         risk
       }
@@ -140,12 +163,13 @@ function Sessions() {
 
   const handleExport = () => {
     const rows = [
-      ['User', 'Start Time', 'Logout Time', 'IP Address', 'Browser', 'OS', 'Device', 'Timezone', 'Status', 'Risk'],
+      ['User', 'Start Time', 'Logout Time', 'IP Address', 'Location', 'Browser', 'OS', 'Device', 'Timezone', 'Status', 'Risk'],
       ...sorted.map((session) => [
         session.username || '',
         formatDateTime(session.loginTime || session.login_time),
         formatDateTime(session.logoutTime || session.logout_time),
         session.ipAddress || '',
+        session.location || '',
         session.parsedBrowser || '',
         session.parsedOs || '',
         session.parsedDevice || '',
@@ -179,6 +203,19 @@ function Sessions() {
           : session
       )
     )
+  }
+
+  const clearAllSessions = async () => {
+    if (!window.confirm('Clear all session records? This cannot be undone.')) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/sessions`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    setSessions([])
+    setPage(1)
   }
 
   return (
@@ -242,6 +279,9 @@ function Sessions() {
         <button className="btn" type="button" onClick={handleExport}>
           Export CSV
         </button>
+        <button className="btn btn-danger" type="button" onClick={clearAllSessions}>
+          Clear All
+        </button>
       </div>
 
       <div className="table-container">
@@ -253,6 +293,7 @@ function Sessions() {
               <th>Last Activity</th>
               <th>Logout Time</th>
               <th>IP Address</th>
+              <th>Location</th>
               <th>Browser</th>
               <th>OS</th>
               <th>Device</th>
@@ -264,7 +305,7 @@ function Sessions() {
           <tbody>
             {pageSessions.length === 0 && (
               <tr>
-                <td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
+                <td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
                   No sessions recorded yet.
                 </td>
               </tr>
@@ -276,6 +317,7 @@ function Sessions() {
                 <td data-label="Last Activity">{formatDateTime(session.lastActivity || session.last_activity)}</td>
                 <td data-label="Logout Time">{formatDateTime(session.logoutTime || session.logout_time)}</td>
                 <td data-label="IP Address">{session.ipAddress || '-'}</td>
+                <td data-label="Location">{session.location || '-'}</td>
                 <td data-label="Browser">{session.parsedBrowser}</td>
                 <td data-label="OS">{session.parsedOs}</td>
                 <td data-label="Device">{session.parsedDevice}</td>

@@ -1927,6 +1927,16 @@ app.put("/api/sessions/:id/metrics", requireAuth, requireAdmin, async (req, res)
   }
 });
 
+app.delete("/api/sessions", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query("DELETE FROM sessions");
+    res.json({ ok: true, deleted: result.rowCount || 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to clear sessions" });
+  }
+});
+
 // GET CELLS (PROTECTED OR ACCESS CODE)
 app.get("/api/cells", requireAuthOrAccessCode, async (req, res) => {
   try {
