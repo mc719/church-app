@@ -2936,6 +2936,10 @@ body {
         backdrop-filter: blur(8px);
     }
 
+    .mobile-bottom-nav.mobile-bottom-nav--four {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
     .mobile-bottom-item {
         display: flex;
         min-height: var(--touch-target);

@@ -728,7 +728,7 @@ function AppLayout() {
         </div>
       )}
 
-      <nav className="mobile-bottom-nav mobile-bottom-nav--three" aria-label="Mobile navigation">
+      <nav className="mobile-bottom-nav mobile-bottom-nav--four" aria-label="Mobile navigation">
         <NavLink to="/" className={`mobile-bottom-item${isHomeActive ? ' active' : ''}`}>
           <i className="fas fa-home"></i>
           <span>Home</span>
@@ -741,6 +741,10 @@ function AppLayout() {
           <i className="fas fa-user"></i>
           <span>Profile</span>
         </NavLink>
+        <button type="button" className="mobile-bottom-item" onClick={handleLogoutClick}>
+          <i className="fas fa-sign-out-alt"></i>
+          <span>Logout</span>
+        </button>
       </nav>
     </>
   )
