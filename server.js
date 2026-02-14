@@ -579,6 +579,7 @@ async function createNotification({ title, message, type = "info", userId = null
        ADD COLUMN IF NOT EXISTS in_foundation_school BOOLEAN NOT NULL DEFAULT FALSE,
        ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual',
        ADD COLUMN IF NOT EXISTS invited_by TEXT,
+       ADD COLUMN IF NOT EXISTS foundation_tracking JSONB DEFAULT '{}'::jsonb,
        ADD COLUMN IF NOT EXISTS foundation_class TEXT,
        ADD COLUMN IF NOT EXISTS exam_status TEXT,
        ADD COLUMN IF NOT EXISTS graduation_date DATE,
@@ -2450,6 +2451,7 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
               ft.graduation_date as "graduationDate",
               ft.graduated_year as "graduatedYear",
               COALESCE(ft.is_graduate, FALSE) as "isGraduate",
+              COALESCE(ft.foundation_tracking, '{}'::jsonb) as "foundationTracking",
               ft.invited_by as "invitedBy",
               COALESCE(ft.archived, FALSE) as archived,
               COALESCE(ft.in_foundation_school, FALSE) as "inFoundationSchool",
@@ -2479,7 +2481,7 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
       "title", "name", "surname", "gender", "mobile", "email", "photoData", "address", "postcode", "birthday",
       "ageGroup", "maritalStatus", "bornAgain", "speakTongues", "findOut", "contactPref", "visit", "visitWhen",
       "prayerRequests", "dateJoined", "status", "foundationSchool", "foundationClass", "examStatus", "graduationDate",
-      "graduatedYear", "isGraduate", "cellId", "departmentId", "invitedBy"
+      "graduatedYear", "isGraduate", "cellId", "departmentId", "invitedBy", "foundationTracking"
     ])) return;
     const {
       title,
@@ -2511,7 +2513,8 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
       isGraduate,
       cellId,
       departmentId,
-      invitedBy
+      invitedBy,
+      foundationTracking
     } = req.body || {};
     const photoCheck = validateDataUrlImage(photoData);
     if (!photoCheck.ok) {
@@ -2532,6 +2535,10 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
     const safeFindOut = toTextArray(findOut);
     const safeContactPref = toTextArray(contactPref);
     const safePrayerRequests = toTextArray(prayerRequests);
+    const safeFoundationTracking =
+      foundationTracking && typeof foundationTracking === "object" && !Array.isArray(foundationTracking)
+        ? foundationTracking
+        : null;
 
     const existing = await pool.query(
       `SELECT ft.id::text as id,
@@ -2589,9 +2596,9 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
            title, name, surname, gender, mobile, email, photo_data, address, postcode,
          birthday_month, birthday_day, age_group, marital_status, born_again, speak_tongues,
          find_out, contact_pref, visit, visit_when, prayer_requests,
-         date_joined, status, foundation_school, foundation_class, exam_status, graduation_date, graduated_year, is_graduate, cell_id, department_id, invited_by, source
+         date_joined, status, foundation_school, foundation_class, exam_status, graduation_date, graduated_year, is_graduate, cell_id, department_id, invited_by, foundation_tracking, source
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17::jsonb,$18,$19,$20::jsonb,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17::jsonb,$18,$19,$20::jsonb,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32::jsonb,$33)
        RETURNING id::text as id,
                  title,
                  name,
@@ -2621,6 +2628,7 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
                  graduation_date as "graduationDate",
                  graduated_year as "graduatedYear",
                  COALESCE(is_graduate, FALSE) as "isGraduate",
+                 COALESCE(foundation_tracking, '{}'::jsonb) as "foundationTracking",
                  invited_by as "invitedBy",
                  COALESCE(archived, FALSE) as archived,
                  COALESCE(in_foundation_school, FALSE) as "inFoundationSchool",
@@ -2659,6 +2667,7 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
         cellId || null,
         departmentId || null,
         invitedBy || null,
+        safeFoundationTracking ? JSON.stringify(safeFoundationTracking) : null,
         cellId ? "cell" : "manual"
       ]
     );
@@ -2711,7 +2720,7 @@ app.put("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => 
         "title", "name", "surname", "gender", "mobile", "email", "photoData", "address", "postcode", "birthday",
         "ageGroup", "maritalStatus", "bornAgain", "speakTongues", "findOut", "contactPref", "visit", "visitWhen",
         "prayerRequests", "dateJoined", "status", "foundationSchool", "foundationClass", "examStatus", "graduationDate",
-        "graduatedYear", "isGraduate", "cellId", "departmentId", "invitedBy"
+        "graduatedYear", "isGraduate", "cellId", "departmentId", "invitedBy", "foundationTracking"
       ])) return;
       const {
         title,
@@ -2743,7 +2752,8 @@ app.put("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => 
         isGraduate,
         cellId,
         departmentId,
-        invitedBy
+        invitedBy,
+        foundationTracking
     } = req.body || {};
     const photoCheck = validateDataUrlImage(photoData);
     if (!photoCheck.ok) {
@@ -2761,6 +2771,10 @@ app.put("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => 
     const safeFindOut = toTextArray(findOut);
     const safeContactPref = toTextArray(contactPref);
     const safePrayerRequests = toTextArray(prayerRequests);
+    const safeFoundationTracking =
+      foundationTracking && typeof foundationTracking === "object" && !Array.isArray(foundationTracking)
+        ? foundationTracking
+        : null;
 
     const result = await pool.query(
       `UPDATE first_timers
@@ -2794,8 +2808,9 @@ app.put("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => 
            is_graduate = COALESCE($28, is_graduate),
            cell_id = COALESCE($29, cell_id),
            department_id = COALESCE($30, department_id),
-           invited_by = COALESCE($31, invited_by)
-       WHERE id = $32
+           invited_by = COALESCE($31, invited_by),
+           foundation_tracking = COALESCE($32::jsonb, foundation_tracking)
+       WHERE id = $33
        RETURNING id::text as id,
                  title,
                  name,
@@ -2825,6 +2840,7 @@ app.put("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => 
                  graduation_date as "graduationDate",
                  graduated_year as "graduatedYear",
                  COALESCE(is_graduate, FALSE) as "isGraduate",
+                 COALESCE(foundation_tracking, '{}'::jsonb) as "foundationTracking",
                  invited_by as "invitedBy",
                  COALESCE(archived, FALSE) as archived,
                  COALESCE(in_foundation_school, FALSE) as "inFoundationSchool",
@@ -2863,6 +2879,7 @@ app.put("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => 
         cellId ?? null,
         departmentId ?? null,
         invitedBy ?? null,
+        safeFoundationTracking ? JSON.stringify(safeFoundationTracking) : null,
         req.params.id
       ]
       );

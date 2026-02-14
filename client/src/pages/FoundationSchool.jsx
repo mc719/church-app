@@ -3,12 +3,33 @@ import './FoundationSchool.css'
 
 const CLASS_OPTIONS = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Exam']
 const EXAM_OPTIONS = ['Not Started', 'In Progress', 'Passed', 'Resit']
+const TRACKABLE_CLASSES = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7']
+
+function normalizeTracking(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  const sourceClasses = source.classes && typeof source.classes === 'object' ? source.classes : {}
+  const classes = {}
+  TRACKABLE_CLASSES.forEach((name) => {
+    const row = sourceClasses[name] && typeof sourceClasses[name] === 'object' ? sourceClasses[name] : {}
+    classes[name] = {
+      completed: !!row.completed,
+      date: row.date || ''
+    }
+  })
+  return {
+    classes,
+    notes: source.notes || '',
+    updatedAt: source.updatedAt || ''
+  }
+}
 
 function FoundationSchool() {
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('students')
   const [editRows, setEditRows] = useState({})
+  const [selectedId, setSelectedId] = useState('')
+  const [tracker, setTracker] = useState(() => normalizeTracking({}))
 
   const loadData = async () => {
     const token = localStorage.getItem('token')
@@ -18,7 +39,15 @@ function FoundationSchool() {
     })
     if (!res.ok) return
     const data = await res.json()
-    setItems(Array.isArray(data) ? data.filter((x) => !x.archived) : [])
+    const normalized = (Array.isArray(data) ? data.filter((x) => !x.archived) : []).map((item) => ({
+      ...item,
+      foundationTracking: normalizeTracking(item.foundationTracking)
+    }))
+    setItems(normalized)
+    if (!selectedId && normalized.length) {
+      setSelectedId(String(normalized[0].id))
+      setTracker(normalized[0].foundationTracking)
+    }
   }
 
   useEffect(() => {
@@ -56,6 +85,17 @@ function FoundationSchool() {
     )
   }, [items, search, tab])
 
+  const selectedItem = useMemo(
+    () => filtered.find((item) => String(item.id) === String(selectedId)) || filtered[0] || null,
+    [filtered, selectedId]
+  )
+
+  useEffect(() => {
+    if (!selectedItem) return
+    setSelectedId(String(selectedItem.id))
+    setTracker(normalizeTracking(selectedItem.foundationTracking))
+  }, [selectedItem?.id])
+
   const updateRow = (id, field, value) => {
     setEditRows((prev) => ({
       ...prev,
@@ -66,7 +106,7 @@ function FoundationSchool() {
     }))
   }
 
-  const saveRow = async (item) => {
+  const saveRow = async (item, trackingValue = null) => {
     const token = localStorage.getItem('token')
     if (!token) return
     const row = editRows[item.id] || {}
@@ -79,7 +119,8 @@ function FoundationSchool() {
           ? Number(new Date(row.graduationDate).getFullYear()) || null
           : (row.graduatedYear ?? item.graduatedYear ?? null),
       isGraduate: row.isGraduate ?? item.isGraduate ?? false,
-      foundationSchool: 'Yes'
+      foundationSchool: 'Yes',
+      foundationTracking: trackingValue ?? normalizeTracking(item.foundationTracking)
     }
     const res = await fetch(`/api/first-timers/${item.id}`, {
       method: 'PUT',
@@ -91,12 +132,16 @@ function FoundationSchool() {
     })
     if (!res.ok) return
     const updated = await res.json()
-    setItems((prev) => prev.map((x) => (String(x.id) === String(updated.id) ? { ...x, ...updated } : x)))
+    const normalizedUpdated = { ...updated, foundationTracking: normalizeTracking(updated.foundationTracking) }
+    setItems((prev) => prev.map((x) => (String(x.id) === String(updated.id) ? { ...x, ...normalizedUpdated } : x)))
     setEditRows((prev) => {
       const next = { ...prev }
       delete next[item.id]
       return next
     })
+    if (String(selectedId) === String(item.id)) {
+      setTracker(normalizeTracking(normalizedUpdated.foundationTracking))
+    }
   }
 
   const toggleGraduate = async (item, nextState) => {
@@ -113,7 +158,29 @@ function FoundationSchool() {
     })
     if (!res.ok) return
     const updated = await res.json()
-    setItems((prev) => prev.map((x) => (String(x.id) === String(updated.id) ? updated : x)))
+    setItems((prev) => prev.map((x) => (String(x.id) === String(updated.id) ? { ...x, ...updated } : x)))
+  }
+
+  const saveSelectedTracking = async () => {
+    if (!selectedItem) return
+    const nextTracking = {
+      ...tracker,
+      updatedAt: new Date().toISOString()
+    }
+    await saveRow(selectedItem, nextTracking)
+  }
+
+  const setClassTracking = (className, field, value) => {
+    setTracker((prev) => ({
+      ...prev,
+      classes: {
+        ...prev.classes,
+        [className]: {
+          ...(prev.classes[className] || {}),
+          [field]: value
+        }
+      }
+    }))
   }
 
   const nameLabel = (item) => `${item.title ? `${item.title} ` : ''}${item.name || ''} ${item.surname || ''}`.trim()
@@ -122,7 +189,7 @@ function FoundationSchool() {
     <div className="foundation-page">
       <div className="foundation-hero">
         <h2>Foundation School</h2>
-        <p>Track classes, exam progress, and graduations.</p>
+        <p>Individual journey tracking for each student from Class 1 to graduation.</p>
       </div>
 
       <div className="foundation-class-grid">
@@ -152,91 +219,157 @@ function FoundationSchool() {
         />
       </div>
 
-      <div className="table-container">
-        <table className="mobile-grid-table">
-          <thead>
-            <tr>
-              <th>Student</th>
-              <th>Class</th>
-              <th>Exam</th>
-              <th>Graduation Date</th>
-              <th>Year</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '32px' }}>
-                  No records found.
-                </td>
-              </tr>
-            )}
-            {filtered.map((item) => {
-              const row = editRows[item.id] || {}
-              const isGraduate = row.isGraduate ?? item.isGraduate
-              const graduatedYear = row.graduatedYear ?? item.graduatedYear
-              return (
-                <tr key={item.id}>
-                  <td data-label="Student">{nameLabel(item)}</td>
-                  <td data-label="Class">
-                    <select
-                      className="form-control inline-input"
-                      value={row.foundationClass ?? item.foundationClass ?? 'Class 1'}
-                      onChange={(e) => updateRow(item.id, 'foundationClass', e.target.value)}
-                    >
-                      {CLASS_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
+      <div className="foundation-tracker-layout">
+        <div className="foundation-student-list">
+          {filtered.length === 0 && (
+            <div className="dashboard-note">No records found.</div>
+          )}
+          {filtered.map((item) => {
+            const isActive = String(item.id) === String(selectedItem?.id)
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`foundation-student-card${isActive ? ' active' : ''}`}
+                onClick={() => {
+                  setSelectedId(String(item.id))
+                  setTracker(normalizeTracking(item.foundationTracking))
+                }}
+              >
+                <div className="foundation-student-name">{nameLabel(item)}</div>
+                <div className="foundation-student-meta">
+                  <span>{item.foundationClass || 'Class 1'}</span>
+                  <span>{item.examStatus || 'Not Started'}</span>
+                  <span>{item.isGraduate ? 'Graduate' : 'Student'}</span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="foundation-detail-panel">
+          {!selectedItem && <div className="dashboard-note">Select a student to view and track progress.</div>}
+          {selectedItem && (
+            <>
+              <div className="foundation-detail-header">
+                <div>
+                  <h3>{nameLabel(selectedItem)}</h3>
+                  <p>{selectedItem.mobile || '-'} {selectedItem.cellName ? `| ${selectedItem.cellName}` : ''}</p>
+                </div>
+                <div className="action-buttons">
+                  <button type="button" className="action-btn edit-btn" onClick={() => saveRow(selectedItem)}>
+                    Save Main
+                  </button>
+                  <button
+                    type="button"
+                    className={`action-btn ${selectedItem.isGraduate ? 'delete-btn' : 'edit-btn'}`}
+                    onClick={() => toggleGraduate(selectedItem, !selectedItem.isGraduate)}
+                  >
+                    {selectedItem.isGraduate ? 'Ungraduate' : 'Graduate'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="foundation-main-grid">
+                <div className="form-group">
+                  <label>Current Class</label>
+                  <select
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.foundationClass ?? selectedItem.foundationClass) || 'Class 1'}
+                    onChange={(e) => updateRow(selectedItem.id, 'foundationClass', e.target.value)}
+                  >
+                    {CLASS_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Exam Status</label>
+                  <select
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.examStatus ?? selectedItem.examStatus) || 'Not Started'}
+                    onChange={(e) => updateRow(selectedItem.id, 'examStatus', e.target.value)}
+                  >
+                    {EXAM_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Graduation Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.graduationDate ?? selectedItem.graduationDate) || ''}
+                    onChange={(e) => updateRow(selectedItem.id, 'graduationDate', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Graduated Year</label>
+                  <input
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.graduatedYear ?? selectedItem.graduatedYear) || ''}
+                    onChange={(e) => updateRow(selectedItem.id, 'graduatedYear', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="foundation-tracker-card">
+                <div className="section-header" style={{ marginTop: 0 }}>
+                  <h3>Individual Class Tracking</h3>
+                  <button type="button" className="btn btn-success" onClick={saveSelectedTracking}>
+                    Save Tracking
+                  </button>
+                </div>
+                <div className="table-container">
+                  <table className="mobile-grid-table">
+                    <thead>
+                      <tr>
+                        <th>Class</th>
+                        <th>Completed</th>
+                        <th>Completion Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {TRACKABLE_CLASSES.map((className) => (
+                        <tr key={className}>
+                          <td data-label="Class">{className}</td>
+                          <td data-label="Completed">
+                            <input
+                              type="checkbox"
+                              checked={!!tracker.classes[className]?.completed}
+                              onChange={(e) => setClassTracking(className, 'completed', e.target.checked)}
+                            />
+                          </td>
+                          <td data-label="Completion Date">
+                            <input
+                              type="date"
+                              className="form-control inline-input"
+                              value={tracker.classes[className]?.date || ''}
+                              onChange={(e) => setClassTracking(className, 'date', e.target.value)}
+                            />
+                          </td>
+                        </tr>
                       ))}
-                    </select>
-                  </td>
-                  <td data-label="Exam">
-                    <select
-                      className="form-control inline-input"
-                      value={row.examStatus ?? item.examStatus ?? 'Not Started'}
-                      onChange={(e) => updateRow(item.id, 'examStatus', e.target.value)}
-                    >
-                      {EXAM_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td data-label="Graduation Date">
-                    <input
-                      type="date"
-                      className="form-control inline-input"
-                      value={row.graduationDate ?? item.graduationDate ?? ''}
-                      onChange={(e) => updateRow(item.id, 'graduationDate', e.target.value)}
-                    />
-                  </td>
-                  <td data-label="Year">{graduatedYear || '-'}</td>
-                  <td data-label="Status">
-                    {isGraduate ? (
-                      <span className="graduate-badge">Graduate</span>
-                    ) : (
-                      <span className="student-badge">Student</span>
-                    )}
-                  </td>
-                  <td data-label="Actions">
-                    <div className="action-buttons">
-                      <button type="button" className="action-btn edit-btn" onClick={() => saveRow(item)}>
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        className={`action-btn ${isGraduate ? 'delete-btn' : 'edit-btn'}`}
-                        onClick={() => toggleGraduate(item, !isGraduate)}
-                      >
-                        {isGraduate ? 'Ungraduate' : 'Graduate'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="form-group">
+                  <label>Tracking Notes</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={tracker.notes || ''}
+                    onChange={(e) => setTracker((prev) => ({ ...prev, notes: e.target.value }))}
+                  />
+                </div>
+                <small className="foundation-updated-at">
+                  Last tracking update: {tracker.updatedAt ? new Date(tracker.updatedAt).toLocaleString() : 'Not set'}
+                </small>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
