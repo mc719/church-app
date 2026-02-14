@@ -578,6 +578,7 @@ async function createNotification({ title, message, type = "info", userId = null
        ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE,
        ADD COLUMN IF NOT EXISTS in_foundation_school BOOLEAN NOT NULL DEFAULT FALSE,
        ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual',
+       ADD COLUMN IF NOT EXISTS invited_by TEXT,
        ADD COLUMN IF NOT EXISTS foundation_class TEXT,
        ADD COLUMN IF NOT EXISTS exam_status TEXT,
        ADD COLUMN IF NOT EXISTS graduation_date DATE,
