@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import './FirstTimers.css'
 
 const API_BASE = '/api'
+const TITLE_OPTIONS = ['Brother', 'Sister', 'Dcn', 'Dcns', 'Pastor']
+const AGE_GROUP_OPTIONS = ['13-19', '20-35', '36-45', '46&above']
+const MARITAL_STATUS_OPTIONS = ['Married', 'Single']
+const FIND_OUT_OPTIONS = ['TV', 'SOCIAL MEDIA', 'A CHRIST EMBASSY PROGRAM', 'PERSONAL INVITATION']
+const CONTACT_PREF_OPTIONS = ['Telephone', 'SMS', 'Post', 'Email']
 
 function FirstTimers() {
   const [firstTimers, setFirstTimers] = useState([])
@@ -28,6 +33,20 @@ function FirstTimers() {
     gender: '',
     mobile: '',
     email: '',
+    address: '',
+    postcode: '',
+    birthdayDay: '',
+    birthdayMonth: '',
+    ageGroup: '',
+    maritalStatus: '',
+    bornAgain: '',
+    speakTongues: '',
+    findOut: [],
+    invitedBy: '',
+    contactPref: [],
+    visit: '',
+    visitWhen: '',
+    prayerRequestsText: '',
     photoData: '',
     status: ''
   })
@@ -79,6 +98,33 @@ function FirstTimers() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
+  const birthdayToValue = (item) => {
+    const month = String(item?.birthdayMonth || '').padStart(2, '0')
+    const day = String(item?.birthdayDay || '').padStart(2, '0')
+    if (!month || !day || month === '00' || day === '00') return ''
+    return `${month}-${day}`
+  }
+
+  const parseBirthdayInput = (value) => {
+    if (!value) return { month: '', day: '' }
+    const [month, day] = String(value).split('-')
+    return { month: month || '', day: day || '' }
+  }
+
+  const formatMonthDay = (month, day) => {
+    if (!month || !day) return ''
+    const d = new Date(2024, Number(month) - 1, Number(day))
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+  }
+
+  const toggleArrayValue = (source, value) => {
+    const next = new Set(Array.isArray(source) ? source : [])
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    return Array.from(next)
+  }
+
   const filteredFirstTimers = useMemo(() => {
     const term = search.trim().toLowerCase()
     const scopedList = firstTimers.filter((item) =>
@@ -94,6 +140,10 @@ function FirstTimers() {
         item.surname,
         item.mobile,
         item.email,
+        item.address,
+        item.postcode,
+        item.ageGroup,
+        item.maritalStatus,
         item.status,
         item.gender,
         item.cellName,
@@ -170,6 +220,7 @@ function FirstTimers() {
     const token = localStorage.getItem('token')
     if (!token) return
     const updates = inlineEdits[item.id] || {}
+    const birthdayInput = updates.birthday ?? birthdayToValue(item)
     const normalizeNullable = (value) => {
       if (value === undefined || value === null) return null
       if (typeof value === 'string' && !value.trim()) return null
@@ -185,7 +236,7 @@ function FirstTimers() {
       email: updates.email ?? item.email ?? '',
       address: updates.address ?? item.address ?? '',
       postcode: updates.postcode ?? item.postcode ?? '',
-      birthday: updates.birthday ?? item.birthday ?? '',
+      birthday: birthdayInput,
       ageGroup: updates.ageGroup ?? item.ageGroup ?? '',
       maritalStatus: updates.maritalStatus ?? item.maritalStatus ?? '',
       bornAgain: updates.bornAgain ?? item.bornAgain ?? '',
@@ -308,6 +359,14 @@ function FirstTimers() {
     event.preventDefault()
     const token = localStorage.getItem('token')
     if (!token) return
+    const birthday =
+      addForm.birthdayMonth && addForm.birthdayDay
+        ? `${String(addForm.birthdayMonth).padStart(2, '0')}-${String(addForm.birthdayDay).padStart(2, '0')}`
+        : ''
+    const prayerRequests = (addForm.prayerRequestsText || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
     const res = await fetch(`${API_BASE}/first-timers`, {
       method: 'POST',
       headers: {
@@ -321,8 +380,23 @@ function FirstTimers() {
           gender: addForm.gender,
           mobile: addForm.mobile,
           email: addForm.email,
+          address: addForm.address,
+          postcode: addForm.postcode,
+          birthday,
+          ageGroup: addForm.ageGroup,
+          maritalStatus: addForm.maritalStatus,
+          bornAgain: addForm.bornAgain,
+          speakTongues: addForm.speakTongues,
+          findOut: addForm.findOut,
+          invitedBy: addForm.invitedBy,
+          contactPref: addForm.contactPref,
+          visit: addForm.visit,
+          visitWhen: addForm.visit === 'Yes' ? addForm.visitWhen : '',
+          prayerRequests,
           photoData: addForm.photoData,
-          status: addForm.status
+          status: addForm.status || 'amber',
+          dateJoined: new Date().toISOString().slice(0, 10),
+          foundationSchool: 'Not Yet'
         })
       })
     if (!res.ok) return
@@ -335,6 +409,20 @@ function FirstTimers() {
         gender: '',
         mobile: '',
         email: '',
+        address: '',
+        postcode: '',
+        birthdayDay: '',
+        birthdayMonth: '',
+        ageGroup: '',
+        maritalStatus: '',
+        bornAgain: '',
+        speakTongues: '',
+        findOut: [],
+        invitedBy: '',
+        contactPref: [],
+        visit: '',
+        visitWhen: '',
+        prayerRequestsText: '',
         photoData: '',
         status: ''
       })
@@ -685,11 +773,133 @@ function FirstTimers() {
                   </div>
                   <div className="detail-row">
                     <span>Status</span>
+                    <select
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.status ?? selectedFirstTimer.status ?? 'amber'}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'status', e.target.value)}
+                    >
+                      <option value="green">Green</option>
+                      <option value="amber">Amber</option>
+                      <option value="red">Red</option>
+                    </select>
+                  </div>
+                  <div className="detail-row">
+                    <span>Address</span>
                     <input
                       className="form-control inline-input"
-                      value={inlineEdits[selectedFirstTimer.id]?.status ?? selectedFirstTimer.status ?? ''}
-                      onChange={(e) => updateInline(selectedFirstTimer.id, 'status', e.target.value)}
+                      value={inlineEdits[selectedFirstTimer.id]?.address ?? selectedFirstTimer.address ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'address', e.target.value)}
                     />
+                  </div>
+                  <div className="detail-row">
+                    <span>Post Code</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.postcode ?? selectedFirstTimer.postcode ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'postcode', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Birthday</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%' }}>
+                      <select
+                        className="form-control inline-input"
+                        value={parseBirthdayInput(inlineEdits[selectedFirstTimer.id]?.birthday ?? birthdayToValue(selectedFirstTimer)).day}
+                        onChange={(e) => {
+                          const current = parseBirthdayInput(inlineEdits[selectedFirstTimer.id]?.birthday ?? birthdayToValue(selectedFirstTimer))
+                          updateInline(selectedFirstTimer.id, 'birthday', `${String(current.month || '').padStart(2, '0')}-${String(e.target.value || '').padStart(2, '0')}`)
+                        }}
+                      >
+                        <option value="">Day</option>
+                        {Array.from({ length: 31 }).map((_, i) => (
+                          <option key={`inline-day-${i + 1}`} value={String(i + 1).padStart(2, '0')}>{i + 1}</option>
+                        ))}
+                      </select>
+                      <select
+                        className="form-control inline-input"
+                        value={parseBirthdayInput(inlineEdits[selectedFirstTimer.id]?.birthday ?? birthdayToValue(selectedFirstTimer)).month}
+                        onChange={(e) => {
+                          const current = parseBirthdayInput(inlineEdits[selectedFirstTimer.id]?.birthday ?? birthdayToValue(selectedFirstTimer))
+                          updateInline(selectedFirstTimer.id, 'birthday', `${String(e.target.value || '').padStart(2, '0')}-${String(current.day || '').padStart(2, '0')}`)
+                        }}
+                      >
+                        <option value="">Month</option>
+                        {Array.from({ length: 12 }).map((_, i) => (
+                          <option key={`inline-month-${i + 1}`} value={String(i + 1).padStart(2, '0')}>{i + 1}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="detail-row">
+                    <span>Age Group</span>
+                    <select
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.ageGroup ?? selectedFirstTimer.ageGroup ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'ageGroup', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      {AGE_GROUP_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="detail-row">
+                    <span>Marital Status</span>
+                    <select
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.maritalStatus ?? selectedFirstTimer.maritalStatus ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'maritalStatus', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      {MARITAL_STATUS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="detail-row">
+                    <span>Born Again?</span>
+                    <select
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.bornAgain ?? selectedFirstTimer.bornAgain ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'bornAgain', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
+                  <div className="detail-row">
+                    <span>Speak in Tongues?</span>
+                    <select
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.speakTongues ?? selectedFirstTimer.speakTongues ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'speakTongues', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
+                  <div className="detail-row">
+                    <span>Found Us Through</span>
+                    <div style={{ display: 'grid', gap: '6px', width: '100%' }}>
+                      {FIND_OUT_OPTIONS.map((option) => (
+                        <label key={option} className="check">
+                          <input
+                            type="checkbox"
+                            checked={Array.isArray(inlineEdits[selectedFirstTimer.id]?.findOut ?? selectedFirstTimer.findOut) && (inlineEdits[selectedFirstTimer.id]?.findOut ?? selectedFirstTimer.findOut).includes(option)}
+                            onChange={() =>
+                              updateInline(
+                                selectedFirstTimer.id,
+                                'findOut',
+                                toggleArrayValue(inlineEdits[selectedFirstTimer.id]?.findOut ?? selectedFirstTimer.findOut ?? [], option)
+                              )
+                            }
+                          />
+                          {option}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   <div className="detail-row">
                     <span>Date Joined</span>
@@ -701,6 +911,66 @@ function FirstTimers() {
                       className="form-control inline-input"
                       value={inlineEdits[selectedFirstTimer.id]?.invitedBy ?? selectedFirstTimer.invitedBy ?? ''}
                       onChange={(e) => updateInline(selectedFirstTimer.id, 'invitedBy', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Contact Preference</span>
+                    <div style={{ display: 'grid', gap: '6px', width: '100%' }}>
+                      {CONTACT_PREF_OPTIONS.map((option) => (
+                        <label key={option} className="check">
+                          <input
+                            type="checkbox"
+                            checked={Array.isArray(inlineEdits[selectedFirstTimer.id]?.contactPref ?? selectedFirstTimer.contactPref) && (inlineEdits[selectedFirstTimer.id]?.contactPref ?? selectedFirstTimer.contactPref).includes(option)}
+                            onChange={() =>
+                              updateInline(
+                                selectedFirstTimer.id,
+                                'contactPref',
+                                toggleArrayValue(inlineEdits[selectedFirstTimer.id]?.contactPref ?? selectedFirstTimer.contactPref ?? [], option)
+                              )
+                            }
+                          />
+                          {option}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="detail-row">
+                    <span>Would you like a visit?</span>
+                    <select
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.visit ?? selectedFirstTimer.visit ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'visit', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
+                  {(inlineEdits[selectedFirstTimer.id]?.visit ?? selectedFirstTimer.visit ?? '') === 'Yes' && (
+                    <div className="detail-row">
+                      <span>If yes, when?</span>
+                      <input
+                        className="form-control inline-input"
+                        value={inlineEdits[selectedFirstTimer.id]?.visitWhen ?? selectedFirstTimer.visitWhen ?? ''}
+                        onChange={(e) => updateInline(selectedFirstTimer.id, 'visitWhen', e.target.value)}
+                      />
+                    </div>
+                  )}
+                  <div className="detail-row">
+                    <span>Prayer Requests</span>
+                    <textarea
+                      className="form-control inline-input"
+                      rows="3"
+                      value={Array.isArray(inlineEdits[selectedFirstTimer.id]?.prayerRequests ?? selectedFirstTimer.prayerRequests)
+                        ? (inlineEdits[selectedFirstTimer.id]?.prayerRequests ?? selectedFirstTimer.prayerRequests).join('\n')
+                        : ''}
+                      onChange={(e) =>
+                        updateInline(
+                          selectedFirstTimer.id,
+                          'prayerRequests',
+                          e.target.value.split('\n').map((line) => line.trim()).filter(Boolean)
+                        )
+                      }
                     />
                   </div>
                 </div>
@@ -863,11 +1133,9 @@ function FirstTimers() {
                     onChange={(e) => setAddForm((prev) => ({ ...prev, title: e.target.value }))}
                   >
                     <option value="">Select Title</option>
-                    <option value="Brother">Brother</option>
-                    <option value="Sister">Sister</option>
-                    <option value="Dcn">Dcn</option>
-                    <option value="Dcns">Dcns</option>
-                    <option value="Pastor">Pastor</option>
+                    {TITLE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group">
@@ -899,6 +1167,22 @@ function FirstTimers() {
                   </select>
                 </div>
                 <div className="form-group">
+                  <label>Address</label>
+                  <input
+                    className="form-control"
+                    value={addForm.address}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, address: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Post Code</label>
+                  <input
+                    className="form-control"
+                    value={addForm.postcode}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, postcode: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
                   <label>Mobile</label>
                   <input
                     className="form-control"
@@ -915,20 +1199,165 @@ function FirstTimers() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Photo URL</label>
+                  <label>Birthday (Day and Month)</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <select
+                      className="form-control"
+                      value={addForm.birthdayDay}
+                      onChange={(e) => setAddForm((prev) => ({ ...prev, birthdayDay: e.target.value }))}
+                    >
+                      <option value="">Day</option>
+                      {Array.from({ length: 31 }).map((_, i) => (
+                        <option key={`add-day-${i + 1}`} value={String(i + 1)}>{i + 1}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="form-control"
+                      value={addForm.birthdayMonth}
+                      onChange={(e) => setAddForm((prev) => ({ ...prev, birthdayMonth: e.target.value }))}
+                    >
+                      <option value="">Month</option>
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <option key={`add-month-${i + 1}`} value={String(i + 1)}>{i + 1}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Age Group</label>
+                  <select
+                    className="form-control"
+                    value={addForm.ageGroup}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, ageGroup: e.target.value }))}
+                  >
+                    <option value="">Select</option>
+                    {AGE_GROUP_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Marital Status</label>
+                  <select
+                    className="form-control"
+                    value={addForm.maritalStatus}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, maritalStatus: e.target.value }))}
+                  >
+                    <option value="">Select</option>
+                    {MARITAL_STATUS_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Are you born again?</label>
+                  <select
+                    className="form-control"
+                    value={addForm.bornAgain}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, bornAgain: e.target.value }))}
+                  >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Do you speak in tongues?</label>
+                  <select
+                    className="form-control"
+                    value={addForm.speakTongues}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, speakTongues: e.target.value }))}
+                  >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>How did you find out about Christ Embassy?</label>
+                  <div style={{ display: 'grid', gap: '6px' }}>
+                    {FIND_OUT_OPTIONS.map((option) => (
+                      <label key={option} className="check">
+                        <input
+                          type="checkbox"
+                          checked={addForm.findOut.includes(option)}
+                          onChange={() =>
+                            setAddForm((prev) => ({ ...prev, findOut: toggleArrayValue(prev.findOut, option) }))
+                          }
+                        />
+                        {option}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Name of Person that Invited you</label>
                   <input
                     className="form-control"
-                    value={addForm.photoData}
-                    onChange={(e) => setAddForm((prev) => ({ ...prev, photoData: e.target.value }))}
+                    value={addForm.invitedBy}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, invitedBy: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Preferred contact method</label>
+                  <div style={{ display: 'grid', gap: '6px' }}>
+                    {CONTACT_PREF_OPTIONS.map((option) => (
+                      <label key={option} className="check">
+                        <input
+                          type="checkbox"
+                          checked={addForm.contactPref.includes(option)}
+                          onChange={() =>
+                            setAddForm((prev) => ({ ...prev, contactPref: toggleArrayValue(prev.contactPref, option) }))
+                          }
+                        />
+                        {option}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Would you like us to visit you?</label>
+                  <select
+                    className="form-control"
+                    value={addForm.visit}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, visit: e.target.value }))}
+                  >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                {addForm.visit === 'Yes' && (
+                  <div className="form-group">
+                    <label>If yes, when is most convenient?</label>
+                    <input
+                      className="form-control"
+                      value={addForm.visitWhen}
+                      onChange={(e) => setAddForm((prev) => ({ ...prev, visitWhen: e.target.value }))}
+                    />
+                  </div>
+                )}
+                <div className="form-group">
+                  <label>Please list any Prayer Request that you may have</label>
+                  <textarea
+                    className="form-control"
+                    rows="4"
+                    value={addForm.prayerRequestsText}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, prayerRequestsText: e.target.value }))}
                   />
                 </div>
                 <div className="form-group">
                   <label>Status</label>
-                  <input
+                  <select
                     className="form-control"
                     value={addForm.status}
                     onChange={(e) => setAddForm((prev) => ({ ...prev, status: e.target.value }))}
-                  />
+                  >
+                    <option value="">Amber (default)</option>
+                    <option value="green">Green</option>
+                    <option value="amber">Amber</option>
+                    <option value="red">Red</option>
+                  </select>
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setShowAddFirstTimer(false)}>

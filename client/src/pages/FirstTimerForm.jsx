@@ -26,6 +26,7 @@ function FirstTimerForm() {
   const [accessError, setAccessError] = useState('')
   const [showAccess, setShowAccess] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [visitPreference, setVisitPreference] = useState('')
 
   const days = useMemo(() => Array.from({ length: 31 }, (_, index) => index + 1), [])
 
@@ -175,7 +176,7 @@ function FirstTimerForm() {
             <div className="headtext">
               <div className="h1">CHRIST EMBASSY</div>
               <div className="h2">Welcome FORM!</div>
-              <div className="p">
+              <div className="p" style={{ fontStyle: 'italic' }}>
                 <strong>We</strong> are most delighted to have <strong>YOU</strong> in our midst today.
               </div>
               <div className="p">
@@ -351,13 +352,17 @@ function FirstTimerForm() {
             <div className="row" style={{ gap: '14px' }}>
               <div className="smalllabel">Would you like us to visit you?</div>
               <label className="check">
-                <input type="radio" name="visit" value="Yes" /> Yes
+                <input type="radio" name="visit" value="Yes" onChange={(e) => setVisitPreference(e.target.value)} /> Yes
               </label>
               <label className="check">
-                <input type="radio" name="visit" value="No" /> No
+                <input type="radio" name="visit" value="No" onChange={(e) => setVisitPreference(e.target.value)} /> No
               </label>
-              <div className="smalllabel">If yes, when is most convenient?</div>
-              <input className="line" name="visit_when" style={{ minWidth: '260px', maxWidth: '320px' }} />
+              {visitPreference === 'Yes' && (
+                <>
+                  <div className="smalllabel">If yes, when is most convenient?</div>
+                  <input className="line" name="visit_when" style={{ minWidth: '260px', maxWidth: '320px' }} />
+                </>
+              )}
             </div>
 
             <div className="section-title" style={{ marginTop: '6px' }}>
