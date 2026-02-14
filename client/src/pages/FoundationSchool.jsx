@@ -56,9 +56,21 @@ function FoundationSchool() {
 
   const classCounts = useMemo(() => {
     const counts = new Map(CLASS_OPTIONS.map((name) => [name, 0]))
-    items.filter((item) => !item.isGraduate).forEach((item) => {
-      const key = CLASS_OPTIONS.includes(item.foundationClass) ? item.foundationClass : 'Class 1'
-      counts.set(key, (counts.get(key) || 0) + 1)
+    items.forEach((item) => {
+      const tracking = normalizeTracking(item.foundationTracking)
+      TRACKABLE_CLASSES.forEach((className) => {
+        const classRow = tracking.classes[className]
+        if (classRow?.completed || classRow?.date) {
+          counts.set(className, (counts.get(className) || 0) + 1)
+        }
+      })
+      const examStarted =
+        String(item.examStatus || '').toLowerCase() !== 'not started' ||
+        String(item.foundationClass || '').toLowerCase() === 'exam' ||
+        !!item.isGraduate
+      if (examStarted) {
+        counts.set('Exam', (counts.get('Exam') || 0) + 1)
+      }
     })
     return counts
   }, [items])
@@ -187,11 +199,6 @@ function FoundationSchool() {
 
   return (
     <div className="foundation-page">
-      <div className="foundation-hero">
-        <h2>Foundation School</h2>
-        <p>Individual journey tracking for each student from Class 1 to graduation.</p>
-      </div>
-
       <div className="foundation-class-grid">
         {CLASS_OPTIONS.map((cls) => (
           <div key={cls} className="foundation-class-card">
