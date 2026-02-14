@@ -17,6 +17,7 @@ function Dashboard({ onAddCell }) {
   const [recentReports, setRecentReports] = useState([])
   const [birthdaySummary, setBirthdaySummary] = useState([])
   const [birthdayModal, setBirthdayModal] = useState({ open: false, title: '', list: [] })
+  const [birthdayModalSearch, setBirthdayModalSearch] = useState('')
   const [calendarDate, setCalendarDate] = useState(() => new Date())
   const [editingCell, setEditingCell] = useState(null)
   const [deletingCell, setDeletingCell] = useState(null)
@@ -171,6 +172,7 @@ function Dashboard({ onAddCell }) {
   }
 
   const closeBirthdayModal = () => {
+    setBirthdayModalSearch('')
     setBirthdayModal({ open: false, title: '', list: [] })
   }
 
@@ -368,6 +370,26 @@ function Dashboard({ onAddCell }) {
     if (Number.isNaN(date.getTime())) return ''
     return date.toLocaleDateString()
   }
+
+  const birthdayModalRows = birthdayModal.list
+    .map((member) => {
+      const memberMatch = members.find((m) => String(m.id) === String(member.id))
+      const merged = { ...member, ...(memberMatch || {}) }
+      const cell = cells.find((c) => String(c.id) === String(merged.cellId || merged.cell_id))
+      const title = merged.title ? `${merged.title} ` : ''
+      const name = merged.name || merged.full_name || ''
+      return {
+        ...merged,
+        displayName: `${title}${name}`.trim(),
+        cellName: cell?.name || merged.cellName || '',
+        photoData: merged.photoData || merged.photo_data || ''
+      }
+    })
+    .filter((row) => {
+      const q = birthdayModalSearch.trim().toLowerCase()
+      if (!q) return true
+      return `${row.displayName} ${row.mobile || ''} ${row.cellName || ''}`.toLowerCase().includes(q)
+    })
 
   return (
     <div className="dashboard-page">
@@ -725,7 +747,7 @@ function Dashboard({ onAddCell }) {
 
       {birthdayModal.open && (
         <div className="modal-overlay active" onClick={closeBirthdayModal}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal birthday-display-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{birthdayModal.title}</h3>
               <button className="close-modal" type="button" onClick={closeBirthdayModal}>
@@ -736,32 +758,57 @@ function Dashboard({ onAddCell }) {
               {birthdayModal.list.length === 0 ? (
                 <div className="dashboard-note">No birthdays.</div>
               ) : (
-                <div className="table-container">
-                  <table className="mobile-grid-table">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Cell</th>
-                        <th>Birthday</th>
-                        <th>Mobile</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {birthdayModal.list.map((member) => {
-                        const cell = cells.find((c) => String(c.id) === String(member.cellId))
-                        return (
-                          <tr key={`birthday-${member.id}`}>
-                            <td data-label="Name">{member.name || ''}</td>
-                            <td data-label="Cell">{cell ? cell.name : ''}</td>
-                            <td data-label="Birthday">{formatMonthDay(member.dateOfBirth)}</td>
-                            <td data-label="Mobile">
-                              {member.mobile ? <a href={`tel:${member.mobile}`}>{member.mobile}</a> : ''}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                <div className="birthday-display-content">
+                  <div className="birthday-display-toolbar">
+                    <input
+                      className="form-control"
+                      placeholder="Search by name, mobile, or cell..."
+                      value={birthdayModalSearch}
+                      onChange={(e) => setBirthdayModalSearch(e.target.value)}
+                    />
+                    <span className="birthday-count-chip">{birthdayModalRows.length} member(s)</span>
+                  </div>
+                  <div className="birthday-cards-grid">
+                    {birthdayModalRows.map((member) => (
+                      <article key={`birthday-${member.id}`} className="birthday-member-card">
+                        <div className="birthday-member-head">
+                          <div className="birthday-avatar-wrap">
+                            {member.photoData ? (
+                              <img src={member.photoData} alt={member.displayName || 'Member'} className="birthday-avatar" />
+                            ) : (
+                              <div className="birthday-avatar fallback">
+                                <i className="fas fa-user"></i>
+                              </div>
+                            )}
+                          </div>
+                          <div className="birthday-member-meta">
+                            <h4>{member.displayName || 'Member'}</h4>
+                            <div className="birthday-meta-line">
+                              <span className="birthday-tag">{member.cellName || 'No Cell'}</span>
+                              <span className="birthday-tag subtle">{formatMonthDay(member.dateOfBirth)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="birthday-member-actions">
+                          {member.mobile ? (
+                            <a className="btn btn-outline" href={`tel:${member.mobile}`}>
+                              <i className="fas fa-phone"></i> Call
+                            </a>
+                          ) : (
+                            <span className="birthday-empty-action">No mobile</span>
+                          )}
+                          {member.mobile ? (
+                            <a className="btn btn-outline" href={`sms:${member.mobile}`}>
+                              <i className="fas fa-comment-dots"></i> Message
+                            </a>
+                          ) : null}
+                        </div>
+                      </article>
+                    ))}
+                    {birthdayModalRows.length === 0 && (
+                      <div className="dashboard-note">No matching member for this search.</div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

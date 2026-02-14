@@ -84,6 +84,125 @@
   margin-top: 12px;
 }
 
+.birthday-display-modal {
+  width: min(920px, 94vw);
+  max-height: 88vh;
+  overflow: hidden;
+}
+
+.birthday-display-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.birthday-display-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.birthday-count-chip {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  border: 1px solid rgba(59, 130, 246, 0.26);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.birthday-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  max-height: calc(88vh - 190px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.birthday-member-card {
+  border: 1px solid rgba(15, 118, 110, 0.16);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
+}
+
+.birthday-member-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.birthday-avatar-wrap {
+  flex-shrink: 0;
+}
+
+.birthday-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(59, 130, 246, 0.25);
+}
+
+.birthday-avatar.fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.birthday-member-meta h4 {
+  margin: 0 0 6px;
+  font-size: 0.98rem;
+  color: #0f172a;
+}
+
+.birthday-meta-line {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.birthday-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+}
+
+.birthday-tag.subtle {
+  background: rgba(148, 163, 184, 0.22);
+  color: #334155;
+}
+
+.birthday-member-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.birthday-member-actions .btn.btn-outline {
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.06);
+  padding: 6px 10px;
+}
+
+.birthday-empty-action {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
 .report-card {
   background: #fff;
   border-radius: 14px;
@@ -109,5 +228,15 @@
 
   .dashboard-section {
     padding: 16px;
+  }
+
+  .birthday-display-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .birthday-cards-grid {
+    grid-template-columns: 1fr;
+    max-height: calc(88vh - 220px);
   }
 }
