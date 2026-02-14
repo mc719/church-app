@@ -1,7 +1,74 @@
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 64px;
+}
+
+.settings-page .settings-quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .settings-page .settings-grid {
   display: grid;
-  gap: 20px;
+  gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-page .settings-preview-card {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 14px;
+  background: var(--card-bg);
+}
+
+.settings-page .settings-preview-title {
+  font-weight: 700;
+}
+
+.settings-page .settings-preview-subtitle {
+  color: var(--gray-color);
+  font-size: 0.9rem;
+}
+
+.settings-page .settings-role-add {
+  display: flex;
+  gap: 10px;
+}
+
+.settings-page .settings-form-links {
+  justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settings-page .settings-savebar {
+  position: sticky;
+  bottom: 10px;
+  z-index: 10;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow);
+}
+
+.settings-page .settings-savebar-status {
+  color: var(--gray-color);
+  font-weight: 600;
+}
+
+.settings-page .settings-savebar-status.dirty {
+  color: #b45309;
 }
 
 @media (max-width: 1024px) {
@@ -10,8 +77,12 @@
   }
 }
 
-@media (max-width: 768px) {
-  .settings-page .settings-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 640px) {
+  .settings-page .settings-role-add {
+    flex-direction: column;
+  }
+
+  .settings-page .settings-savebar {
+    bottom: 70px;
   }
 }
