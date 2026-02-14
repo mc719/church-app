@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './AccessManagement.css'
 
 const API_BASE = '/api'
@@ -21,6 +21,10 @@ function AccessManagement() {
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('name')
   const [editingUser, setEditingUser] = useState(null)
   const [deletingUser, setDeletingUser] = useState(null)
   const [allowedMenus, setAllowedMenus] = useState([])
@@ -101,51 +105,156 @@ function AccessManagement() {
     setEditingUser(null)
   }
 
-  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE))
-  const showPagination = users.length > 10
+  const stats = useMemo(() => {
+    return users.reduce(
+      (acc, user) => {
+        acc.total += 1
+        if (user.status) acc.active += 1
+        else acc.inactive += 1
+        return acc
+      },
+      { total: 0, active: 0, inactive: 0 }
+    )
+  }, [users])
+
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return users.filter((user) => {
+      if (roleFilter !== 'all' && String(user.role || '').toLowerCase() !== roleFilter) return false
+      if (statusFilter === 'active' && !user.status) return false
+      if (statusFilter === 'inactive' && user.status) return false
+      if (!q) return true
+      const haystack = [user.name, user.username, user.email, user.role].filter(Boolean).join(' ').toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [users, search, roleFilter, statusFilter])
+
+  const sortedUsers = useMemo(() => {
+    const list = [...filteredUsers]
+    list.sort((a, b) => {
+      if (sortBy === 'name') return String(a.name || a.username || '').localeCompare(String(b.name || b.username || ''))
+      if (sortBy === 'role') return String(a.role || '').localeCompare(String(b.role || ''))
+      return String(a.username || '').localeCompare(String(b.username || ''))
+    })
+    return list
+  }, [filteredUsers, sortBy])
+
+  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / PAGE_SIZE))
+  const showPagination = sortedUsers.length > 10
   const currentPage = Math.min(page, totalPages)
   const startIndex = (currentPage - 1) * PAGE_SIZE
-  const pageUsers = users.slice(startIndex, startIndex + PAGE_SIZE)
+  const pageUsers = sortedUsers.slice(startIndex, startIndex + PAGE_SIZE)
 
   return (
     <div className="access-page">
+      <div className="access-stats">
+        <div className="access-stat-card">
+          <span>Total Users</span>
+          <strong>{stats.total}</strong>
+        </div>
+        <div className="access-stat-card active">
+          <span>Active</span>
+          <strong>{stats.active}</strong>
+        </div>
+        <div className="access-stat-card inactive">
+          <span>Inactive</span>
+          <strong>{stats.inactive}</strong>
+        </div>
+      </div>
+
+      <div className="page-actions access-actions">
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="Search users..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <select
+          className="form-control access-filter"
+          value={roleFilter}
+          onChange={(e) => {
+            setRoleFilter(e.target.value)
+            setPage(1)
+          }}
+        >
+          <option value="all">All roles</option>
+          {roles.map((role) => (
+            <option key={role.id} value={String(role.name || '').toLowerCase()}>
+              {role.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="form-control access-filter"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value)
+            setPage(1)
+          }}
+        >
+          <option value="all">All status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select
+          className="form-control access-filter"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+        >
+          <option value="name">Sort: Name</option>
+          <option value="username">Sort: Username</option>
+          <option value="role">Sort: Role</option>
+        </select>
+      </div>
+
       <div className="table-container">
         <table className="mobile-grid-table">
           <thead>
-              <tr>
-                <th>Name</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Password</th>
-                <th>Role</th>
-                <th>Allowed Menus</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
+            <tr>
+              <th>Name</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Password</th>
+              <th>Role</th>
+              <th>Allowed Menus</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {pageUsers.length === 0 && (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
+                <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
                   No users found.
                 </td>
               </tr>
             )}
             {pageUsers.map((user) => (
-                <tr key={user.id}>
-                  <td data-label="Name">{user.name || '-'}</td>
-                  <td data-label="Username">{user.username}</td>
-                  <td data-label="Email">
-                    {user.email ? <a href={`mailto:${user.email}`}>{user.email}</a> : '-'}
-                  </td>
+              <tr key={user.id}>
+                <td data-label="Name">{user.name || '-'}</td>
+                <td data-label="Username">{user.username}</td>
+                <td data-label="Email">
+                  {user.email ? <a href={`mailto:${user.email}`}>{user.email}</a> : '-'}
+                </td>
                 <td data-label="Password">******</td>
-                <td data-label="Role">{user.role}</td>
+                <td data-label="Role">
+                  <span className="role-pill">{user.role}</span>
+                </td>
                 <td data-label="Allowed Menus">
                   {user.restrictedMenus && user.restrictedMenus.length
                     ? toAllowedMenus(user.restrictedMenus).map((id) => MENU_OPTIONS.find((m) => m.id === id)?.label || id).join(', ')
                     : 'All'}
                 </td>
-                <td data-label="Status">{user.status ? 'Active' : 'Inactive'}</td>
+                <td data-label="Status">
+                  <span className={`status-pill ${user.status ? 'active' : 'inactive'}`}>
+                    {user.status ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
                 <td data-label="Actions">
                   <div className="action-buttons">
                     <button className="action-btn edit-btn" type="button" onClick={() => openEdit(user)}>

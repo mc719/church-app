@@ -1,3 +1,76 @@
+.access-page .access-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.access-page .access-stat-card {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.access-page .access-stat-card span {
+  font-size: 12px;
+  color: var(--gray-color);
+}
+
+.access-page .access-stat-card strong {
+  font-size: 1.15rem;
+}
+
+.access-page .access-stat-card.active {
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.access-page .access-stat-card.inactive {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.access-page .access-actions {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.access-page .access-filter {
+  min-width: 150px;
+}
+
+.access-page .role-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  padding: 4px 9px;
+  font-weight: 700;
+}
+
+.access-page .status-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.access-page .status-pill.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.access-page .status-pill.inactive {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
 .access-page .table-pagination {
   display: flex;
   align-items: center;
@@ -22,4 +95,19 @@
   gap: 8px;
   align-items: center;
   font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .access-page .access-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .access-page .access-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .access-page .access-filter {
+    min-width: 0;
+  }
 }

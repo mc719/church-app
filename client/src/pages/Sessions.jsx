@@ -101,19 +101,6 @@ function Sessions() {
     })
   }, [sessions])
 
-  const stats = useMemo(() => {
-    return enriched.reduce(
-      (acc, session) => {
-        acc.total += 1
-        if (session.status === 'active') acc.active += 1
-        if (session.status === 'ended') acc.ended += 1
-        if (session.risk === 'suspicious') acc.suspicious += 1
-        return acc
-      },
-      { total: 0, active: 0, ended: 0, suspicious: 0 }
-    )
-  }, [enriched])
-
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
     return enriched.filter((session) => {
@@ -220,25 +207,6 @@ function Sessions() {
 
   return (
     <div className="sessions-page">
-      <div className="sessions-kpi-grid">
-        <div className="sessions-kpi-card">
-          <span>Total Sessions</span>
-          <strong>{stats.total}</strong>
-        </div>
-        <div className="sessions-kpi-card active">
-          <span>Active</span>
-          <strong>{stats.active}</strong>
-        </div>
-        <div className="sessions-kpi-card ended">
-          <span>Ended</span>
-          <strong>{stats.ended}</strong>
-        </div>
-        <div className="sessions-kpi-card suspicious">
-          <span>Suspicious</span>
-          <strong>{stats.suspicious}</strong>
-        </div>
-      </div>
-
       <div className="page-actions sessions-actions">
         <div className="search-box">
           <input
