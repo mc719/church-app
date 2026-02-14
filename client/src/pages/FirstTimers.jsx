@@ -772,18 +772,6 @@ function FirstTimers() {
                     </select>
                   </div>
                   <div className="detail-row">
-                    <span>Status</span>
-                    <select
-                      className="form-control inline-input"
-                      value={inlineEdits[selectedFirstTimer.id]?.status ?? selectedFirstTimer.status ?? 'amber'}
-                      onChange={(e) => updateInline(selectedFirstTimer.id, 'status', e.target.value)}
-                    >
-                      <option value="green">Green</option>
-                      <option value="amber">Amber</option>
-                      <option value="red">Red</option>
-                    </select>
-                  </div>
-                  <div className="detail-row">
                     <span>Address</span>
                     <input
                       className="form-control inline-input"
@@ -1345,19 +1333,6 @@ function FirstTimers() {
                     value={addForm.prayerRequestsText}
                     onChange={(e) => setAddForm((prev) => ({ ...prev, prayerRequestsText: e.target.value }))}
                   />
-                </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <select
-                    className="form-control"
-                    value={addForm.status}
-                    onChange={(e) => setAddForm((prev) => ({ ...prev, status: e.target.value }))}
-                  >
-                    <option value="">Amber (default)</option>
-                    <option value="green">Green</option>
-                    <option value="amber">Amber</option>
-                    <option value="red">Red</option>
-                  </select>
                 </div>
                 <div className="form-actions">
                   <button className="btn" type="button" onClick={() => setShowAddFirstTimer(false)}>
