@@ -4,20 +4,28 @@ import './FoundationSchool.css'
 const CLASS_OPTIONS = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Exam']
 const EXAM_OPTIONS = ['Not Started', 'In Progress', 'Passed', 'Resit']
 const TRACKABLE_CLASSES = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7']
+const TITLE_OPTIONS = ['Brother', 'Sister', 'Dcn', 'Dcns', 'Pastor']
+const GENDER_OPTIONS = ['Male', 'Female']
+const AGE_GROUP_OPTIONS = ['13-19', '20-35', '36-45', '46&above']
+const MEMBERSHIP_DURATION_OPTIONS = ['0 - 12months', '1-2 years', '2-3 years', '3year and above']
+const GOWN_SIZE_OPTIONS = ['Small', 'Medium', 'Large', 'XLarge', '2XLarge']
 
 function normalizeTracking(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  const sourcePresence = source.presence && typeof source.presence === 'object' ? source.presence : {}
   const sourceClasses = source.classes && typeof source.classes === 'object' ? source.classes : {}
-  const classes = {}
-  TRACKABLE_CLASSES.forEach((name) => {
-    const row = sourceClasses[name] && typeof sourceClasses[name] === 'object' ? sourceClasses[name] : {}
-    classes[name] = {
-      completed: !!row.completed,
-      date: row.date || ''
-    }
+  const presence = {}
+  CLASS_OPTIONS.forEach((name) => {
+    const legacy = sourceClasses[name] && typeof sourceClasses[name] === 'object' ? sourceClasses[name] : {}
+    presence[name] = typeof sourcePresence[name] === 'boolean' ? sourcePresence[name] : !!legacy.completed
   })
   return {
-    classes,
+    presence,
+    currentStage: source.currentStage || '',
+    membershipDuration: source.membershipDuration || '',
+    areInCell: source.areInCell || '',
+    gownSize: source.gownSize || '',
+    comment: source.comment || '',
     notes: source.notes || '',
     updatedAt: source.updatedAt || ''
   }
@@ -25,11 +33,27 @@ function normalizeTracking(value) {
 
 function FoundationSchool() {
   const [items, setItems] = useState([])
+  const [cells, setCells] = useState([])
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('students')
   const [editRows, setEditRows] = useState({})
   const [selectedId, setSelectedId] = useState('')
   const [tracker, setTracker] = useState(() => normalizeTracking({}))
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newStudent, setNewStudent] = useState({
+    title: 'Brother',
+    name: '',
+    surname: '',
+    phone: '',
+    email: '',
+    gender: 'Male',
+    ageGroup: AGE_GROUP_OPTIONS[1],
+    membershipDuration: MEMBERSHIP_DURATION_OPTIONS[0],
+    areInCell: 'No',
+    cellId: '',
+    gownSize: GOWN_SIZE_OPTIONS[1],
+    comment: ''
+  })
 
   const loadData = async () => {
     const token = localStorage.getItem('token')
@@ -50,26 +74,29 @@ function FoundationSchool() {
     }
   }
 
+  const loadCells = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch('/api/cells', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    setCells(Array.isArray(data) ? data : [])
+  }
+
   useEffect(() => {
     loadData().catch(() => setItems([]))
+    loadCells().catch(() => setCells([]))
   }, [])
 
   const classCounts = useMemo(() => {
     const counts = new Map(CLASS_OPTIONS.map((name) => [name, 0]))
     items.forEach((item) => {
       const tracking = normalizeTracking(item.foundationTracking)
-      TRACKABLE_CLASSES.forEach((className) => {
-        const classRow = tracking.classes[className]
-        if (classRow?.completed || classRow?.date) {
-          counts.set(className, (counts.get(className) || 0) + 1)
-        }
-      })
-      const examStarted =
-        String(item.examStatus || '').toLowerCase() !== 'not started' ||
-        String(item.foundationClass || '').toLowerCase() === 'exam' ||
-        !!item.isGraduate
-      if (examStarted) {
-        counts.set('Exam', (counts.get('Exam') || 0) + 1)
+      const currentStage = tracking.currentStage || item.foundationClass || 'Class 1'
+      if (tracking.presence[currentStage]) {
+        counts.set(currentStage, (counts.get(currentStage) || 0) + 1)
       }
     })
     return counts
@@ -122,7 +149,18 @@ function FoundationSchool() {
     const token = localStorage.getItem('token')
     if (!token) return
     const row = editRows[item.id] || {}
+    const mergedTracking =
+      trackingValue ??
+      (String(selectedId) === String(item.id) ? tracker : normalizeTracking(item.foundationTracking))
     const payload = {
+      title: row.title ?? item.title ?? null,
+      name: row.name ?? item.name ?? null,
+      surname: row.surname ?? item.surname ?? null,
+      mobile: row.mobile ?? item.mobile ?? null,
+      email: row.email ?? item.email ?? null,
+      gender: row.gender ?? item.gender ?? null,
+      ageGroup: row.ageGroup ?? item.ageGroup ?? null,
+      cellId: row.areInCell === 'No' ? null : (row.cellId ?? item.cellId ?? null),
       foundationClass: row.foundationClass ?? item.foundationClass ?? 'Class 1',
       examStatus: row.examStatus ?? item.examStatus ?? 'Not Started',
       graduationDate: row.graduationDate ?? item.graduationDate ?? null,
@@ -132,7 +170,7 @@ function FoundationSchool() {
           : (row.graduatedYear ?? item.graduatedYear ?? null),
       isGraduate: row.isGraduate ?? item.isGraduate ?? false,
       foundationSchool: 'Yes',
-      foundationTracking: trackingValue ?? normalizeTracking(item.foundationTracking)
+      foundationTracking: mergedTracking
     }
     const res = await fetch(`/api/first-timers/${item.id}`, {
       method: 'PUT',
@@ -177,37 +215,84 @@ function FoundationSchool() {
     if (!selectedItem) return
     const nextTracking = {
       ...tracker,
+      currentStage: (editRows[selectedItem.id]?.foundationClass ?? selectedItem.foundationClass) || tracker.currentStage || 'Class 1',
       updatedAt: new Date().toISOString()
     }
     await saveRow(selectedItem, nextTracking)
   }
 
-  const setClassTracking = (className, field, value) => {
+  const setClassTracking = (className, value) => {
     setTracker((prev) => ({
       ...prev,
-      classes: {
-        ...prev.classes,
-        [className]: {
-          ...(prev.classes[className] || {}),
-          [field]: value
-        }
-      }
+      currentStage: className,
+      presence: CLASS_OPTIONS.reduce((acc, stage) => ({ ...acc, [stage]: stage === className ? value : false }), {})
     }))
   }
 
+  const saveNewStudent = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    if (!newStudent.name.trim()) return
+    const payload = {
+      title: newStudent.title,
+      name: newStudent.name.trim(),
+      surname: newStudent.surname.trim() || null,
+      mobile: newStudent.phone.trim() || null,
+      email: newStudent.email.trim() || null,
+      gender: newStudent.gender,
+      ageGroup: newStudent.ageGroup,
+      foundationSchool: 'Yes',
+      foundationClass: 'Class 1',
+      examStatus: 'Not Started',
+      status: 'amber',
+      cellId: newStudent.areInCell === 'Yes' ? (newStudent.cellId || null) : null,
+      foundationTracking: {
+        ...normalizeTracking({}),
+        currentStage: 'Class 1',
+        presence: { ...normalizeTracking({}).presence, 'Class 1': true },
+        membershipDuration: newStudent.membershipDuration,
+        areInCell: newStudent.areInCell,
+        gownSize: newStudent.gownSize,
+        comment: newStudent.comment || ''
+      }
+    }
+    const res = await fetch('/api/first-timers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) return
+    const saved = await res.json()
+    const normalizedSaved = { ...saved, foundationTracking: normalizeTracking(saved.foundationTracking) }
+    setItems((prev) => [normalizedSaved, ...prev])
+    setShowAddModal(false)
+    setSelectedId(String(saved.id))
+    setTracker(normalizeTracking(saved.foundationTracking))
+    setNewStudent({
+      title: 'Brother',
+      name: '',
+      surname: '',
+      phone: '',
+      email: '',
+      gender: 'Male',
+      ageGroup: AGE_GROUP_OPTIONS[1],
+      membershipDuration: MEMBERSHIP_DURATION_OPTIONS[0],
+      areInCell: 'No',
+      cellId: '',
+      gownSize: GOWN_SIZE_OPTIONS[1],
+      comment: ''
+    })
+  }
+
+  const currentStage = (selectedItem && ((editRows[selectedItem.id]?.foundationClass ?? selectedItem.foundationClass) || tracker.currentStage)) || 'Class 1'
+  const currentStageIndex = CLASS_OPTIONS.indexOf(currentStage)
   const nameLabel = (item) => `${item.title ? `${item.title} ` : ''}${item.name || ''} ${item.surname || ''}`.trim()
 
   return (
     <div className="foundation-page">
-      <div className="foundation-class-grid">
-        {CLASS_OPTIONS.map((cls) => (
-          <div key={cls} className="foundation-class-card">
-            <div className="foundation-class-name">{cls}</div>
-            <div className="foundation-class-count">{classCounts.get(cls) || 0} Students</div>
-          </div>
-        ))}
-      </div>
-
       <div className="cell-tabs foundation-tabs mobile-sticky-actions">
         <button className={`cell-tab-btn${tab === 'students' ? ' active' : ''}`} type="button" onClick={() => setTab('students')}>
           Students
@@ -215,6 +300,18 @@ function FoundationSchool() {
         <button className={`cell-tab-btn${tab === 'graduates' ? ' active' : ''}`} type="button" onClick={() => setTab('graduates')}>
           Graduates
         </button>
+        <button type="button" className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setShowAddModal(true)}>
+          Add New Student
+        </button>
+      </div>
+
+      <div className="foundation-class-grid">
+        {CLASS_OPTIONS.map((cls) => (
+          <div key={cls} className="foundation-class-card">
+            <div className="foundation-class-name">{cls}</div>
+            <div className="foundation-class-count">{classCounts.get(cls) || 0} Students</div>
+          </div>
+        ))}
       </div>
 
       <div className="search-box" style={{ marginBottom: 12 }}>
@@ -279,11 +376,135 @@ function FoundationSchool() {
 
               <div className="foundation-main-grid">
                 <div className="form-group">
+                  <label>Title</label>
+                  <select
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.title ?? selectedItem.title) || 'Brother'}
+                    onChange={(e) => updateRow(selectedItem.id, 'title', e.target.value)}
+                  >
+                    {TITLE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.name ?? selectedItem.name) || ''}
+                    onChange={(e) => updateRow(selectedItem.id, 'name', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Surname</label>
+                  <input
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.surname ?? selectedItem.surname) || ''}
+                    onChange={(e) => updateRow(selectedItem.id, 'surname', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Phone</label>
+                  <input
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.mobile ?? selectedItem.mobile) || ''}
+                    onChange={(e) => updateRow(selectedItem.id, 'mobile', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.email ?? selectedItem.email) || ''}
+                    onChange={(e) => updateRow(selectedItem.id, 'email', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Gender</label>
+                  <select
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.gender ?? selectedItem.gender) || 'Male'}
+                    onChange={(e) => updateRow(selectedItem.id, 'gender', e.target.value)}
+                  >
+                    {GENDER_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Age Category</label>
+                  <select
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.ageGroup ?? selectedItem.ageGroup) || AGE_GROUP_OPTIONS[1]}
+                    onChange={(e) => updateRow(selectedItem.id, 'ageGroup', e.target.value)}
+                  >
+                    {AGE_GROUP_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Membership Duration</label>
+                  <select
+                    className="form-control"
+                    value={tracker.membershipDuration || MEMBERSHIP_DURATION_OPTIONS[0]}
+                    onChange={(e) => setTracker((prev) => ({ ...prev, membershipDuration: e.target.value }))}
+                  >
+                    {MEMBERSHIP_DURATION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Are you in a cell?</label>
+                  <select
+                    className="form-control"
+                    value={(editRows[selectedItem.id]?.areInCell ?? tracker.areInCell) || (selectedItem.cellId ? 'Yes' : 'No')}
+                    onChange={(e) => {
+                      updateRow(selectedItem.id, 'areInCell', e.target.value)
+                      setTracker((prev) => ({ ...prev, areInCell: e.target.value }))
+                      if (e.target.value === 'No') updateRow(selectedItem.id, 'cellId', null)
+                    }}
+                  >
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                {((editRows[selectedItem.id]?.areInCell ?? tracker.areInCell) || (selectedItem.cellId ? 'Yes' : 'No')) === 'Yes' && (
+                  <div className="form-group">
+                    <label>Cell Name</label>
+                    <select
+                      className="form-control"
+                      value={(editRows[selectedItem.id]?.cellId ?? selectedItem.cellId) || ''}
+                      onChange={(e) => updateRow(selectedItem.id, 'cellId', e.target.value || null)}
+                    >
+                      <option value="">Select cell</option>
+                      {cells.map((cell) => (
+                        <option key={cell.id} value={cell.id}>{cell.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="form-group">
+                  <label>Graduation Gown Size</label>
+                  <select
+                    className="form-control"
+                    value={tracker.gownSize || GOWN_SIZE_OPTIONS[1]}
+                    onChange={(e) => setTracker((prev) => ({ ...prev, gownSize: e.target.value }))}
+                  >
+                    {GOWN_SIZE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Any Comment?</label>
+                  <textarea
+                    className="form-control"
+                    rows="2"
+                    value={tracker.comment || ''}
+                    onChange={(e) => setTracker((prev) => ({ ...prev, comment: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
                   <label>Current Class</label>
                   <select
                     className="form-control"
                     value={(editRows[selectedItem.id]?.foundationClass ?? selectedItem.foundationClass) || 'Class 1'}
-                    onChange={(e) => updateRow(selectedItem.id, 'foundationClass', e.target.value)}
+                    onChange={(e) => {
+                      updateRow(selectedItem.id, 'foundationClass', e.target.value)
+                      setTracker((prev) => ({ ...prev, currentStage: e.target.value }))
+                    }}
                   >
                     {CLASS_OPTIONS.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -333,31 +554,29 @@ function FoundationSchool() {
                     <thead>
                       <tr>
                         <th>Class</th>
-                        <th>Completed</th>
-                        <th>Completion Date</th>
+                        <th>Present (In Progress)</th>
+                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {TRACKABLE_CLASSES.map((className) => (
+                      {CLASS_OPTIONS.map((className) => {
+                        const stageIndex = CLASS_OPTIONS.indexOf(className)
+                        const isCompleted = currentStageIndex > -1 && stageIndex < currentStageIndex
+                        return (
                         <tr key={className}>
                           <td data-label="Class">{className}</td>
-                          <td data-label="Completed">
+                          <td data-label="Present (In Progress)">
                             <input
                               type="checkbox"
-                              checked={!!tracker.classes[className]?.completed}
-                              onChange={(e) => setClassTracking(className, 'completed', e.target.checked)}
+                              checked={!!tracker.presence[className]}
+                              onChange={(e) => setClassTracking(className, e.target.checked)}
                             />
                           </td>
-                          <td data-label="Completion Date">
-                            <input
-                              type="date"
-                              className="form-control inline-input"
-                              value={tracker.classes[className]?.date || ''}
-                              onChange={(e) => setClassTracking(className, 'date', e.target.value)}
-                            />
+                          <td data-label="Status">
+                            {isCompleted ? 'Completed' : tracker.presence[className] ? 'In Progress' : '-'}
                           </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>
@@ -378,6 +597,93 @@ function FoundationSchool() {
           )}
         </div>
       </div>
+
+      {showAddModal && (
+        <div className="modal-overlay active" onClick={() => setShowAddModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add New Student</h3>
+              <button className="close-modal" type="button" onClick={() => setShowAddModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Title</label>
+                  <select className="form-control" value={newStudent.title} onChange={(e) => setNewStudent((s) => ({ ...s, title: e.target.value }))}>
+                    {TITLE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input className="form-control" value={newStudent.name} onChange={(e) => setNewStudent((s) => ({ ...s, name: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Surname</label>
+                  <input className="form-control" value={newStudent.surname} onChange={(e) => setNewStudent((s) => ({ ...s, surname: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Phone</label>
+                  <input className="form-control" value={newStudent.phone} onChange={(e) => setNewStudent((s) => ({ ...s, phone: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input className="form-control" value={newStudent.email} onChange={(e) => setNewStudent((s) => ({ ...s, email: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Gender</label>
+                  <select className="form-control" value={newStudent.gender} onChange={(e) => setNewStudent((s) => ({ ...s, gender: e.target.value }))}>
+                    {GENDER_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Age Category</label>
+                  <select className="form-control" value={newStudent.ageGroup} onChange={(e) => setNewStudent((s) => ({ ...s, ageGroup: e.target.value }))}>
+                    {AGE_GROUP_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Membership Duration</label>
+                  <select className="form-control" value={newStudent.membershipDuration} onChange={(e) => setNewStudent((s) => ({ ...s, membershipDuration: e.target.value }))}>
+                    {MEMBERSHIP_DURATION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Are you in a cell?</label>
+                  <select className="form-control" value={newStudent.areInCell} onChange={(e) => setNewStudent((s) => ({ ...s, areInCell: e.target.value }))}>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                {newStudent.areInCell === 'Yes' && (
+                  <div className="form-group">
+                    <label>Cell Name</label>
+                    <select className="form-control" value={newStudent.cellId} onChange={(e) => setNewStudent((s) => ({ ...s, cellId: e.target.value }))}>
+                      <option value="">Select cell</option>
+                      {cells.map((cell) => (
+                        <option key={cell.id} value={cell.id}>{cell.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="form-group">
+                  <label>Graduation Gown Size</label>
+                  <select className="form-control" value={newStudent.gownSize} onChange={(e) => setNewStudent((s) => ({ ...s, gownSize: e.target.value }))}>
+                    {GOWN_SIZE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>Any Comment?</label>
+                  <textarea className="form-control" rows="3" value={newStudent.comment} onChange={(e) => setNewStudent((s) => ({ ...s, comment: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button className="btn btn-success" type="button" onClick={saveNewStudent}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
