@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install root deps
+        run: npm install
+
+      - name: Check server syntax
+        run: node --check server.js
+
+      - name: Install client deps
+        run: npm --prefix client install --include=dev
+
+      - name: Build client
+        run: npm --prefix client run build
+
+      - name: Audit (optional)
+        run: npm audit --omit=dev
