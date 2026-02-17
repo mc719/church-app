@@ -25,7 +25,7 @@ import NewDepartmentForm from './pages/NewDepartmentForm.jsx'
 
 function App() {
   const [showAddCell, setShowAddCell] = useState(false)
-  const [hasToken, setHasToken] = useState(null)
+  const [hasToken, setHasToken] = useState(Boolean(localStorage.getItem('token')))
 
   const modalContext = useMemo(() => ({
     openAddCell: () => setShowAddCell(true),
@@ -33,15 +33,10 @@ function App() {
   }), [])
 
   useEffect(() => {
-    const syncToken = async () => {
-      try {
-        const res = await fetch('/api/profile/me')
-        setHasToken(res.ok)
-      } catch {
-        setHasToken(false)
-      }
+    const syncToken = () => {
+      setHasToken(Boolean(localStorage.getItem('token')))
     }
-    syncToken().catch(() => setHasToken(false))
+    syncToken()
     window.addEventListener('storage', syncToken)
     window.addEventListener('auth-changed', syncToken)
     return () => {
@@ -58,9 +53,6 @@ function App() {
 
   return (
     <>
-      {hasToken === null ? (
-        <div style={{ padding: 24 }}>Loading...</div>
-      ) : (
       <Routes>
         <Route path="new-cell" element={<NewCellForm />} />
         <Route path="ft-form" element={<FirstTimerForm />} />
@@ -84,7 +76,6 @@ function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      )}
       <AddCellModal open={showAddCell} onClose={modalContext.closeAddCell} />
     </>
   )

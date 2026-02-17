@@ -53,6 +53,17 @@ const attemptRefresh = async () => {
 
 window.fetch = async (input, init) => {
   const reqInit = { ...(init || {}), credentials: 'include' }
+  const token = localStorage.getItem('token')
+  const isApiRequest =
+    (typeof input === 'string' && input.startsWith('/api/')) ||
+    (typeof input !== 'string' && String(input?.url || '').includes('/api/'))
+  if (token && isApiRequest) {
+    const headers = new Headers(reqInit.headers || {})
+    if (!headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+    reqInit.headers = headers
+  }
   let response = await originalFetch(input, reqInit)
   const url = typeof input === 'string' ? input : input?.url || ''
   const method = (reqInit?.method || 'GET').toUpperCase()
