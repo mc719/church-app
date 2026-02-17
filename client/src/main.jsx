@@ -33,9 +33,6 @@ const attemptRefresh = async () => {
         throw new Error('refresh_failed')
       }
       const data = await res.json().catch(() => ({}))
-      if (data?.token) {
-        localStorage.setItem('token', data.token)
-      }
       if (data?.username) {
         localStorage.setItem('username', data.username)
       }
@@ -84,7 +81,6 @@ window.fetch = async (input, init) => {
       }
     }
     if (response.status === 401) {
-      localStorage.removeItem('token')
       localStorage.removeItem('username')
       localStorage.removeItem('role')
       localStorage.removeItem('restrictedMenus')

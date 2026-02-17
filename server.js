@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const helmet = require("helmet");
+const { z } = require("zod");
 require("dotenv").config();
 
 // ===============================
@@ -29,6 +30,27 @@ app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true, limit: "8mb" }));
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+
+app.use((req, res, next) => {
+  req.requestId = crypto.randomUUID();
+  res.setHeader("x-request-id", req.requestId);
+  next();
+});
+
+function logJson(level, message, fields = {}) {
+  const payload = {
+    level,
+    message,
+    ts: new Date().toISOString(),
+    ...fields
+  };
+  const line = JSON.stringify(payload);
+  if (level === "error" || level === "warn") {
+    console.error(line);
+  } else {
+    console.log(line);
+  }
+}
 
 const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
@@ -56,6 +78,22 @@ app.use("/api", (req, res, next) => {
   if (!isAllowedOrigin(origin)) {
     return res.status(403).json({ error: "CORS origin blocked" });
   }
+  next();
+});
+
+app.use("/api", (req, res, next) => {
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    logJson("info", "api_request", {
+      requestId: req.requestId,
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt,
+      ip: req.ip || null,
+      userId: req.user?.userId || null
+    });
+  });
   next();
 });
 
@@ -230,7 +268,11 @@ function normalizeAccessCode(code) {
 
 function getBearerOrCookieToken(req) {
   const header = req.headers.authorization || "";
-  if (header.startsWith("Bearer ")) return header.slice(7);
+  if (header.startsWith("Bearer ")) {
+    const raw = header.slice(7).trim();
+    const invalid = !raw || raw === "null" || raw === "undefined";
+    if (!invalid) return raw;
+  }
   const cookies = parseCookies(req);
   return cookies.access_token || null;
 }
@@ -491,6 +533,38 @@ function validateDataUrlImage(dataUrl, maxBytes = 2 * 1024 * 1024) {
 function isValidEmail(value) {
   if (!value) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
+}
+
+const loginSchema = z.object({
+  username: z.string().trim().min(1).max(120),
+  password: z.string().min(1).max(256)
+});
+
+const createUserSchema = z.object({
+  username: z.string().trim().min(1).max(120),
+  password: z.string().min(1).max(256),
+  email: z.string().trim().email().max(180),
+  role: z.string().trim().min(1).max(80),
+  status: z.boolean().optional(),
+  restrictedMenus: z.array(z.string().trim().max(80)).optional()
+});
+
+const updateUserSchema = z.object({
+  username: z.string().trim().min(1).max(120).optional(),
+  password: z.string().min(1).max(256).optional(),
+  email: z.string().trim().email().max(180).optional(),
+  role: z.string().trim().min(1).max(80).optional(),
+  status: z.boolean().optional(),
+  restrictedMenus: z.array(z.string().trim().max(80)).optional()
+}).refine((v) => Object.keys(v).length > 0, { message: "No valid fields supplied" });
+
+function parseWithSchema(schema, payload) {
+  const result = schema.safeParse(payload || {});
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    return { ok: false, error: issue?.message || "Invalid payload" };
+  }
+  return { ok: true, data: result.data };
 }
 
 async function logAuditEvent({
@@ -1738,12 +1812,10 @@ app.post("/api/otp/login", rateLimit({ keyPrefix: "otp-login", windowMs: 60_000,
 // LOGIN ROUTE (PUBLIC)
 app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10 }), async (req, res) => {
   try {
-    const username = safeString(req.body?.username, 120);
-    const password = safeString(req.body?.password, 256);
-
-    if (!username || !password) {
-      return res.status(400).json({ error: "Username and password are required" });
-    }
+    const parsed = parseWithSchema(loginSchema, req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const username = parsed.data.username;
+    const password = parsed.data.password;
 
     if (await isLoginLocked(req, username)) {
       return res.status(429).json({ error: "Too many failed attempts. Try again later." });
@@ -2019,19 +2091,14 @@ app.get("/api/users/search", requireAuth, requireAdmin, async (req, res) => {
 app.post("/api/users", requireAuth, requireAdmin, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["username", "password", "email", "role", "status", "restrictedMenus"])) return;
-    const username = safeString(req.body?.username, 120);
-    const password = safeString(req.body?.password, 256);
-    const email = safeString(req.body?.email, 180).toLowerCase();
-    const role = safeString(req.body?.role, 80);
-    const status = typeof req.body?.status === "boolean" ? req.body.status : true;
-    const restrictedMenus = Array.isArray(req.body?.restrictedMenus) ? req.body.restrictedMenus.map((item) => safeString(item, 80)).filter(Boolean) : [];
-
-    if (!username || !password || !email || !role) {
-      return res.status(400).json({ error: "Username, email, password, and role are required" });
-    }
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ error: "Invalid email" });
-    }
+    const parsed = parseWithSchema(createUserSchema, req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const username = parsed.data.username;
+    const password = parsed.data.password;
+    const email = parsed.data.email.toLowerCase();
+    const role = parsed.data.role;
+    const status = typeof parsed.data.status === "boolean" ? parsed.data.status : true;
+    const restrictedMenus = Array.isArray(parsed.data.restrictedMenus) ? parsed.data.restrictedMenus : [];
 
     const passwordHash = await bcrypt.hash(password, 10);
     const restrictedMenusJson = JSON.stringify(restrictedMenus || []);
@@ -2069,19 +2136,18 @@ app.post("/api/users", requireAuth, requireAdmin, async (req, res) => {
 app.put("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["username", "password", "email", "role", "status", "restrictedMenus"])) return;
-    const username = req.body?.username != null ? safeString(req.body.username, 120) : null;
-    const password = req.body?.password != null ? safeString(req.body.password, 256) : null;
-    const email = req.body?.email != null ? safeString(req.body.email, 180).toLowerCase() : null;
-    const role = req.body?.role != null ? safeString(req.body.role, 80) : null;
-    const status = typeof req.body?.status === "boolean" ? req.body.status : null;
-    const restrictedMenus = Array.isArray(req.body?.restrictedMenus) ? req.body.restrictedMenus.map((item) => safeString(item, 80)).filter(Boolean) : null;
+    const parsed = parseWithSchema(updateUserSchema, req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const username = parsed.data.username ?? null;
+    const password = parsed.data.password ?? null;
+    const email = parsed.data.email ? parsed.data.email.toLowerCase() : null;
+    const role = parsed.data.role ?? null;
+    const status = typeof parsed.data.status === "boolean" ? parsed.data.status : null;
+    const restrictedMenus = Array.isArray(parsed.data.restrictedMenus) ? parsed.data.restrictedMenus : null;
 
     let passwordHash = null;
     if (password) {
       passwordHash = await bcrypt.hash(password, 10);
-    }
-    if (email && !isValidEmail(email)) {
-      return res.status(400).json({ error: "Invalid email" });
     }
     const restrictedMenusJson = restrictedMenus ? JSON.stringify(restrictedMenus) : null;
 
