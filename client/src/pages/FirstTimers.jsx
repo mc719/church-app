@@ -194,6 +194,13 @@ function FirstTimers() {
     return 'red'
   }
 
+  const categoryCode = (item) => {
+    const status = statusFallback(item)
+    if (status === 'green') return 'A'
+    if (status === 'amber') return 'B'
+    return 'C'
+  }
+
   useEffect(() => {
     if (!filteredFirstTimers.length) {
       setSelectedFirstTimer(null)
@@ -662,7 +669,7 @@ function FirstTimers() {
                         {formatFirstTimerName(item)}
                       </div>
                       <div className="first-timer-row-meta">
-                        <span>{statusFallback(item)}</span>
+                        <span>{categoryCode(item)}</span>
                         <span>•</span>
                         <span>{item.mobile || '-'}</span>
                       </div>
@@ -712,7 +719,7 @@ function FirstTimers() {
                     <tr key={item.id} className={`first-timer-status-${statusFallback(item)}`}>
                       <td data-label="Name">{formatFirstTimerName(item)}</td>
                       <td data-label="Mobile">{item.mobile || '-'}</td>
-                      <td data-label="Cat">{statusFallback(item)}</td>
+                      <td data-label="Cat">{categoryCode(item)}</td>
                       <td data-label="Actions">
                         <div className="action-buttons">
                           <button
@@ -857,7 +864,7 @@ function FirstTimers() {
                     {formatFirstTimerName(selectedFirstTimer)}
                   </h2>
                   <div className="member-detail-meta">
-                    <span>{statusFallback(selectedFirstTimer)}</span>
+                    <span>{categoryCode(selectedFirstTimer)}</span>
                     <span>•</span>
                     <span>{selectedFirstTimer.email || '-'}</span>
                   </div>

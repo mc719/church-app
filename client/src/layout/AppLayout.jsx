@@ -393,7 +393,7 @@ function AppLayout() {
     if (!shouldShowGreeting) return
     sessionStorage.removeItem('showGreetingOnce')
     setShowGreeting(true)
-    const timer = setTimeout(() => setShowGreeting(false), 5000)
+    const timer = setTimeout(() => setShowGreeting(false), 5500)
     return () => clearTimeout(timer)
   }, [])
 
