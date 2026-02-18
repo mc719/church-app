@@ -3024,6 +3024,52 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
   }
 });
 
+// FIRST-TIMER CATEGORY TRENDS (PROTECTED)
+app.get("/api/first-timers/category-trends", requireAuth, async (req, res) => {
+  try {
+    const parsedMonths = Number.parseInt(String(req.query?.months || "6"), 10);
+    const months = Number.isFinite(parsedMonths) ? Math.min(Math.max(parsedMonths, 3), 18) : 6;
+    const result = await pool.query(
+      `WITH months AS (
+         SELECT (date_trunc('month', CURRENT_DATE) - (gs || ' month')::interval)::date as month_start
+         FROM generate_series($1 - 1, 0, -1) AS gs
+       ),
+       monthly_presence AS (
+         SELECT a.first_timer_id,
+                date_trunc('month', s.service_date::timestamp)::date as month_start,
+                COUNT(*) FILTER (WHERE a.present = TRUE)::int as present_count
+         FROM first_timer_attendance a
+         JOIN first_timer_services s ON s.id = a.service_id
+         GROUP BY a.first_timer_id, date_trunc('month', s.service_date::timestamp)::date
+       ),
+       classified AS (
+         SELECT m.month_start,
+                ft.id as first_timer_id,
+                COALESCE(mp.present_count, 0)::int as present_count
+         FROM months m
+         JOIN first_timers ft
+           ON COALESCE(ft.archived, FALSE) = FALSE
+          AND (ft.date_joined IS NULL OR ft.date_joined <= (m.month_start + INTERVAL '1 month - 1 day')::date)
+         LEFT JOIN monthly_presence mp
+           ON mp.first_timer_id = ft.id
+          AND mp.month_start = m.month_start
+       )
+       SELECT to_char(month_start, 'Mon YYYY') as label,
+              SUM(CASE WHEN present_count >= 3 THEN 1 ELSE 0 END)::int as "aCount",
+              SUM(CASE WHEN present_count = 2 THEN 1 ELSE 0 END)::int as "bCount",
+              SUM(CASE WHEN present_count < 2 THEN 1 ELSE 0 END)::int as "cCount"
+       FROM classified
+       GROUP BY month_start
+       ORDER BY month_start`,
+      [months]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load first-timer category trends" });
+  }
+});
+
 // ADD FIRST-TIMER (PROTECTED OR ACCESS CODE)
 app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", windowMs: 60_000, max: 30 }), requireAuthOrAccessCode, async (req, res) => {
   try {

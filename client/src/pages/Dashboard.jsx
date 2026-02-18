@@ -17,6 +17,7 @@ function Dashboard({ onAddCell }) {
   const [cells, setCells] = useState([])
   const [recentReports, setRecentReports] = useState([])
   const [birthdaySummary, setBirthdaySummary] = useState([])
+  const [categoryTrends, setCategoryTrends] = useState([])
   const [birthdayModal, setBirthdayModal] = useState({ open: false, title: '', list: [] })
   const [birthdayModalSearch, setBirthdayModalSearch] = useState('')
   const [calendarDate, setCalendarDate] = useState(() => new Date())
@@ -29,8 +30,10 @@ function Dashboard({ onAddCell }) {
   const [departmentError, setDepartmentError] = useState('')
   const genderChartRef = useRef(null)
   const rolesChartRef = useRef(null)
+  const trendsChartRef = useRef(null)
   const genderChartInstance = useRef(null)
   const rolesChartInstance = useRef(null)
+  const trendsChartInstance = useRef(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -43,8 +46,9 @@ function Dashboard({ onAddCell }) {
       fetch(`${API_BASE}/cells`, { headers }).then(r => r.ok ? r.json() : []),
       fetch(`${API_BASE}/reports`, { headers }).then(r => r.ok ? r.json() : []),
       fetch(`${API_BASE}/birthdays/summary`, { headers }).then(r => r.ok ? r.json() : []),
-      fetch(`${API_BASE}/first-timers`, { headers }).then(r => r.ok ? r.json() : [])
-    ]).then(([members, cellsData, reports, birthdays, firstTimersData]) => {
+      fetch(`${API_BASE}/first-timers`, { headers }).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/first-timers/category-trends?months=6`, { headers }).then(r => r.ok ? r.json() : [])
+    ]).then(([members, cellsData, reports, birthdays, firstTimersData, trendsData]) => {
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       const memberCountByCell = (members || []).reduce((acc, member) => {
@@ -94,6 +98,7 @@ function Dashboard({ onAddCell }) {
       })
       setMembers(members)
       setFirstTimers(Array.isArray(firstTimersData) ? firstTimersData : [])
+      setCategoryTrends(Array.isArray(trendsData) ? trendsData : [])
       const cellsById = cellsData.reduce((acc, cell) => {
         acc[String(cell.id)] = cell
         return acc
@@ -140,6 +145,7 @@ function Dashboard({ onAddCell }) {
     }).catch(() => {
       setStats({ members: 0, cells: 0, activeCells: 0, inactiveCells: 0 })
       setFirstTimers([])
+      setCategoryTrends([])
       setCells([])
       setRecentReports([])
       setBirthdaySummary([])
@@ -366,6 +372,38 @@ function Dashboard({ onAddCell }) {
       })
     }
 
+    const trendLabels = (categoryTrends || []).map((row) => row.label)
+    const trendA = (categoryTrends || []).map((row) => Number(row.aCount || 0))
+    const trendB = (categoryTrends || []).map((row) => Number(row.bCount || 0))
+    const trendC = (categoryTrends || []).map((row) => Number(row.cCount || 0))
+    if (trendsChartInstance.current) {
+      trendsChartInstance.current.data.labels = trendLabels
+      trendsChartInstance.current.data.datasets[0].data = trendA
+      trendsChartInstance.current.data.datasets[1].data = trendB
+      trendsChartInstance.current.data.datasets[2].data = trendC
+      trendsChartInstance.current.update()
+    } else if (trendsChartRef.current) {
+      trendsChartInstance.current = new Chart(trendsChartRef.current, {
+        type: 'line',
+        data: {
+          labels: trendLabels,
+          datasets: [
+            { label: 'A', data: trendA, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', tension: 0.35, fill: false },
+            { label: 'B', data: trendB, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', tension: 0.35, fill: false },
+            { label: 'C', data: trendC, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.15)', tension: 0.35, fill: false }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: true } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      })
+    }
+
     return () => {
       if (genderChartInstance.current) {
         genderChartInstance.current.destroy()
@@ -375,8 +413,12 @@ function Dashboard({ onAddCell }) {
         rolesChartInstance.current.destroy()
         rolesChartInstance.current = null
       }
+      if (trendsChartInstance.current) {
+        trendsChartInstance.current.destroy()
+        trendsChartInstance.current = null
+      }
     }
-  }, [members, firstTimers])
+  }, [members, firstTimers, categoryTrends])
 
   const formatDate = (value) => {
     if (!value) return ''
@@ -452,6 +494,12 @@ function Dashboard({ onAddCell }) {
             </div>
             <canvas ref={rolesChartRef} height="200"></canvas>
           </div>
+        </div>
+        <div className="chart-card dashboard-trend-chart">
+          <div className="section-header" style={{ marginTop: 0 }}>
+            <h2>FT Category Trend (6 Months)</h2>
+          </div>
+          <canvas ref={trendsChartRef} height="120"></canvas>
         </div>
       </div>
 
