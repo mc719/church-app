@@ -13,6 +13,7 @@ function Dashboard({ onAddCell }) {
     inactiveCells: 0
   })
   const [members, setMembers] = useState([])
+  const [firstTimers, setFirstTimers] = useState([])
   const [cells, setCells] = useState([])
   const [recentReports, setRecentReports] = useState([])
   const [birthdaySummary, setBirthdaySummary] = useState([])
@@ -41,8 +42,9 @@ function Dashboard({ onAddCell }) {
       fetch(`${API_BASE}/members`, { headers }).then(r => r.ok ? r.json() : []),
       fetch(`${API_BASE}/cells`, { headers }).then(r => r.ok ? r.json() : []),
       fetch(`${API_BASE}/reports`, { headers }).then(r => r.ok ? r.json() : []),
-      fetch(`${API_BASE}/birthdays/summary`, { headers }).then(r => r.ok ? r.json() : [])
-    ]).then(([members, cellsData, reports, birthdays]) => {
+      fetch(`${API_BASE}/birthdays/summary`, { headers }).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/first-timers`, { headers }).then(r => r.ok ? r.json() : [])
+    ]).then(([members, cellsData, reports, birthdays, firstTimersData]) => {
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       const memberCountByCell = (members || []).reduce((acc, member) => {
@@ -91,6 +93,7 @@ function Dashboard({ onAddCell }) {
         inactiveCells: inactiveCount
       })
       setMembers(members)
+      setFirstTimers(Array.isArray(firstTimersData) ? firstTimersData : [])
       const cellsById = cellsData.reduce((acc, cell) => {
         acc[String(cell.id)] = cell
         return acc
@@ -136,6 +139,7 @@ function Dashboard({ onAddCell }) {
       setBirthdaySummary(summary)
     }).catch(() => {
       setStats({ members: 0, cells: 0, activeCells: 0, inactiveCells: 0 })
+      setFirstTimers([])
       setCells([])
       setRecentReports([])
       setBirthdaySummary([])
@@ -289,7 +293,7 @@ function Dashboard({ onAddCell }) {
   }, {})
 
   useEffect(() => {
-    if (!members.length || typeof Chart === 'undefined') return
+    if (typeof Chart === 'undefined') return
 
     const cellMembershipCounts = members.reduce((acc, member) => {
       const hasCell = Boolean(member.cellId || member.cell_id)
@@ -298,16 +302,26 @@ function Dashboard({ onAddCell }) {
       return acc
     }, { inCell: 0, unassigned: 0 })
 
-    const membersInDepartment = members.reduce((acc, member) => {
-      if (member.departmentId || member.department_id) acc.inDepartment += 1
-      return acc
-    }, { inDepartment: 0 })
+    const firstTimerCounts = (Array.isArray(firstTimers) ? firstTimers : []).reduce(
+      (acc, item) => {
+        const current = String(item?.category || item?.status || '').trim().toLowerCase()
+        if (current === 'green' || Number(item?.monthlyPresentCount || 0) >= 3) {
+          acc.A += 1
+        } else if (current === 'amber' || Number(item?.monthlyPresentCount || 0) >= 2) {
+          acc.B += 1
+        } else {
+          acc.C += 1
+        }
+        return acc
+      },
+      { A: 0, B: 0, C: 0 }
+    )
 
     const genderLabels = ['Members in Cells', 'Unassigned Members']
     const genderValues = [cellMembershipCounts.inCell, cellMembershipCounts.unassigned]
-    const roleLabels = ['Members in Departments', 'Other Members']
-    const roleValues = [membersInDepartment.inDepartment, Math.max(0, members.length - membersInDepartment.inDepartment)]
-    const roleColors = ['#3b82f6', '#94a3b8']
+    const roleLabels = ['A', 'B', 'C']
+    const roleValues = [firstTimerCounts.A, firstTimerCounts.B, firstTimerCounts.C]
+    const roleColors = ['#22c55e', '#f59e0b', '#ef4444']
 
     if (genderChartInstance.current) {
       genderChartInstance.current.data.labels = genderLabels
@@ -362,7 +376,7 @@ function Dashboard({ onAddCell }) {
         rolesChartInstance.current = null
       }
     }
-  }, [members])
+  }, [members, firstTimers])
 
   const formatDate = (value) => {
     if (!value) return ''
@@ -434,7 +448,7 @@ function Dashboard({ onAddCell }) {
           </div>
           <div className="chart-card">
             <div className="section-header" style={{ marginTop: 0 }}>
-              <h2>Member Roles</h2>
+              <h2>FT Categories</h2>
             </div>
             <canvas ref={rolesChartRef} height="200"></canvas>
           </div>
