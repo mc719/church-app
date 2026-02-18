@@ -3,12 +3,6 @@ import './Settings.css'
 
 const API_BASE = '/api'
 
-const DEFAULT_TARGETING = {
-  enableRoleTargeting: true,
-  enableUsernameTargeting: true,
-  allowedRoles: []
-}
-
 function Settings() {
   const [logo, setLogo] = useState('/images/logo.png')
   const [logoTitle, setLogoTitle] = useState('Christ Embassy')
@@ -19,8 +13,6 @@ function Settings() {
   const [newRole, setNewRole] = useState('')
   const [editingRole, setEditingRole] = useState(null)
   const [deletingRole, setDeletingRole] = useState(null)
-  const [notificationTargeting, setNotificationTargeting] = useState(DEFAULT_TARGETING)
-  const [savedTargeting, setSavedTargeting] = useState(DEFAULT_TARGETING)
 
   const showToast = (message) => {
     let toast = document.getElementById('appToast')
@@ -61,21 +53,6 @@ function Settings() {
       .then((data) => setRoles(Array.isArray(data) ? data : []))
       .catch(() => setRoles([]))
 
-    fetch(`${API_BASE}/settings/notification-targeting`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data || typeof data !== 'object') return
-        const normalized = {
-          enableRoleTargeting: data.enableRoleTargeting !== false,
-          enableUsernameTargeting: data.enableUsernameTargeting !== false,
-          allowedRoles: Array.isArray(data.allowedRoles) ? data.allowedRoles : []
-        }
-        setNotificationTargeting(normalized)
-        setSavedTargeting(normalized)
-      })
-      .catch(() => {})
   }, [])
 
   const handleLogoUpload = async (event) => {
@@ -170,57 +147,14 @@ function Settings() {
     showToast('Role deleted')
   }
 
-  const saveNotificationTargeting = async () => {
-    const token = localStorage.getItem('token')
-    if (!token) return false
-    const res = await fetch(`${API_BASE}/settings/notification-targeting`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(notificationTargeting)
-    })
-    if (!res.ok) return false
-    setSavedTargeting(notificationTargeting)
-    showToast('Notification targeting saved')
-    return true
-  }
-
-  const saveAll = async () => {
-    const brandingDirty = logoTitle !== savedLogoTitle || logoSubtitle !== savedLogoSubtitle
-    const targetingDirty = JSON.stringify(notificationTargeting) !== JSON.stringify(savedTargeting)
-    if (brandingDirty) saveLogoText()
-    if (targetingDirty) await saveNotificationTargeting()
-    if (!brandingDirty && !targetingDirty) {
-      showToast('No pending changes')
-    }
-  }
-
-  const brandingDirty = useMemo(
-    () => logoTitle !== savedLogoTitle || logoSubtitle !== savedLogoSubtitle,
-    [logoTitle, logoSubtitle, savedLogoTitle, savedLogoSubtitle]
-  )
-  const targetingDirty = useMemo(
-    () => JSON.stringify(notificationTargeting) !== JSON.stringify(savedTargeting),
-    [notificationTargeting, savedTargeting]
-  )
-  const hasPendingChanges = brandingDirty || targetingDirty
-
   return (
     <div className="settings-page">
       <div className="settings-quick-actions">
         <button className="btn" type="button" onClick={() => document.getElementById('settings-branding')?.scrollIntoView({ behavior: 'smooth' })}>
           Branding
         </button>
-        <button className="btn" type="button" onClick={() => document.getElementById('settings-notify')?.scrollIntoView({ behavior: 'smooth' })}>
-          Notification Targeting
-        </button>
         <button className="btn" type="button" onClick={() => document.getElementById('settings-roles')?.scrollIntoView({ behavior: 'smooth' })}>
           Roles
-        </button>
-        <button className="btn" type="button" onClick={() => document.getElementById('settings-forms')?.scrollIntoView({ behavior: 'smooth' })}>
-          External Forms
         </button>
       </div>
 
@@ -265,70 +199,6 @@ function Settings() {
           <div className="form-actions">
             <button className="btn btn-success" type="button" onClick={saveLogoText}>
               Save Branding
-            </button>
-          </div>
-        </div>
-
-        <div className="settings-card" id="settings-notify">
-          <div className="section-header" style={{ marginTop: 0 }}>
-            <h2>Notification Targeting</h2>
-          </div>
-          <div className="form-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={notificationTargeting.enableRoleTargeting}
-                onChange={(e) =>
-                  setNotificationTargeting((prev) => ({
-                    ...prev,
-                    enableRoleTargeting: e.target.checked
-                  }))
-                }
-              />{' '}
-              Enable role targeting
-            </label>
-          </div>
-          <div className="form-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={notificationTargeting.enableUsernameTargeting}
-                onChange={(e) =>
-                  setNotificationTargeting((prev) => ({
-                    ...prev,
-                    enableUsernameTargeting: e.target.checked
-                  }))
-                }
-              />{' '}
-              Enable username targeting
-            </label>
-          </div>
-          <div className="form-group">
-            <label>Allowed roles for notification targeting</label>
-            <select
-              className="form-control"
-              multiple
-              value={notificationTargeting.allowedRoles}
-              onChange={(e) =>
-                setNotificationTargeting((prev) => ({
-                  ...prev,
-                  allowedRoles: Array.from(e.target.selectedOptions).map((item) => item.value)
-                }))
-              }
-            >
-              {roles.map((role) => (
-                <option key={role.id} value={role.name}>
-                  {role.name}
-                </option>
-              ))}
-            </select>
-            <small style={{ color: 'var(--gray-color)' }}>
-              Leave empty to allow all roles.
-            </small>
-          </div>
-          <div className="form-actions">
-            <button className="btn btn-success" type="button" onClick={saveNotificationTargeting}>
-              Save Targeting
             </button>
           </div>
         </div>
@@ -384,34 +254,6 @@ function Settings() {
           </div>
         </div>
 
-        <div className="settings-card" id="settings-forms">
-          <div className="section-header" style={{ marginTop: 0 }}>
-            <h2>External Forms</h2>
-          </div>
-          <p style={{ color: 'var(--gray-color)', marginBottom: '16px' }}>
-            Share these links to collect submissions without logging in.
-          </p>
-          <div className="form-actions settings-form-links">
-            <a className="btn btn-success" href="/new-cell" target="_blank" rel="noreferrer">
-              New Cell Form
-            </a>
-            <a className="btn btn-success" href="/ft-form" target="_blank" rel="noreferrer">
-              First-Timer Form
-            </a>
-            <a className="btn btn-success" href="/new-department" target="_blank" rel="noreferrer">
-              Department Form
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div className="settings-savebar">
-        <span className={`settings-savebar-status${hasPendingChanges ? ' dirty' : ''}`}>
-          {hasPendingChanges ? 'Unsaved changes' : 'All changes saved'}
-        </span>
-        <button className="btn btn-success" type="button" onClick={saveAll}>
-          Save All
-        </button>
       </div>
 
       {editingRole && (
