@@ -60,7 +60,7 @@ function AppLayout() {
   const [logoSrc, setLogoSrc] = useState(() => localStorage.getItem('logoImage') || '')
   const [logoTitle, setLogoTitle] = useState('Christ Embassy')
   const [logoSubtitle, setLogoSubtitle] = useState('Church Cell Data')
-  const [showGreeting, setShowGreeting] = useState(true)
+  const [showGreeting, setShowGreeting] = useState(false)
   const [greetingName, setGreetingName] = useState(() => localStorage.getItem('username') || 'User')
   const [restrictedMenus, setRestrictedMenus] = useState([])
   const location = useLocation()
@@ -389,6 +389,9 @@ function AppLayout() {
   }
 
   useEffect(() => {
+    const shouldShowGreeting = sessionStorage.getItem('showGreetingOnce') === '1'
+    if (!shouldShowGreeting) return
+    sessionStorage.removeItem('showGreetingOnce')
     setShowGreeting(true)
     const timer = setTimeout(() => setShowGreeting(false), 5000)
     return () => clearTimeout(timer)

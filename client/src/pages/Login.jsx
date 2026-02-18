@@ -72,6 +72,7 @@ function Login() {
       localStorage.setItem('username', data.username)
       localStorage.setItem('role', data.role)
       localStorage.setItem('restrictedMenus', JSON.stringify(data.restrictedMenus || []))
+      sessionStorage.setItem('showGreetingOnce', '1')
       window.dispatchEvent(new Event('auth-changed'))
       window.location.href = '/app'
     } catch (err) {
