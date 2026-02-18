@@ -34,6 +34,7 @@ function FirstTimers() {
   const [addForm, setAddForm] = useState({
     title: '',
     name: '',
+    surname: '',
     gender: '',
     mobile: '',
     email: '',
@@ -129,6 +130,16 @@ function FirstTimers() {
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
   }
 
+  const formatFirstTimerName = (item) => {
+    if (!item) return 'First-timer'
+    const firstLast = [item.name, item.surname].filter(Boolean).join(' ').trim()
+    const titled = [item.title, firstLast].filter(Boolean).join(' ').trim()
+    return titled || item.name || 'First-timer'
+  }
+
+  const getFirstTimerNameById = (id) =>
+    formatFirstTimerName(firstTimers.find((item) => String(item.id) === String(id)))
+
   const toggleArrayValue = (source, value) => {
     const next = new Set(Array.isArray(source) ? source : [])
     if (next.has(value)) next.delete(value)
@@ -148,6 +159,7 @@ function FirstTimers() {
       const values = [
         item.title,
         item.name,
+        item.surname,
         item.mobile,
         item.email,
         item.address,
@@ -273,6 +285,7 @@ function FirstTimers() {
       title: updates.title ?? item.title ?? '',
       photoData: updates.photoData ?? item.photoData ?? '',
       name: updates.name ?? item.name ?? item.full_name ?? '',
+      surname: updates.surname ?? item.surname ?? '',
       gender: updates.gender ?? item.gender ?? '',
       mobile: updates.mobile ?? item.mobile ?? '',
       email: updates.email ?? item.email ?? '',
@@ -380,8 +393,9 @@ function FirstTimers() {
       setIndividualAttendance((prev) =>
         prev.map((item) =>
           String(item.serviceId) === String(selectedServiceId) ? { ...item, present } : item
+        )
       )
-    )
+    }
   }
 
   const handleDeleteService = async () => {
@@ -396,7 +410,6 @@ function FirstTimers() {
     setAttendanceServices((prev) => prev.filter((svc) => String(svc.id) !== String(selectedServiceId)))
     setSelectedServiceId('')
     setAttendanceRows([])
-  }
   }
 
   const handleSaveFollowUp = async (event) => {
@@ -481,6 +494,7 @@ function FirstTimers() {
         body: JSON.stringify({
           title: addForm.title,
           name: addForm.name,
+          surname: addForm.surname,
           gender: addForm.gender,
           mobile: addForm.mobile,
           email: addForm.email,
@@ -509,6 +523,7 @@ function FirstTimers() {
       setAddForm({
         title: '',
         name: '',
+        surname: '',
         gender: '',
         mobile: '',
         email: '',
@@ -636,7 +651,7 @@ function FirstTimers() {
                       {((selectedFirstTimer && String(selectedFirstTimer.id) === String(item.id) && inlineEdits[item.id]?.photoData) || item.photoData) ? (
                         <img
                           src={(selectedFirstTimer && String(selectedFirstTimer.id) === String(item.id) && inlineEdits[item.id]?.photoData) || item.photoData}
-                          alt={item.name || 'First-timer'}
+                          alt={formatFirstTimerName(item)}
                         />
                       ) : (
                         <i className="fas fa-user"></i>
@@ -644,8 +659,7 @@ function FirstTimers() {
                     </div>
                     <div className="first-timer-row-info">
                       <div className="first-timer-row-name">
-                        {item.title ? `${item.title} ` : ''}
-                        {item.name || 'First-timer'}
+                        {formatFirstTimerName(item)}
                       </div>
                       <div className="first-timer-row-meta">
                         <span>{statusFallback(item)}</span>
@@ -696,7 +710,7 @@ function FirstTimers() {
                   )}
                   {filteredFirstTimers.map((item) => (
                     <tr key={item.id} className={`first-timer-status-${statusFallback(item)}`}>
-                      <td data-label="Name">{item.title ? `${item.title} ` : ''}{item.name || ''}</td>
+                      <td data-label="Name">{formatFirstTimerName(item)}</td>
                       <td data-label="Mobile">{item.mobile || '-'}</td>
                       <td data-label="Cat">{statusFallback(item)}</td>
                       <td data-label="Actions">
@@ -818,7 +832,7 @@ function FirstTimers() {
                   )}
                   {selectedServiceId && attendanceRows.map((row) => (
                     <tr key={row.firstTimerId}>
-                      <td data-label="Name">{row.title ? `${row.title} ` : ''}{row.name || '-'}</td>
+                      <td data-label="Name">{formatFirstTimerName(row)}</td>
                       <td data-label="Mobile">{row.mobile || '-'}</td>
                       <td data-label="Present">
                         <input
@@ -840,8 +854,7 @@ function FirstTimers() {
               <div className="first-timer-detail-header">
                 <div>
                   <h2>
-                    {selectedFirstTimer.title ? `${selectedFirstTimer.title} ` : ''}
-                    {selectedFirstTimer.name || 'First-timer'}
+                    {formatFirstTimerName(selectedFirstTimer)}
                   </h2>
                   <div className="member-detail-meta">
                     <span>{statusFallback(selectedFirstTimer)}</span>
@@ -916,7 +929,7 @@ function FirstTimers() {
                         {(inlineEdits[selectedFirstTimer.id]?.photoData || selectedFirstTimer.photoData) ? (
                           <img
                             src={inlineEdits[selectedFirstTimer.id]?.photoData || selectedFirstTimer.photoData}
-                            alt={selectedFirstTimer.name || 'First-timer'}
+                            alt={formatFirstTimerName(selectedFirstTimer)}
                             onClick={() =>
                               setPhotoPreview(
                                 inlineEdits[selectedFirstTimer.id]?.photoData || selectedFirstTimer.photoData
@@ -946,11 +959,19 @@ function FirstTimers() {
                     </select>
                   </div>
                   <div className="detail-row">
-                    <span>Name</span>
+                    <span>First Name</span>
                     <input
                       className="form-control inline-input"
                       value={inlineEdits[selectedFirstTimer.id]?.name ?? selectedFirstTimer.name ?? ''}
                       onChange={(e) => updateInline(selectedFirstTimer.id, 'name', e.target.value)}
+                    />
+                  </div>
+                  <div className="detail-row">
+                    <span>Surname</span>
+                    <input
+                      className="form-control inline-input"
+                      value={inlineEdits[selectedFirstTimer.id]?.surname ?? selectedFirstTimer.surname ?? ''}
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'surname', e.target.value)}
                     />
                   </div>
                   <div className="detail-row">
@@ -1260,7 +1281,7 @@ function FirstTimers() {
         <div className="modal-overlay active" onClick={() => setDecidingFirstTimer(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Decide: {decidingFirstTimer.name || 'First-Timer'}</h3>
+              <h3>Decide: {formatFirstTimerName(decidingFirstTimer)}</h3>
               <button className="close-modal" type="button" onClick={() => setDecidingFirstTimer(null)}>
                 &times;
               </button>
@@ -1367,11 +1388,19 @@ function FirstTimers() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Name</label>
+                  <label>First Name</label>
                   <input
                     className="form-control"
                     value={addForm.name}
                     onChange={(e) => setAddForm((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Surname</label>
+                  <input
+                    className="form-control"
+                    value={addForm.surname}
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, surname: e.target.value }))}
                   />
                 </div>
                 <div className="form-group">
@@ -1588,7 +1617,7 @@ function FirstTimers() {
                 <i className="fas fa-trash"></i>
               </div>
               <p className="confirmation-text">
-                Delete {deletingFirstTimer.name || 'this first-timer'}?
+                Delete {formatFirstTimerName(deletingFirstTimer)}?
               </p>
               <div className="form-actions">
                 <button className="btn" type="button" onClick={() => setDeletingFirstTimer(null)}>
@@ -1615,11 +1644,11 @@ function FirstTimers() {
             <div className="modal-body">
               <form onSubmit={handleSaveFollowUp}>
                 <div className="form-group">
-                  <label>First-Timer ID</label>
+                  <label>Name</label>
                   <input
                     className="form-control"
-                    value={editingFollowUp.firstTimerId || ''}
-                    onChange={(e) => setEditingFollowUp({ ...editingFollowUp, firstTimerId: e.target.value })}
+                    value={getFirstTimerNameById(editingFollowUp.firstTimerId)}
+                    readOnly
                   />
                 </div>
                 <div className="form-group">
@@ -1727,7 +1756,7 @@ function FirstTimers() {
                       <option value="">Select</option>
                       {firstTimers.map((ft) => (
                         <option key={ft.id} value={ft.id}>
-                          {ft.name}
+                          {formatFirstTimerName(ft)}
                         </option>
                     ))}
                   </select>

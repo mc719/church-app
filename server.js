@@ -3653,7 +3653,9 @@ app.get("/api/follow-ups", requireAuth, async (req, res) => {
     const result = await pool.query(
       `SELECT fu.id::text as id,
               fu.first_timer_id::text as "firstTimerId",
+              ft.title as "firstTimerTitle",
               ft.name as "firstTimerName",
+              ft.surname as "firstTimerSurname",
               fu.followup_date as "date",
               fu.followup_time as "time",
               fu.comment,
@@ -3837,6 +3839,7 @@ app.get("/api/ft-attendance", requireAuth, async (req, res) => {
       `SELECT ft.id::text as "firstTimerId",
               ft.title,
               ft.name,
+              ft.surname,
               ft.mobile,
               COALESCE(a.present, FALSE) as present
        FROM first_timers ft
