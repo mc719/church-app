@@ -3,28 +3,54 @@ import './AccessManagement.css'
 
 const API_BASE = '/api'
 const PAGE_SIZE = 20
-const MENU_OPTIONS = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'members', label: 'Members' },
-  { id: 'first-timers', label: 'First-Timers' },
-  { id: 'birthdays', label: 'Birthdays' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'page-management', label: 'Page Management' },
-  { id: 'access-management', label: 'Access Management' },
-  { id: 'sessions', label: 'Sessions' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'cells', label: 'Cells' },
-  { id: 'reports', label: 'Reports' }
+const LEGACY_MENU_MAP = {
+  dashboard: '/',
+  members: '/members',
+  'first-timers': '/first-timers',
+  'foundation-school': '/foundation-school',
+  birthdays: '/birthdays',
+  notifications: '/notifications',
+  'page-management': '/page-management',
+  'access-management': '/access-management',
+  sessions: '/sessions',
+  settings: '/settings',
+  cells: '/cells',
+  reports: '/reports',
+  departments: '/departments',
+  profile: '/profile'
+}
+
+const normalizeMenuId = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  if (raw.startsWith('/')) return raw
+  return LEGACY_MENU_MAP[raw] || raw
+}
+
+const BASE_MENU_OPTIONS = [
+  { id: '/', label: 'Dashboard' },
+  { id: '/members', label: 'Members' },
+  { id: '/first-timers', label: 'First-Timers' },
+  { id: '/foundation-school', label: 'Foundation School' },
+  { id: '/birthdays', label: 'Birthdays' },
+  { id: '/cells', label: 'All Cells' },
+  { id: '/departments', label: 'Departments' },
+  { id: '/reports', label: 'Reports' },
+  { id: '/notifications', label: 'Notifications' },
+  { id: '/page-management', label: 'Page Management' },
+  { id: '/access-management', label: 'Access Management' },
+  { id: '/sessions', label: 'Sessions' },
+  { id: '/settings', label: 'Settings' },
+  { id: '/profile', label: 'Profile' }
 ]
+
+const getMenuLabel = (id, options) => options.find((m) => m.id === id)?.label || id
 
 function AccessManagement() {
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
+  const [menuOptions, setMenuOptions] = useState(BASE_MENU_OPTIONS)
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('name')
   const [editingUser, setEditingUser] = useState(null)
   const [deletingUser, setDeletingUser] = useState(null)
   const [allowedMenus, setAllowedMenus] = useState([])
@@ -33,30 +59,91 @@ function AccessManagement() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) return
-    Promise.all([
-      fetch(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/roles`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : []))
-    ])
-      .then(([usersData, rolesData]) => {
-        setUsers(Array.isArray(usersData) ? usersData : [])
-        setRoles(Array.isArray(rolesData) ? rolesData : [])
-      })
-      .catch(() => {
-        setUsers([])
-        setRoles([])
-      })
+    const load = () =>
+      Promise.all([
+        fetch(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : [])),
+        fetch(`${API_BASE}/roles`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : []))
+      ])
+        .then(([usersData, rolesData]) => {
+          setUsers(Array.isArray(usersData) ? usersData : [])
+          setRoles(Array.isArray(rolesData) ? rolesData : [])
+        })
+        .catch(() => {
+          setUsers([])
+          setRoles([])
+        })
+
+    load()
+    const timer = setInterval(load, 30000)
+    const onFocus = () => load()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    const loadMenuOptions = async () => {
+      try {
+        const pageVisibility = JSON.parse(localStorage.getItem('pageVisibility') || '{}')
+        const deletedPages = JSON.parse(localStorage.getItem('deletedPages') || '[]')
+        const visibleBase = BASE_MENU_OPTIONS.filter(
+          (page) => pageVisibility[page.id] !== false && !deletedPages.includes(page.id)
+        )
+        const [cellsRes, departmentsRes] = await Promise.all([
+          fetch(`${API_BASE}/cells`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/departments`, { headers: { Authorization: `Bearer ${token}` } })
+        ])
+        const [cellsData, departmentsData] = await Promise.all([
+          cellsRes.ok ? cellsRes.json() : [],
+          departmentsRes.ok ? departmentsRes.json() : []
+        ])
+        const cells = (Array.isArray(cellsData) ? cellsData : []).map((cell) => ({
+          id: `/cells?cellId=${cell.id}`,
+          label: `Cell: ${cell.name || cell.id}`
+        }))
+        const departments = (Array.isArray(departmentsData) ? departmentsData : []).map((department) => ({
+          id: `/departments?departmentId=${department.id}`,
+          label: `Department: ${department.name || department.id}`
+        }))
+        const merged = [...visibleBase, ...cells, ...departments]
+        const deduped = merged.filter((item, index) => merged.findIndex((p) => p.id === item.id) === index)
+        setMenuOptions(deduped)
+      } catch {
+        setMenuOptions(BASE_MENU_OPTIONS)
+      }
+    }
+
+    loadMenuOptions()
+    const sync = () => loadMenuOptions()
+    window.addEventListener('cells-updated', sync)
+    window.addEventListener('departments-updated', sync)
+    window.addEventListener('page-meta-updated', sync)
+    window.addEventListener('page-visibility-updated', sync)
+    window.addEventListener('page-deleted-updated', sync)
+    return () => {
+      window.removeEventListener('cells-updated', sync)
+      window.removeEventListener('departments-updated', sync)
+      window.removeEventListener('page-meta-updated', sync)
+      window.removeEventListener('page-visibility-updated', sync)
+      window.removeEventListener('page-deleted-updated', sync)
+    }
   }, [])
 
   const toAllowedMenus = (restrictedMenus) => {
-    if (!restrictedMenus || restrictedMenus.length === 0) return MENU_OPTIONS.map((m) => m.id)
-    const restrictedSet = new Set(restrictedMenus)
-    return MENU_OPTIONS.map((m) => m.id).filter((id) => !restrictedSet.has(id))
+    if (!restrictedMenus || restrictedMenus.length === 0) return menuOptions.map((m) => m.id)
+    const restrictedSet = new Set((restrictedMenus || []).map((menuId) => normalizeMenuId(menuId)).filter(Boolean))
+    return menuOptions.map((m) => m.id).filter((id) => !restrictedSet.has(id))
   }
 
   const toRestrictedMenus = (allowedIds) => {
     if (allowAll) return []
     const allowedSet = new Set(allowedIds)
-    return MENU_OPTIONS.map((m) => m.id).filter((id) => !allowedSet.has(id))
+    return menuOptions.map((m) => m.id).filter((id) => !allowedSet.has(id))
   }
 
   const openEdit = (user) => {
@@ -102,116 +189,20 @@ function AccessManagement() {
     if (!res.ok) return
     const updated = await res.json()
     setUsers((prev) => prev.map((u) => (String(u.id) === String(updated.id) ? updated : u)))
+    if (String(localStorage.getItem('username') || '').toLowerCase() === String(updated.username || '').toLowerCase()) {
+      localStorage.setItem('restrictedMenus', JSON.stringify(updated.restrictedMenus || []))
+      window.dispatchEvent(new Event('menu-access-updated'))
+    }
     setEditingUser(null)
   }
-
-  const stats = useMemo(() => {
-    return users.reduce(
-      (acc, user) => {
-        acc.total += 1
-        if (user.status) acc.active += 1
-        else acc.inactive += 1
-        return acc
-      },
-      { total: 0, active: 0, inactive: 0 }
-    )
-  }, [users])
-
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return users.filter((user) => {
-      if (roleFilter !== 'all' && String(user.role || '').toLowerCase() !== roleFilter) return false
-      if (statusFilter === 'active' && !user.status) return false
-      if (statusFilter === 'inactive' && user.status) return false
-      if (!q) return true
-      const haystack = [user.name, user.username, user.email, user.role].filter(Boolean).join(' ').toLowerCase()
-      return haystack.includes(q)
-    })
-  }, [users, search, roleFilter, statusFilter])
-
-  const sortedUsers = useMemo(() => {
-    const list = [...filteredUsers]
-    list.sort((a, b) => {
-      if (sortBy === 'name') return String(a.name || a.username || '').localeCompare(String(b.name || b.username || ''))
-      if (sortBy === 'role') return String(a.role || '').localeCompare(String(b.role || ''))
-      return String(a.username || '').localeCompare(String(b.username || ''))
-    })
-    return list
-  }, [filteredUsers, sortBy])
-
-  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / PAGE_SIZE))
-  const showPagination = sortedUsers.length > 10
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE))
+  const showPagination = users.length > 10
   const currentPage = Math.min(page, totalPages)
   const startIndex = (currentPage - 1) * PAGE_SIZE
-  const pageUsers = sortedUsers.slice(startIndex, startIndex + PAGE_SIZE)
+  const pageUsers = users.slice(startIndex, startIndex + PAGE_SIZE)
 
   return (
     <div className="access-page">
-      <div className="access-stats">
-        <div className="access-stat-card">
-          <span>Total Users</span>
-          <strong>{stats.total}</strong>
-        </div>
-        <div className="access-stat-card active">
-          <span>Active</span>
-          <strong>{stats.active}</strong>
-        </div>
-        <div className="access-stat-card inactive">
-          <span>Inactive</span>
-          <strong>{stats.inactive}</strong>
-        </div>
-      </div>
-
-      <div className="page-actions access-actions">
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-          />
-        </div>
-        <select
-          className="form-control access-filter"
-          value={roleFilter}
-          onChange={(e) => {
-            setRoleFilter(e.target.value)
-            setPage(1)
-          }}
-        >
-          <option value="all">All roles</option>
-          {roles.map((role) => (
-            <option key={role.id} value={String(role.name || '').toLowerCase()}>
-              {role.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="form-control access-filter"
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value)
-            setPage(1)
-          }}
-        >
-          <option value="all">All status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        <select
-          className="form-control access-filter"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-        >
-          <option value="name">Sort: Name</option>
-          <option value="username">Sort: Username</option>
-          <option value="role">Sort: Role</option>
-        </select>
-      </div>
-
       <div className="table-container">
         <table className="mobile-grid-table">
           <thead>
@@ -222,14 +213,13 @@ function AccessManagement() {
               <th>Password</th>
               <th>Role</th>
               <th>Allowed Menus</th>
-              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {pageUsers.length === 0 && (
               <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-color)' }}>
                   No users found.
                 </td>
               </tr>
@@ -247,13 +237,8 @@ function AccessManagement() {
                 </td>
                 <td data-label="Allowed Menus">
                   {user.restrictedMenus && user.restrictedMenus.length
-                    ? toAllowedMenus(user.restrictedMenus).map((id) => MENU_OPTIONS.find((m) => m.id === id)?.label || id).join(', ')
+                    ? toAllowedMenus(user.restrictedMenus).map((id) => getMenuLabel(id, menuOptions)).join(', ')
                     : 'All'}
-                </td>
-                <td data-label="Status">
-                  <span className={`status-pill ${user.status ? 'active' : 'inactive'}`}>
-                    {user.status ? 'Active' : 'Inactive'}
-                  </span>
                 </td>
                 <td data-label="Actions">
                   <div className="action-buttons">
@@ -369,14 +354,14 @@ function AccessManagement() {
                         onChange={(e) => {
                           setAllowAll(e.target.checked)
                           if (e.target.checked) {
-                            setAllowedMenus(MENU_OPTIONS.map((m) => m.id))
+                            setAllowedMenus(menuOptions.map((m) => m.id))
                           }
                         }}
                       />
                       <span>All</span>
                     </label>
                     {!allowAll &&
-                      MENU_OPTIONS.map((menu) => (
+                      menuOptions.map((menu) => (
                         <label className="allowed-menu-item" key={menu.id}>
                           <input
                             type="checkbox"

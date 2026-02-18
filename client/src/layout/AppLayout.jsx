@@ -1,6 +1,30 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+const LEGACY_MENU_MAP = {
+  dashboard: '/',
+  members: '/members',
+  'first-timers': '/first-timers',
+  'foundation-school': '/foundation-school',
+  birthdays: '/birthdays',
+  notifications: '/notifications',
+  'page-management': '/page-management',
+  'access-management': '/access-management',
+  sessions: '/sessions',
+  settings: '/settings',
+  cells: '/cells',
+  reports: '/reports',
+  departments: '/departments',
+  profile: '/profile'
+}
+
+const normalizeMenuId = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  if (raw.startsWith('/')) return raw
+  return LEGACY_MENU_MAP[raw] || raw
+}
+
 function AppLayout() {
   const defaultPages = useMemo(() => ([
     { id: '/', label: 'Dashboard', icon: 'fas fa-home', section: 'main' },
@@ -38,6 +62,7 @@ function AppLayout() {
   const [logoSubtitle, setLogoSubtitle] = useState('Church Cell Data')
   const [showGreeting, setShowGreeting] = useState(true)
   const [greetingName, setGreetingName] = useState(() => localStorage.getItem('username') || 'User')
+  const [restrictedMenus, setRestrictedMenus] = useState([])
   const location = useLocation()
   const navigate = useNavigate()
   const notificationsRef = useRef(null)
@@ -276,14 +301,26 @@ function AppLayout() {
   }
 
   const isVisible = (path) => pageVisibility[path] !== false && !deletedPages.includes(path)
+  const restrictedSet = useMemo(
+    () => new Set((restrictedMenus || []).map((id) => normalizeMenuId(id)).filter(Boolean)),
+    [restrictedMenus]
+  )
+  const isMenuBlocked = (path) => {
+    if (!path) return false
+    const normalized = normalizeMenuId(path)
+    if (restrictedSet.has(normalized)) return true
+    if (normalized.startsWith('/cells?') && restrictedSet.has('/cells')) return true
+    if (normalized.startsWith('/departments?') && restrictedSet.has('/departments')) return true
+    return false
+  }
 
   const sectionVisible = (section) => sectionVisibility[section] !== false
-  const mainPages = defaultPages.filter((p) => p.section === 'main' && isVisible(p.id) && sectionVisible('Main'))
+  const mainPages = defaultPages.filter((p) => p.section === 'main' && isVisible(p.id) && sectionVisible('Main') && !isMenuBlocked(p.id))
   const mobileMainPages = mainPages.filter((p) => p.id !== '/')
-  const baseCellPages = defaultPages.filter((p) => p.section === 'cells' && isVisible(p.id) && sectionVisible('Cell Groups'))
-  const cellPages = [...cellLinks]
-  const departmentPages = [...departmentLinks]
-  const adminPages = defaultPages.filter((p) => p.section === 'admin' && isVisible(p.id) && sectionVisible('Administrator'))
+  const baseCellPages = defaultPages.filter((p) => p.section === 'cells' && isVisible(p.id) && sectionVisible('Cell Groups') && !isMenuBlocked(p.id))
+  const cellPages = [...cellLinks].filter((page) => !isMenuBlocked(page.id))
+  const departmentPages = [...departmentLinks].filter((page) => !isMenuBlocked(page.id))
+  const adminPages = defaultPages.filter((p) => p.section === 'admin' && isVisible(p.id) && sectionVisible('Administrator') && !isMenuBlocked(p.id))
 
   const handleToggleSidebar = () => {
     if (isMobileNav) {
@@ -356,6 +393,33 @@ function AppLayout() {
     const timer = setTimeout(() => setShowGreeting(false), 5000)
     return () => clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    const loadRestricted = () => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem('restrictedMenus') || '[]')
+        setRestrictedMenus(Array.isArray(parsed) ? parsed : [])
+      } catch {
+        setRestrictedMenus([])
+      }
+    }
+    loadRestricted()
+    window.addEventListener('auth-changed', loadRestricted)
+    window.addEventListener('storage', loadRestricted)
+    window.addEventListener('menu-access-updated', loadRestricted)
+    return () => {
+      window.removeEventListener('auth-changed', loadRestricted)
+      window.removeEventListener('storage', loadRestricted)
+      window.removeEventListener('menu-access-updated', loadRestricted)
+    }
+  }, [])
+
+  useEffect(() => {
+    const currentPath = `${location.pathname}${location.search || ''}`
+    if (!isMenuBlocked(currentPath)) return
+    const fallback = ['/', '/profile', '/members', '/first-timers'].find((path) => !isMenuBlocked(path)) || '/login'
+    navigate(fallback, { replace: true })
+  }, [location.pathname, location.search, navigate, restrictedMenus])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
