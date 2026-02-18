@@ -3749,7 +3749,7 @@ app.delete("/api/follow-ups/:id", requireAuth, requireStaff, async (req, res) =>
 });
 
 // FIRST-TIMER ATTENDANCE SERVICES (PROTECTED)
-app.get("/api/first-timers/attendance/services", requireAuth, async (req, res) => {
+app.get("/api/ft-attendance/services", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT s.id::text as id,
@@ -3771,7 +3771,7 @@ app.get("/api/first-timers/attendance/services", requireAuth, async (req, res) =
   }
 });
 
-app.post("/api/first-timers/attendance/services", requireAuth, requireStaff, async (req, res) => {
+app.post("/api/ft-attendance/services", requireAuth, requireStaff, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["serviceName", "serviceDate", "serviceTime"])) return;
     const serviceName = safeString(req.body?.serviceName, 180);
@@ -3797,7 +3797,7 @@ app.post("/api/first-timers/attendance/services", requireAuth, requireStaff, asy
   }
 });
 
-app.get("/api/first-timers/attendance", requireAuth, async (req, res) => {
+app.get("/api/ft-attendance", requireAuth, async (req, res) => {
   try {
     const serviceId = safeString(req.query?.serviceId, 40);
     if (!serviceId) {
@@ -3824,7 +3824,7 @@ app.get("/api/first-timers/attendance", requireAuth, async (req, res) => {
   }
 });
 
-app.put("/api/first-timers/attendance", requireAuth, requireStaff, async (req, res) => {
+app.put("/api/ft-attendance", requireAuth, requireStaff, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["serviceId", "firstTimerId", "present"])) return;
     const serviceId = safeString(req.body?.serviceId, 40);
@@ -3852,7 +3852,7 @@ app.put("/api/first-timers/attendance", requireAuth, requireStaff, async (req, r
   }
 });
 
-app.get("/api/first-timers/:id/attendance", requireAuth, async (req, res) => {
+app.get("/api/ft-attendance/:id", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT s.id::text as "serviceId",

@@ -73,7 +73,7 @@ function FirstTimers() {
       fetch(`${API_BASE}/follow-ups`, { headers }).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API_BASE}/cells`, { headers }).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API_BASE}/departments`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/first-timers/attendance/services`, { headers }).then((r) => (r.ok ? r.json() : []))
+      fetch(`${API_BASE}/ft-attendance/services`, { headers }).then((r) => (r.ok ? r.json() : []))
     ])
       .then(([firstTimersData, followUpsData, cellsData, departmentsData, servicesData]) => {
         setFirstTimers(Array.isArray(firstTimersData) ? firstTimersData : [])
@@ -197,7 +197,7 @@ function FirstTimers() {
     if (listTab !== 'attendance' || !selectedServiceId) return
     const token = localStorage.getItem('token')
     if (!token) return
-    fetch(`${API_BASE}/first-timers/attendance?serviceId=${selectedServiceId}`, {
+    fetch(`${API_BASE}/ft-attendance?serviceId=${selectedServiceId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then((r) => (r.ok ? r.json() : []))
@@ -209,7 +209,7 @@ function FirstTimers() {
     if (detailTab !== 'attendance' || !selectedFirstTimer?.id) return
     const token = localStorage.getItem('token')
     if (!token) return
-    fetch(`${API_BASE}/first-timers/${selectedFirstTimer.id}/attendance`, {
+    fetch(`${API_BASE}/ft-attendance/${selectedFirstTimer.id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then((r) => (r.ok ? r.json() : []))
@@ -339,7 +339,7 @@ function FirstTimers() {
     event.preventDefault()
     const token = localStorage.getItem('token')
     if (!token || !serviceForm.serviceName || !serviceForm.serviceDate) return
-    const res = await fetch(`${API_BASE}/first-timers/attendance/services`, {
+    const res = await fetch(`${API_BASE}/ft-attendance/services`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -357,7 +357,7 @@ function FirstTimers() {
   const toggleAttendance = async (row, present) => {
     const token = localStorage.getItem('token')
     if (!token || !selectedServiceId) return
-    const res = await fetch(`${API_BASE}/first-timers/attendance`, {
+    const res = await fetch(`${API_BASE}/ft-attendance`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
