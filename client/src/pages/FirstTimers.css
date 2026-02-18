@@ -141,6 +141,29 @@ tr.first-timer-status-red > td {
   background: #f8fafc;
 }
 
+.first-timer-attendance-form {
+  padding: 8px 10px;
+  border: 1px solid rgba(15, 118, 110, 0.08);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.first-timer-attendance-form .form-group {
+  max-width: 260px;
+}
+
+.first-timer-attendance-form .btn {
+  width: auto;
+  min-width: 140px;
+}
+
+.first-timer-attendance-service-select {
+  max-width: 360px;
+  margin-top: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
 @media (max-width: 900px) {
   .first-timers-layout {
     grid-template-columns: 1fr;

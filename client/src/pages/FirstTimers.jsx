@@ -721,7 +721,7 @@ function FirstTimers() {
               <div className="section-header" style={{ marginBottom: 12 }}>
                 <h3 style={{ margin: 0 }}>First-Timers Attendance Overview</h3>
               </div>
-              <form className="form-grid" onSubmit={handleCreateService} style={{ marginBottom: 12 }}>
+              <form className="form-grid first-timer-attendance-form" onSubmit={handleCreateService} style={{ marginBottom: 12 }}>
                 <div className="form-group">
                   <label>Service Name</label>
                   <input
@@ -756,7 +756,7 @@ function FirstTimers() {
                 </div>
               </form>
 
-              <div className="form-group" style={{ maxWidth: 380 }}>
+              <div className="form-group first-timer-attendance-service-select">
                 <label>Select Service</label>
                 <select
                   className="form-control"
