@@ -6,7 +6,8 @@ const DEFAULT_LOGO_URL = '/images/logo.png'
 const createMemberRow = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
   title: '',
-  name: '',
+  firstName: '',
+  surname: '',
   gender: '',
   mobile: '',
   email: '',
@@ -29,10 +30,12 @@ function NewCellForm() {
     description: ''
   })
 
-  const membersPayload = useMemo(
-    () => members.filter((row) => row.name.trim().length > 0),
-    [members]
-  )
+  const membersPayload = useMemo(() => {
+    const buildName = (row) => [row.firstName, row.surname].filter(Boolean).join(' ').trim()
+    return members
+      .map((row) => ({ ...row, fullName: buildName(row) }))
+      .filter((row) => row.fullName.length > 0)
+  }, [members])
 
   useEffect(() => {
     const cached = localStorage.getItem('logoImage')
@@ -131,7 +134,7 @@ function NewCellForm() {
           body: JSON.stringify({
             cellId: data.id,
             title: row.title,
-            name: row.name.trim(),
+            name: row.fullName,
             gender: row.gender,
             mobile: row.mobile.trim(),
             email: row.email.trim(),
@@ -240,11 +243,19 @@ function NewCellForm() {
                 </select>
               </div>
               <div>
-                <label>Full Name</label>
+                <label>First Name</label>
                 <input
                   type="text"
-                  value={member.name}
-                  onChange={(event) => updateMember(member.id, 'name', event.target.value)}
+                  value={member.firstName}
+                  onChange={(event) => updateMember(member.id, 'firstName', event.target.value)}
+                />
+              </div>
+              <div>
+                <label>Surname</label>
+                <input
+                  type="text"
+                  value={member.surname}
+                  onChange={(event) => updateMember(member.id, 'surname', event.target.value)}
                 />
               </div>
               <div>
