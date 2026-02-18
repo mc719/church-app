@@ -3811,6 +3811,22 @@ app.post("/api/ft-attendance/services", requireAuth, requireStaff, async (req, r
   }
 });
 
+app.delete("/api/ft-attendance/services/:id", requireAuth, requireStaff, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM first_timer_services WHERE id = $1 RETURNING id::text as id",
+      [req.params.id]
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Service not found" });
+    }
+    res.json({ ok: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete attendance service" });
+  }
+});
+
 app.get("/api/ft-attendance", requireAuth, async (req, res) => {
   try {
     const serviceId = safeString(req.query?.serviceId, 40);

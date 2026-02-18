@@ -380,9 +380,23 @@ function FirstTimers() {
       setIndividualAttendance((prev) =>
         prev.map((item) =>
           String(item.serviceId) === String(selectedServiceId) ? { ...item, present } : item
-        )
       )
-    }
+    )
+  }
+
+  const handleDeleteService = async () => {
+    if (!selectedServiceId) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`${API_BASE}/ft-attendance/services/${selectedServiceId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    setAttendanceServices((prev) => prev.filter((svc) => String(svc.id) !== String(selectedServiceId)))
+    setSelectedServiceId('')
+    setAttendanceRows([])
+  }
   }
 
   const handleSaveFollowUp = async (event) => {
@@ -759,18 +773,28 @@ function FirstTimers() {
 
               <div className="form-group first-timer-attendance-service-select">
                 <label>Select Service</label>
-                <select
-                  className="form-control"
-                  value={selectedServiceId}
-                  onChange={(e) => setSelectedServiceId(e.target.value)}
-                >
-                  <option value="">Select service</option>
-                  {attendanceServices.map((svc) => (
-                    <option key={svc.id} value={svc.id}>
-                      {svc.serviceName} - {formatDate(svc.serviceDate)} {svc.serviceTime ? formatTime(`1970-01-01T${svc.serviceTime}`) : ''}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <select
+                    className="form-control"
+                    value={selectedServiceId}
+                    onChange={(e) => setSelectedServiceId(e.target.value)}
+                  >
+                    <option value="">Select service</option>
+                    {attendanceServices.map((svc) => (
+                      <option key={svc.id} value={svc.id}>
+                        {svc.serviceName} - {formatDate(svc.serviceDate)} {svc.serviceTime ? formatTime(`1970-01-01T${svc.serviceTime}`) : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn btn-danger"
+                    type="button"
+                    disabled={!selectedServiceId}
+                    onClick={handleDeleteService}
+                  >
+                    Delete Service
+                  </button>
+                </div>
               </div>
 
               <table className="mobile-grid-table">
