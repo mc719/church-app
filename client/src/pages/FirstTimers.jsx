@@ -29,7 +29,6 @@ function FirstTimers() {
   const [addForm, setAddForm] = useState({
     title: '',
     name: '',
-    surname: '',
     gender: '',
     mobile: '',
     email: '',
@@ -130,14 +129,13 @@ function FirstTimers() {
     const scopedList = firstTimers.filter((item) =>
       listTab === 'archive'
         ? !!item.archived
-        : (!item.archived && !item.inFoundationSchool)
+        : !item.archived
     )
     if (!term) return scopedList
     return scopedList.filter((item) => {
       const values = [
         item.title,
         item.name,
-        item.surname,
         item.mobile,
         item.email,
         item.address,
@@ -162,6 +160,14 @@ function FirstTimers() {
       (item) => String(item.firstTimerId || item.first_timer_id) === String(selectedFirstTimer.id)
     )
   }, [followUps, selectedFirstTimer])
+
+  const statusFallback = (item) => {
+    const current = String(item?.status || '').trim().toLowerCase()
+    if (current === 'green' || current === 'amber' || current === 'red') return current
+    const idNum = Number(item?.id || 0)
+    const palette = ['green', 'amber', 'red']
+    return palette[Math.abs(idNum) % palette.length]
+  }
 
   useEffect(() => {
     if (!filteredFirstTimers.length) {
@@ -230,7 +236,6 @@ function FirstTimers() {
       title: updates.title ?? item.title ?? '',
       photoData: updates.photoData ?? item.photoData ?? '',
       name: updates.name ?? item.name ?? item.full_name ?? '',
-      surname: updates.surname ?? item.surname ?? '',
       gender: updates.gender ?? item.gender ?? '',
       mobile: updates.mobile ?? item.mobile ?? '',
       email: updates.email ?? item.email ?? '',
@@ -376,7 +381,6 @@ function FirstTimers() {
         body: JSON.stringify({
           title: addForm.title,
           name: addForm.name,
-          surname: addForm.surname,
           gender: addForm.gender,
           mobile: addForm.mobile,
           email: addForm.email,
@@ -405,7 +409,6 @@ function FirstTimers() {
       setAddForm({
         title: '',
         name: '',
-        surname: '',
         gender: '',
         mobile: '',
         email: '',
@@ -515,7 +518,7 @@ function FirstTimers() {
                 <button
                   key={item.id}
                   type="button"
-                  className={`first-timer-row${isActive ? ' active' : ''}`}
+                  className={`first-timer-row first-timer-status-${statusFallback(item)}${isActive ? ' active' : ''}`}
                   onClick={() => {
                     setSelectedFirstTimer({ ...item })
                     setDetailTab('details')
@@ -535,10 +538,10 @@ function FirstTimers() {
                     <div className="first-timer-row-info">
                       <div className="first-timer-row-name">
                         {item.title ? `${item.title} ` : ''}
-                        {item.name || 'First-timer'} {item.surname || ''}
+                        {item.name || 'First-timer'}
                       </div>
                       <div className="first-timer-row-meta">
-                        <span>{item.status || 'Pending'}</span>
+                        <span>{statusFallback(item)}</span>
                         <span>•</span>
                         <span>{item.mobile || '-'}</span>
                       </div>
@@ -585,10 +588,10 @@ function FirstTimers() {
                     </tr>
                   )}
                   {filteredFirstTimers.map((item) => (
-                    <tr key={item.id}>
-                      <td data-label="Name">{item.title ? `${item.title} ` : ''}{item.name || ''} {item.surname || ''}</td>
+                    <tr key={item.id} className={`first-timer-status-${statusFallback(item)}`}>
+                      <td data-label="Name">{item.title ? `${item.title} ` : ''}{item.name || ''}</td>
                       <td data-label="Mobile">{item.mobile || '-'}</td>
-                      <td data-label="Status">{item.status || '-'}</td>
+                      <td data-label="Status">{statusFallback(item)}</td>
                       <td data-label="Actions">
                         <div className="action-buttons">
                           <button
@@ -630,10 +633,10 @@ function FirstTimers() {
                 <div>
                   <h2>
                     {selectedFirstTimer.title ? `${selectedFirstTimer.title} ` : ''}
-                    {selectedFirstTimer.name || 'First-timer'} {selectedFirstTimer.surname || ''}
+                    {selectedFirstTimer.name || 'First-timer'}
                   </h2>
                   <div className="member-detail-meta">
-                    <span>{selectedFirstTimer.status || 'Pending'}</span>
+                    <span>{statusFallback(selectedFirstTimer)}</span>
                     <span>•</span>
                     <span>{selectedFirstTimer.email || '-'}</span>
                   </div>
@@ -679,6 +682,13 @@ function FirstTimers() {
                   onClick={() => setDetailTab('followups')}
                 >
                   Follow-up Records
+                </button>
+                <button
+                  className={`cell-tab-btn${detailTab === 'attendance' ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDetailTab('attendance')}
+                >
+                  Attendance
                 </button>
                 {detailTab === 'followups' && (
                   <div className="cell-tabs-actions mobile-sticky-actions">
@@ -733,14 +743,6 @@ function FirstTimers() {
                       className="form-control inline-input"
                       value={inlineEdits[selectedFirstTimer.id]?.name ?? selectedFirstTimer.name ?? ''}
                       onChange={(e) => updateInline(selectedFirstTimer.id, 'name', e.target.value)}
-                    />
-                  </div>
-                  <div className="detail-row">
-                    <span>Surname</span>
-                    <input
-                      className="form-control inline-input"
-                      value={inlineEdits[selectedFirstTimer.id]?.surname ?? selectedFirstTimer.surname ?? ''}
-                      onChange={(e) => updateInline(selectedFirstTimer.id, 'surname', e.target.value)}
                     />
                   </div>
                   <div className="detail-row">
@@ -1008,6 +1010,36 @@ function FirstTimers() {
                   </table>
                 </div>
               )}
+
+              {detailTab === 'attendance' && (
+                <div className="table-container">
+                  <table className="mobile-grid-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Meeting</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: 6 }).map((_, idx) => {
+                        const states = ['Present', 'Absent']
+                        const state = states[(Number(selectedFirstTimer?.id || 0) + idx) % 2]
+                        const dt = new Date()
+                        dt.setDate(dt.getDate() - idx * 7)
+                        return (
+                          <tr key={`att-${idx}`}>
+                            <td data-label="Date">{dt.toLocaleDateString()}</td>
+                            <td data-label="Meeting">Weekly Meeting</td>
+                            <td data-label="Status">{state}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  <small className="foundation-updated-at">Attendance is placeholder data for now.</small>
+                </div>
+              )}
             </>
           )}
           </>
@@ -1082,7 +1114,7 @@ function FirstTimers() {
               <div className="form-group">
                 <label>Assign Foundation School</label>
                 <button className="btn btn-success" type="button" onClick={() => applyDecision('assignFoundationSchool')}>
-                  Move to Foundation School
+                  Share with FOUNDATION SCHOOL
                 </button>
               </div>
               {decidingFirstTimer.archived && (
@@ -1132,14 +1164,6 @@ function FirstTimers() {
                     className="form-control"
                     value={addForm.name}
                     onChange={(e) => setAddForm((prev) => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Surname</label>
-                  <input
-                    className="form-control"
-                    value={addForm.surname}
-                    onChange={(e) => setAddForm((prev) => ({ ...prev, surname: e.target.value }))}
                   />
                 </div>
                 <div className="form-group">
@@ -1495,8 +1519,8 @@ function FirstTimers() {
                       <option value="">Select</option>
                       {firstTimers.map((ft) => (
                         <option key={ft.id} value={ft.id}>
-                          {ft.name} {ft.surname || ''}
-                      </option>
+                          {ft.name}
+                        </option>
                     ))}
                   </select>
                 </div>
