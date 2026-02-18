@@ -13,6 +13,11 @@ function FirstTimers() {
   const [followUps, setFollowUps] = useState([])
   const [cells, setCells] = useState([])
   const [departments, setDepartments] = useState([])
+  const [attendanceServices, setAttendanceServices] = useState([])
+  const [attendanceRows, setAttendanceRows] = useState([])
+  const [selectedServiceId, setSelectedServiceId] = useState('')
+  const [individualAttendance, setIndividualAttendance] = useState([])
+  const [serviceForm, setServiceForm] = useState({ serviceName: '', serviceDate: '', serviceTime: '' })
   const [search, setSearch] = useState('')
   const [listTab, setListTab] = useState('active')
   const [selectedFirstTimer, setSelectedFirstTimer] = useState(null)
@@ -67,19 +72,26 @@ function FirstTimers() {
       fetch(`${API_BASE}/first-timers?includeArchived=true`, { headers }).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API_BASE}/follow-ups`, { headers }).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API_BASE}/cells`, { headers }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/departments`, { headers }).then((r) => (r.ok ? r.json() : []))
+      fetch(`${API_BASE}/departments`, { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API_BASE}/first-timers/attendance/services`, { headers }).then((r) => (r.ok ? r.json() : []))
     ])
-      .then(([firstTimersData, followUpsData, cellsData, departmentsData]) => {
+      .then(([firstTimersData, followUpsData, cellsData, departmentsData, servicesData]) => {
         setFirstTimers(Array.isArray(firstTimersData) ? firstTimersData : [])
         setFollowUps(Array.isArray(followUpsData) ? followUpsData : [])
         setCells(Array.isArray(cellsData) ? cellsData : [])
         setDepartments(Array.isArray(departmentsData) ? departmentsData : [])
+        const serviceList = Array.isArray(servicesData) ? servicesData : []
+        setAttendanceServices(serviceList)
+        if (serviceList[0]?.id) {
+          setSelectedServiceId(String(serviceList[0].id))
+        }
       })
       .catch(() => {
         setFirstTimers([])
         setFollowUps([])
         setCells([])
         setDepartments([])
+        setAttendanceServices([])
       })
   }, [])
 
@@ -180,6 +192,30 @@ function FirstTimers() {
     setSelectedFirstTimer({ ...filteredFirstTimers[0] })
     setDetailTab('details')
   }, [filteredFirstTimers, selectedFirstTimer])
+
+  useEffect(() => {
+    if (listTab !== 'attendance' || !selectedServiceId) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API_BASE}/first-timers/attendance?serviceId=${selectedServiceId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setAttendanceRows(Array.isArray(data) ? data : []))
+      .catch(() => setAttendanceRows([]))
+  }, [listTab, selectedServiceId])
+
+  useEffect(() => {
+    if (detailTab !== 'attendance' || !selectedFirstTimer?.id) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API_BASE}/first-timers/${selectedFirstTimer.id}/attendance`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setIndividualAttendance(Array.isArray(data) ? data : []))
+      .catch(() => setIndividualAttendance([]))
+  }, [detailTab, selectedFirstTimer?.id])
 
   const handleDeleteFirstTimer = async () => {
     if (!deletingFirstTimer) return
@@ -297,6 +333,55 @@ function FirstTimers() {
     if (!res.ok) return
     setFollowUps((prev) => prev.filter((item) => String(item.id) !== String(deletingFollowUp.id)))
     setDeletingFollowUp(null)
+  }
+
+  const handleCreateService = async (event) => {
+    event.preventDefault()
+    const token = localStorage.getItem('token')
+    if (!token || !serviceForm.serviceName || !serviceForm.serviceDate) return
+    const res = await fetch(`${API_BASE}/first-timers/attendance/services`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(serviceForm)
+    })
+    if (!res.ok) return
+    const created = await res.json()
+    setAttendanceServices((prev) => [created, ...prev])
+    setSelectedServiceId(String(created.id))
+    setServiceForm({ serviceName: '', serviceDate: '', serviceTime: '' })
+  }
+
+  const toggleAttendance = async (row, present) => {
+    const token = localStorage.getItem('token')
+    if (!token || !selectedServiceId) return
+    const res = await fetch(`${API_BASE}/first-timers/attendance`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        serviceId: selectedServiceId,
+        firstTimerId: row.firstTimerId,
+        present
+      })
+    })
+    if (!res.ok) return
+    setAttendanceRows((prev) =>
+      prev.map((item) =>
+        String(item.firstTimerId) === String(row.firstTimerId) ? { ...item, present } : item
+      )
+    )
+    if (selectedFirstTimer && String(selectedFirstTimer.id) === String(row.firstTimerId)) {
+      setIndividualAttendance((prev) =>
+        prev.map((item) =>
+          String(item.serviceId) === String(selectedServiceId) ? { ...item, present } : item
+        )
+      )
+    }
   }
 
   const handleSaveFollowUp = async (event) => {
@@ -503,6 +588,13 @@ function FirstTimers() {
               >
                 Archive
               </button>
+              <button
+                className={`cell-tab-btn${listTab === 'attendance' ? ' active' : ''}`}
+                type="button"
+                onClick={() => setListTab('attendance')}
+              >
+                Attendance
+              </button>
             </div>
             <div className="mobile-sticky-actions">
               <button className="btn btn-success" type="button" onClick={() => setShowAddFirstTimer(true)}>
@@ -618,6 +710,97 @@ function FirstTimers() {
                             Unarchive
                           </button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : listTab === 'attendance' ? (
+            <div className="table-container">
+              <div className="section-header" style={{ marginBottom: 12 }}>
+                <h3 style={{ margin: 0 }}>First-Timers Attendance Overview</h3>
+              </div>
+              <form className="form-grid" onSubmit={handleCreateService} style={{ marginBottom: 12 }}>
+                <div className="form-group">
+                  <label>Service Name</label>
+                  <input
+                    className="form-control"
+                    value={serviceForm.serviceName}
+                    onChange={(e) => setServiceForm((prev) => ({ ...prev, serviceName: e.target.value }))}
+                    placeholder="Sunday Service"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={serviceForm.serviceDate}
+                    onChange={(e) => setServiceForm((prev) => ({ ...prev, serviceDate: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Time</label>
+                  <input
+                    type="time"
+                    className="form-control"
+                    value={serviceForm.serviceTime}
+                    onChange={(e) => setServiceForm((prev) => ({ ...prev, serviceTime: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group" style={{ alignSelf: 'end' }}>
+                  <button className="btn btn-success" type="submit">
+                    Create Service
+                  </button>
+                </div>
+              </form>
+
+              <div className="form-group" style={{ maxWidth: 380 }}>
+                <label>Select Service</label>
+                <select
+                  className="form-control"
+                  value={selectedServiceId}
+                  onChange={(e) => setSelectedServiceId(e.target.value)}
+                >
+                  <option value="">Select service</option>
+                  {attendanceServices.map((svc) => (
+                    <option key={svc.id} value={svc.id}>
+                      {svc.serviceName} - {formatDate(svc.serviceDate)} {svc.serviceTime ? formatTime(`1970-01-01T${svc.serviceTime}`) : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <table className="mobile-grid-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Mobile</th>
+                    <th>Present</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!selectedServiceId && (
+                    <tr>
+                      <td colSpan="3" style={{ textAlign: 'center', padding: '24px' }}>Create or select a service to mark attendance.</td>
+                    </tr>
+                  )}
+                  {selectedServiceId && attendanceRows.length === 0 && (
+                    <tr>
+                      <td colSpan="3" style={{ textAlign: 'center', padding: '24px' }}>No first-timers found.</td>
+                    </tr>
+                  )}
+                  {selectedServiceId && attendanceRows.map((row) => (
+                    <tr key={row.firstTimerId}>
+                      <td data-label="Name">{row.title ? `${row.title} ` : ''}{row.name || '-'}</td>
+                      <td data-label="Mobile">{row.mobile || '-'}</td>
+                      <td data-label="Present">
+                        <input
+                          type="checkbox"
+                          checked={!!row.present}
+                          onChange={(e) => toggleAttendance(row, e.target.checked)}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -1017,27 +1200,27 @@ function FirstTimers() {
                     <thead>
                       <tr>
                         <th>Date</th>
-                        <th>Meeting</th>
+                        <th>Service</th>
+                        <th>Time</th>
                         <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {Array.from({ length: 6 }).map((_, idx) => {
-                        const states = ['Present', 'Absent']
-                        const state = states[(Number(selectedFirstTimer?.id || 0) + idx) % 2]
-                        const dt = new Date()
-                        dt.setDate(dt.getDate() - idx * 7)
-                        return (
-                          <tr key={`att-${idx}`}>
-                            <td data-label="Date">{dt.toLocaleDateString()}</td>
-                            <td data-label="Meeting">Weekly Meeting</td>
-                            <td data-label="Status">{state}</td>
-                          </tr>
-                        )
-                      })}
+                      {individualAttendance.length === 0 && (
+                        <tr>
+                          <td colSpan="4" style={{ textAlign: 'center', padding: '24px' }}>No attendance records yet.</td>
+                        </tr>
+                      )}
+                      {individualAttendance.map((record) => (
+                        <tr key={`${record.serviceId}-${record.serviceDate}`}>
+                          <td data-label="Date">{formatDate(record.serviceDate)}</td>
+                          <td data-label="Service">{record.serviceName || '-'}</td>
+                          <td data-label="Time">{record.serviceTime ? formatTime(`1970-01-01T${record.serviceTime}`) : '-'}</td>
+                          <td data-label="Status">{record.present ? 'Present' : 'Absent'}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
-                  <small className="foundation-updated-at">Attendance is placeholder data for now.</small>
                 </div>
               )}
             </>

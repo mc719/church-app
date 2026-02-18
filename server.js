@@ -841,6 +841,28 @@ async function createNotification({ title, message, type = "info", userId = null
      WHERE date_of_birth IS NOT NULL
        AND (dob_month IS NULL OR dob_day IS NULL)`
   );
+
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS first_timer_services (
+       id SERIAL PRIMARY KEY,
+       service_name TEXT NOT NULL,
+       service_date DATE NOT NULL,
+       service_time TIME,
+       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+     )`
+  );
+
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS first_timer_attendance (
+       id SERIAL PRIMARY KEY,
+       service_id INTEGER NOT NULL REFERENCES first_timer_services(id) ON DELETE CASCADE,
+       first_timer_id INTEGER NOT NULL REFERENCES first_timers(id) ON DELETE CASCADE,
+       present BOOLEAN NOT NULL DEFAULT FALSE,
+       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       UNIQUE(service_id, first_timer_id)
+     )`
+  );
 }
 
 async function ensureUserProfilesSchema() {
@@ -3723,6 +3745,132 @@ app.delete("/api/follow-ups/:id", requireAuth, requireStaff, async (req, res) =>
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to delete follow-up record" });
+  }
+});
+
+// FIRST-TIMER ATTENDANCE SERVICES (PROTECTED)
+app.get("/api/first-timers/attendance/services", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT s.id::text as id,
+              s.service_name as "serviceName",
+              s.service_date as "serviceDate",
+              s.service_time as "serviceTime",
+              s.created_at as "createdAt",
+              COUNT(a.id)::int as "markedCount",
+              COALESCE(SUM(CASE WHEN a.present THEN 1 ELSE 0 END), 0)::int as "presentCount"
+       FROM first_timer_services s
+       LEFT JOIN first_timer_attendance a ON a.service_id = s.id
+       GROUP BY s.id
+       ORDER BY s.service_date DESC, s.service_time DESC NULLS LAST, s.id DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load attendance services" });
+  }
+});
+
+app.post("/api/first-timers/attendance/services", requireAuth, requireStaff, async (req, res) => {
+  try {
+    if (!validateWritePayload(req, res, ["serviceName", "serviceDate", "serviceTime"])) return;
+    const serviceName = safeString(req.body?.serviceName, 180);
+    const serviceDate = safeString(req.body?.serviceDate, 40);
+    const serviceTime = safeString(req.body?.serviceTime, 40);
+    if (!serviceName || !serviceDate) {
+      return res.status(400).json({ error: "Service name and date are required" });
+    }
+    const result = await pool.query(
+      `INSERT INTO first_timer_services (service_name, service_date, service_time, created_by)
+       VALUES ($1,$2,$3,$4)
+       RETURNING id::text as id,
+                 service_name as "serviceName",
+                 service_date as "serviceDate",
+                 service_time as "serviceTime",
+                 created_at as "createdAt"`,
+      [serviceName, serviceDate, serviceTime || null, req.user?.userId || null]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create attendance service" });
+  }
+});
+
+app.get("/api/first-timers/attendance", requireAuth, async (req, res) => {
+  try {
+    const serviceId = safeString(req.query?.serviceId, 40);
+    if (!serviceId) {
+      return res.status(400).json({ error: "serviceId is required" });
+    }
+    const result = await pool.query(
+      `SELECT ft.id::text as "firstTimerId",
+              ft.title,
+              ft.name,
+              ft.mobile,
+              COALESCE(a.present, FALSE) as present
+       FROM first_timers ft
+       LEFT JOIN first_timer_attendance a
+         ON a.first_timer_id = ft.id
+        AND a.service_id = $1
+       WHERE COALESCE(ft.archived, FALSE) = FALSE
+       ORDER BY ft.name ASC`,
+      [serviceId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load first-timer attendance" });
+  }
+});
+
+app.put("/api/first-timers/attendance", requireAuth, requireStaff, async (req, res) => {
+  try {
+    if (!validateWritePayload(req, res, ["serviceId", "firstTimerId", "present"])) return;
+    const serviceId = safeString(req.body?.serviceId, 40);
+    const firstTimerId = safeString(req.body?.firstTimerId, 40);
+    const present = !!req.body?.present;
+    if (!serviceId || !firstTimerId) {
+      return res.status(400).json({ error: "serviceId and firstTimerId are required" });
+    }
+    const result = await pool.query(
+      `INSERT INTO first_timer_attendance (service_id, first_timer_id, present, updated_at)
+       VALUES ($1,$2,$3,NOW())
+       ON CONFLICT (service_id, first_timer_id) DO UPDATE
+         SET present = EXCLUDED.present,
+             updated_at = NOW()
+       RETURNING service_id::text as "serviceId",
+                 first_timer_id::text as "firstTimerId",
+                 present,
+                 updated_at as "updatedAt"`,
+      [serviceId, firstTimerId, present]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update attendance" });
+  }
+});
+
+app.get("/api/first-timers/:id/attendance", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT s.id::text as "serviceId",
+              s.service_name as "serviceName",
+              s.service_date as "serviceDate",
+              s.service_time as "serviceTime",
+              COALESCE(a.present, FALSE) as present
+       FROM first_timer_services s
+       LEFT JOIN first_timer_attendance a
+         ON a.service_id = s.id
+        AND a.first_timer_id = $1
+       ORDER BY s.service_date DESC, s.service_time DESC NULLS LAST, s.id DESC`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load individual attendance" });
   }
 });
 
