@@ -1129,7 +1129,17 @@ function FirstTimers() {
                   </div>
                   <div className="detail-row">
                     <span>Date Joined</span>
-                    <strong>{formatDate(selectedFirstTimer.joined_date || selectedFirstTimer.created_at)}</strong>
+                    <input
+                      type="date"
+                      className="form-control inline-input"
+                      value={
+                        inlineEdits[selectedFirstTimer.id]?.dateJoined ??
+                        selectedFirstTimer.dateJoined ??
+                        selectedFirstTimer.joined_date ??
+                        ''
+                      }
+                      onChange={(e) => updateInline(selectedFirstTimer.id, 'dateJoined', e.target.value)}
+                    />
                   </div>
                   <div className="detail-row">
                     <span>Invited By</span>
