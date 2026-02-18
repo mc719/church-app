@@ -174,11 +174,12 @@ function FirstTimers() {
   }, [followUps, selectedFirstTimer])
 
   const statusFallback = (item) => {
-    const current = String(item?.status || '').trim().toLowerCase()
+    const current = String(item?.category || item?.status || '').trim().toLowerCase()
     if (current === 'green' || current === 'amber' || current === 'red') return current
-    const idNum = Number(item?.id || 0)
-    const palette = ['green', 'amber', 'red']
-    return palette[Math.abs(idNum) % palette.length]
+    const monthlyPresentCount = Number(item?.monthlyPresentCount || 0)
+    if (monthlyPresentCount >= 3) return 'green'
+    if (monthlyPresentCount >= 2) return 'amber'
+    return 'red'
   }
 
   useEffect(() => {
@@ -669,7 +670,7 @@ function FirstTimers() {
                   <tr>
                     <th>Name</th>
                     <th>Mobile</th>
-                    <th>Status</th>
+                    <th>Cat</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -683,7 +684,7 @@ function FirstTimers() {
                     <tr key={item.id} className={`first-timer-status-${statusFallback(item)}`}>
                       <td data-label="Name">{item.title ? `${item.title} ` : ''}{item.name || ''}</td>
                       <td data-label="Mobile">{item.mobile || '-'}</td>
-                      <td data-label="Status">{statusFallback(item)}</td>
+                      <td data-label="Cat">{statusFallback(item)}</td>
                       <td data-label="Actions">
                         <div className="action-buttons">
                           <button

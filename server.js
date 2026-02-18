@@ -2993,10 +2993,24 @@ app.get("/api/first-timers", requireAuth, async (req, res) => {
               ft.department_id::text as "departmentId",
               d.name as "departmentName",
               ft.cell_id::text as "cellId",
-              c.name as "cellName"
+              c.name as "cellName",
+              COALESCE(att.present_count, 0)::int as "monthlyPresentCount",
+              CASE
+                WHEN COALESCE(att.present_count, 0) >= 3 THEN 'green'
+                WHEN COALESCE(att.present_count, 0) >= 2 THEN 'amber'
+                ELSE 'red'
+              END as category
        FROM first_timers ft
        LEFT JOIN cells c ON c.id = ft.cell_id
        LEFT JOIN departments d ON d.id = ft.department_id
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*)::int as present_count
+         FROM first_timer_attendance a
+         JOIN first_timer_services s ON s.id = a.service_id
+         WHERE a.first_timer_id = ft.id
+           AND a.present = TRUE
+           AND date_trunc('month', s.service_date::timestamp) = date_trunc('month', CURRENT_DATE::timestamp)
+       ) att ON TRUE
        ${whereSql}
        ORDER BY ft.date_joined DESC NULLS LAST, ft.id DESC`,
       params
