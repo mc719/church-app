@@ -248,8 +248,8 @@ function FirstTimers() {
     const token = localStorage.getItem('token')
     if (!token) return
     const payload = { action }
-    if (action === 'assignCell') payload.cellId = decisionForm.cellId || null
-    if (action === 'assignDepartment') payload.departmentId = decisionForm.departmentId || null
+    if (action === 'assignCell' || action === 'addToMembers') payload.cellId = decisionForm.cellId || null
+    if (action === 'assignDepartment' || action === 'addToMembers') payload.departmentId = decisionForm.departmentId || null
     const res = await fetch(`${API_BASE}/first-timers/${decidingFirstTimer.id}/decision`, {
       method: 'PUT',
       headers: {
@@ -1344,6 +1344,12 @@ function FirstTimers() {
                 <label>Assign Foundation School</label>
                 <button className="btn btn-success" type="button" onClick={() => applyDecision('assignFoundationSchool')}>
                   Share with FOUNDATION SCHOOL
+                </button>
+              </div>
+              <div className="form-group">
+                <label>Add to Members</label>
+                <button className="btn btn-primary" type="button" onClick={() => applyDecision('addToMembers')}>
+                  Add to Members
                 </button>
               </div>
               {decidingFirstTimer.archived && (

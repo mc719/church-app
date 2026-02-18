@@ -3220,15 +3220,6 @@ app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", wind
       ]
     );
 
-    // If a cell is selected, add to members list as First-Timer
-    if (cellId) {
-      await pool.query(
-        `INSERT INTO members (cell_id, title, name, gender, mobile, email, role, joined_date, is_first_timer)
-         VALUES ($1,$2,$3,$4,$5,$6,$7, NOW(), TRUE)`,
-        [cellId, title || "First-Timer", name, gender || "Unknown", mobile || "", null, "First-Timer"]
-      );
-    }
-
     try {
       await syncProfileByEmail({
         email: result.rows[0].email,
@@ -3474,7 +3465,7 @@ app.put("/api/first-timers/:id/decision", requireAuth, requireStaff, async (req,
     }
 
     const existing = await pool.query(
-      `SELECT id::text as id, name, email, mobile, title, gender, source, cell_id::text as "cellId"
+      `SELECT id::text as id, name, surname, email, mobile, title, gender, source, cell_id::text as "cellId"
        FROM first_timers
        WHERE id = $1
        LIMIT 1`,
@@ -3484,6 +3475,7 @@ app.put("/api/first-timers/:id/decision", requireAuth, requireStaff, async (req,
       return res.status(404).json({ error: "First-timer not found" });
     }
     const firstTimer = existing.rows[0];
+    const firstTimerFullName = [firstTimer.name, firstTimer.surname].filter(Boolean).join(" ").trim() || firstTimer.name || "";
 
     let updateSql = "";
     let updateParams = [];
@@ -3521,22 +3513,14 @@ app.put("/api/first-timers/:id/decision", requireAuth, requireStaff, async (req,
                        graduated_year = NULL
                    WHERE id = $1`;
       updateParams = [req.params.id];
-    } else {
-      return res.status(400).json({ error: "Unsupported action" });
-    }
-
-    await pool.query(updateSql, updateParams);
-
-    if (action === "assignCell" || action === "assignDepartment") {
-      const targetCellId = action === "assignCell" ? cellId : (firstTimer.cellId || null);
-      const targetDepartmentId = action === "assignDepartment" ? departmentId : null;
+    } else if (action === "addToMembers") {
       const existingMember = await pool.query(
         `SELECT id
          FROM members
-         WHERE LOWER(name) = LOWER($1)
-           AND mobile IS NOT DISTINCT FROM $2
+         WHERE (LOWER(email) = LOWER($1) AND $1 <> '')
+            OR (LOWER(name) = LOWER($2) AND mobile IS NOT DISTINCT FROM $3)
          LIMIT 1`,
-        [firstTimer.name || "", firstTimer.mobile || null]
+        [firstTimer.email || "", firstTimerFullName, firstTimer.mobile || null]
       );
 
       if (existingMember.rows.length) {
@@ -3544,19 +3528,22 @@ app.put("/api/first-timers/:id/decision", requireAuth, requireStaff, async (req,
           `UPDATE members
            SET cell_id = COALESCE($1, cell_id),
                department_id = COALESCE($2, department_id),
-               role = COALESCE(role, 'First-Timer')
-           WHERE id = $3`,
-          [targetCellId, targetDepartmentId, existingMember.rows[0].id]
+               title = COALESCE($3, title),
+               gender = COALESCE($4, gender),
+               role = COALESCE($5, role),
+               is_first_timer = TRUE
+           WHERE id = $6`,
+          [cellId || firstTimer.cellId || null, departmentId || null, firstTimer.title || null, firstTimer.gender || null, "First-Timer", existingMember.rows[0].id]
         );
       } else {
         await pool.query(
           `INSERT INTO members (cell_id, department_id, title, name, gender, mobile, email, role, joined_date, is_first_timer)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),TRUE)`,
           [
-            targetCellId || null,
-            targetDepartmentId || null,
+            cellId || firstTimer.cellId || null,
+            departmentId || null,
             firstTimer.title || null,
-            firstTimer.name || "",
+            firstTimerFullName,
             firstTimer.gender || null,
             firstTimer.mobile || null,
             firstTimer.email || null,
@@ -3564,7 +3551,13 @@ app.put("/api/first-timers/:id/decision", requireAuth, requireStaff, async (req,
           ]
         );
       }
+      updateSql = `UPDATE first_timers SET id = id WHERE id = $1`;
+      updateParams = [req.params.id];
+    } else {
+      return res.status(400).json({ error: "Unsupported action" });
     }
+
+    await pool.query(updateSql, updateParams);
 
     if (action === "graduate" || action === "ungraduate") {
       await pool.query(
