@@ -784,6 +784,44 @@ async function createNotification({ title, message, type = "info", userId = null
   return result.rows[0];
 }
 
+const notificationMenuAliases = {
+  "/cells": ["cells"],
+  "/members": ["members"],
+  "/reports": ["reports"],
+  "/birthdays": ["birthdays"],
+  "/departments": ["departments"],
+  "/foundation-school": ["foundation-school", "foundationSchool"],
+  "/first-timers": ["first-timers", "firstTimers"]
+};
+
+function normalizeRestrictedMenus(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
+function isMenuBlockedForUser(restrictedMenus, menuPath) {
+  const list = normalizeRestrictedMenus(restrictedMenus);
+  if (!list.length) return false;
+  const aliasList = notificationMenuAliases[menuPath] || [];
+  return list.includes(menuPath) || aliasList.some((alias) => list.includes(alias));
+}
+
+async function createMenuScopedNotification({ menuPath, title, message, type = "info" }) {
+  if (!menuPath) return [];
+  const usersResult = await pool.query(
+    `SELECT id::text as id, restricted_menus as "restrictedMenus"
+     FROM users
+     WHERE COALESCE(status, TRUE) = TRUE`
+  );
+  const recipients = usersResult.rows
+    .filter((user) => !isMenuBlockedForUser(user.restrictedMenus, menuPath))
+    .map((user) => user.id);
+  for (const userId of recipients) {
+    await createNotification({ title, message, type, userId });
+  }
+  return recipients;
+}
+
   async function ensureFirstTimerSchema() {
     await pool.query(
       `ALTER TABLE first_timers
@@ -1945,7 +1983,8 @@ app.post("/api/cells", rateLimit({ keyPrefix: "cells-create", windowMs: 60_000, 
 
     const cell = result.rows[0];
     try {
-      await createNotification({
+      await createMenuScopedNotification({
+        menuPath: "/cells",
         title: "New Cell Created",
         message: `Cell "${cell.name}" was created.`,
         type: "info"
@@ -2523,7 +2562,8 @@ app.put("/api/cells/:id", requireAuth, requireStaff, async (req, res) => {
 
     const cell = result.rows[0];
     try {
-      await createNotification({
+      await createMenuScopedNotification({
+        menuPath: "/cells",
         title: "Cell Updated",
         message: `Cell "${cell.name}" was updated.`,
         type: "info"
@@ -2691,7 +2731,8 @@ app.post("/api/members", rateLimit({ keyPrefix: "members-create", windowMs: 60_0
     }
 
     try {
-      await createNotification({
+      await createMenuScopedNotification({
+        menuPath: "/members",
         title: "New Member Added",
         message: `Member "${member.name}" was added.`,
         type: "info"
@@ -2824,7 +2865,8 @@ app.put("/api/members/:id", requireAuth, requireStaff, async (req, res) => {
     }
 
     try {
-      await createNotification({
+      await createMenuScopedNotification({
+        menuPath: "/members",
         title: "Member Updated",
         message: `Member "${member.name}" was updated.`,
         type: "info"
@@ -4102,7 +4144,8 @@ app.post("/api/reports", requireAuth, requireStaff, async (req, res) => {
 
     const report = result.rows[0];
     try {
-      await createNotification({
+      await createMenuScopedNotification({
+        menuPath: "/reports",
         title: "New Report Added",
         message: "A new report was added.",
         type: "info"
@@ -4214,7 +4257,8 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
       );
       if (!notified.rows.length) {
         const names = todaysBirthdays.map(m => m.name).join(", ");
-        await createNotification({
+        await createMenuScopedNotification({
+          menuPath: "/birthdays",
           title: "Birthdays Today",
           message: `Today is the birthday of: ${names}.`,
           type: "success"
@@ -4253,7 +4297,8 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
         day: "2-digit",
         month: "short"
       });
-      await createNotification({
+      await createMenuScopedNotification({
+        menuPath: "/birthdays",
         title: "Upcoming Birthday",
         message: `${item.member.name}'s birthday is on ${dateLabel}.`,
         type: "info"
@@ -4275,7 +4320,7 @@ app.get("/api/birthdays/summary", requireAuth, async (req, res) => {
               created_at as "createdAt",
               read_at as "readAt"
        FROM notifications
-       WHERE user_id IS NULL OR user_id = $1
+       WHERE user_id = $1
        ORDER BY created_at DESC
        LIMIT 200`,
       [req.user.userId]
@@ -4327,7 +4372,8 @@ app.put("/api/reports/:id", requireAuth, requireStaff, async (req, res) => {
 
     const report = result.rows[0];
     try {
-      await createNotification({
+      await createMenuScopedNotification({
+        menuPath: "/reports",
         title: "Report Updated",
         message: "A report was updated.",
         type: "info"
@@ -4355,7 +4401,7 @@ app.get("/api/notifications", requireAuth, async (req, res) => {
               created_at as "createdAt",
               read_at as "readAt"
        FROM notifications
-       WHERE user_id IS NULL OR user_id = $1
+       WHERE user_id = $1
        ORDER BY created_at DESC
        LIMIT 200`,
       [req.user.userId]
@@ -4369,15 +4415,13 @@ app.get("/api/notifications", requireAuth, async (req, res) => {
 
 app.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
   try {
-    const role = String(req.user.role || "").toLowerCase();
-    const canManageGlobal = role === "superuser" || role === "admin";
     const result = await pool.query(
       `UPDATE notifications
        SET read_at = NOW()
        WHERE id = $1
-         AND (user_id = $2 OR ($3 = TRUE AND user_id IS NULL))
+         AND user_id = $2
        RETURNING id::text as id`,
-      [req.params.id, req.user.userId, canManageGlobal]
+      [req.params.id, req.user.userId]
     );
 
     if (result.rows.length === 0) {
@@ -4393,15 +4437,13 @@ app.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
 
 app.put("/api/notifications/:id/unread", requireAuth, async (req, res) => {
   try {
-    const role = String(req.user.role || "").toLowerCase();
-    const canManageGlobal = role === "superuser" || role === "admin";
     const result = await pool.query(
       `UPDATE notifications
        SET read_at = NULL
        WHERE id = $1
-         AND (user_id = $2 OR ($3 = TRUE AND user_id IS NULL))
+         AND user_id = $2
        RETURNING id::text as id`,
-      [req.params.id, req.user.userId, canManageGlobal]
+      [req.params.id, req.user.userId]
     );
 
     if (result.rows.length === 0) {
@@ -4417,14 +4459,12 @@ app.put("/api/notifications/:id/unread", requireAuth, async (req, res) => {
 
 app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
   try {
-    const role = String(req.user.role || "").toLowerCase();
-    const canManageGlobal = role === "superuser" || role === "admin";
     await pool.query(
       `UPDATE notifications
        SET read_at = NOW()
        WHERE read_at IS NULL
-         AND (user_id = $1 OR ($2 = TRUE AND user_id IS NULL))`,
-      [req.user.userId, canManageGlobal]
+         AND user_id = $1`,
+      [req.user.userId]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -4443,15 +4483,9 @@ app.delete("/api/notifications", requireAuth, async (req, res) => {
     const result = await pool.query(
       `DELETE FROM notifications
        WHERE id::text = ANY($1)
-         AND (
-           user_id = $2
-           OR (
-             user_id IS NULL
-             AND ($3 = 'superuser' OR $3 = 'admin')
-           )
-         )
+         AND user_id = $2
        RETURNING id::text as id`,
-      [list, req.user.userId, String(req.user.role || "").toLowerCase()]
+      [list, req.user.userId]
     );
     res.json({ deleted: result.rows.map(r => r.id) });
   } catch (err) {
