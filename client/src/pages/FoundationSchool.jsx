@@ -686,63 +686,6 @@ function FoundationSchool() {
                 </div>
               </div>
 
-              <div className="foundation-tracker-card">
-                <div className="section-header" style={{ marginTop: 0 }}>
-                  <h3>Individual Class Tracking</h3>
-                  <button type="button" className="btn btn-success" onClick={saveSelectedTracking}>
-                    Save Tracking
-                  </button>
-                </div>
-                <div className="table-container">
-                  <table className="mobile-grid-table">
-                    <thead>
-                      <tr>
-                        <th>Class</th>
-                        <th>Present (In Progress)</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {TRACKING_ROWS.map((className) => {
-                        const stageIndex = CLASS_OPTIONS.indexOf(className)
-                        const isCompleted = currentStageIndex > -1 && stageIndex < currentStageIndex
-                        const graduationDate = (editRows[selectedItem.id]?.graduationDate ?? selectedItem.graduationDate) || ''
-                        const graduationPassed = graduationDate ? new Date(graduationDate) <= new Date() : false
-                        const graduateChecked = !!tracker.presence['Graduate']
-                        const status = className === 'Graduate'
-                          ? (graduateChecked ? (graduationPassed ? 'Completed' : 'In Progress') : '-')
-                          : (isCompleted ? 'Completed' : tracker.presence[className] ? 'In Progress' : '-')
-                        return (
-                        <tr key={className}>
-                          <td data-label="Class">{className}</td>
-                          <td data-label="Present (In Progress)">
-                            <input
-                              type="checkbox"
-                              checked={!!tracker.presence[className]}
-                              onChange={(e) => setClassTracking(className, e.target.checked)}
-                            />
-                          </td>
-                          <td data-label="Status">
-                            {status}
-                          </td>
-                        </tr>
-                      )})}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="form-group">
-                  <label>Tracking Notes</label>
-                  <textarea
-                    className="form-control"
-                    rows="3"
-                    value={tracker.notes || ''}
-                    onChange={(e) => setTracker((prev) => ({ ...prev, notes: e.target.value }))}
-                  />
-                </div>
-                <small className="foundation-updated-at">
-                  Last tracking update: {tracker.updatedAt ? new Date(tracker.updatedAt).toLocaleString() : 'Not set'}
-                </small>
-              </div>
             </>
           )}
         </div>
