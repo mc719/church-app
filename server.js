@@ -3501,12 +3501,14 @@ app.put("/api/first-timers/:id", requireAuth, requireStaff, async (req, res) => 
     });
 
     if (typeof isGraduate === "boolean") {
+      const firstTimerFullName = [result.rows[0].name, result.rows[0].surname].filter(Boolean).join(" ").trim() || result.rows[0].name || "";
       await pool.query(
         `UPDATE members
          SET foundation_school = $1
          WHERE (LOWER(email) = LOWER($2))
-            OR (LOWER(name) = LOWER($3) AND mobile IS NOT DISTINCT FROM $4)`,
-        [isGraduate, result.rows[0].email || "", result.rows[0].name || "", result.rows[0].mobile || null]
+            OR (LOWER(name) = LOWER($3) AND mobile IS NOT DISTINCT FROM $4)
+            OR (LOWER(name) = LOWER($5) AND mobile IS NOT DISTINCT FROM $4)`,
+        [isGraduate, result.rows[0].email || "", firstTimerFullName, result.rows[0].mobile || null, result.rows[0].name || ""]
       );
     }
 
@@ -3625,8 +3627,9 @@ app.put("/api/first-timers/:id/decision", requireAuth, requireStaff, async (req,
         `UPDATE members
          SET foundation_school = $1
          WHERE (LOWER(email) = LOWER($2))
-            OR (LOWER(name) = LOWER($3) AND mobile IS NOT DISTINCT FROM $4)`,
-        [action === "graduate", firstTimer.email || "", firstTimer.name || "", firstTimer.mobile || null]
+            OR (LOWER(name) = LOWER($3) AND mobile IS NOT DISTINCT FROM $4)
+            OR (LOWER(name) = LOWER($5) AND mobile IS NOT DISTINCT FROM $4)`,
+        [action === "graduate", firstTimer.email || "", firstTimerFullName, firstTimer.mobile || null, firstTimer.name || ""]
       );
     }
 
