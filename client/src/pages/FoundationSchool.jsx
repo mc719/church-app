@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './FoundationSchool.css'
 
 const CLASS_OPTIONS = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Exam']
+const TRACKING_ROWS = [...CLASS_OPTIONS, 'Graduate']
 const EXAM_OPTIONS = ['Not Started', 'In Progress', 'Passed', 'Resit']
 const TRACKABLE_CLASSES = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7']
 const TITLE_OPTIONS = ['Brother', 'Sister', 'Dcn', 'Dcns', 'Pastor']
@@ -15,7 +16,7 @@ function normalizeTracking(value) {
   const sourcePresence = source.presence && typeof source.presence === 'object' ? source.presence : {}
   const sourceClasses = source.classes && typeof source.classes === 'object' ? source.classes : {}
   const presence = {}
-  CLASS_OPTIONS.forEach((name) => {
+  TRACKING_ROWS.forEach((name) => {
     const legacy = sourceClasses[name] && typeof sourceClasses[name] === 'object' ? sourceClasses[name] : {}
     presence[name] = typeof sourcePresence[name] === 'boolean' ? sourcePresence[name] : !!legacy.completed
   })
@@ -33,6 +34,7 @@ function normalizeTracking(value) {
 
 function FoundationSchool() {
   const [items, setItems] = useState([])
+  const [teachers, setTeachers] = useState([])
   const [cells, setCells] = useState([])
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('students')
@@ -40,6 +42,9 @@ function FoundationSchool() {
   const [selectedId, setSelectedId] = useState('')
   const [tracker, setTracker] = useState(() => normalizeTracking({}))
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showTeacherModal, setShowTeacherModal] = useState(false)
+  const [teacherForm, setTeacherForm] = useState({ id: '', title: 'Brother', name: '', mobile: '', email: '', assignedClasses: [] })
+  const [deletingTeacherId, setDeletingTeacherId] = useState('')
   const [newStudent, setNewStudent] = useState({
     title: 'Brother',
     name: '',
@@ -85,25 +90,26 @@ function FoundationSchool() {
     setCells(Array.isArray(data) ? data : [])
   }
 
+  const loadTeachers = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch('/api/foundation-teachers', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    setTeachers(Array.isArray(data) ? data : [])
+  }
+
   useEffect(() => {
     loadData().catch(() => setItems([]))
     loadCells().catch(() => setCells([]))
+    loadTeachers().catch(() => setTeachers([]))
   }, [])
-
-  const classCounts = useMemo(() => {
-    const counts = new Map(CLASS_OPTIONS.map((name) => [name, 0]))
-    items.forEach((item) => {
-      const tracking = normalizeTracking(item.foundationTracking)
-      const currentStage = tracking.currentStage || item.foundationClass || 'Class 1'
-      if (tracking.presence[currentStage]) {
-        counts.set(currentStage, (counts.get(currentStage) || 0) + 1)
-      }
-    })
-    return counts
-  }, [items])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
+    if (tab === 'teachers') return []
     const source = items.filter((item) => (tab === 'graduates' ? !!item.isGraduate : !item.isGraduate))
     if (!q) return source
     return source.filter((item) =>
@@ -124,9 +130,29 @@ function FoundationSchool() {
     )
   }, [items, search, tab])
 
+  const filteredTeachers = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return teachers
+    return teachers.filter((teacher) =>
+      [
+        teacher.title,
+        teacher.name,
+        teacher.mobile,
+        teacher.email,
+        ...(Array.isArray(teacher.assignedClasses) ? teacher.assignedClasses : [])
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    )
+  }, [teachers, search])
+
   const selectedItem = useMemo(
-    () => filtered.find((item) => String(item.id) === String(selectedId)) || filtered[0] || null,
-    [filtered, selectedId]
+    () => (tab === 'teachers'
+      ? null
+      : (filtered.find((item) => String(item.id) === String(selectedId)) || filtered[0] || null)),
+    [filtered, selectedId, tab]
   )
 
   useEffect(() => {
@@ -145,7 +171,7 @@ function FoundationSchool() {
     }))
   }
 
-  const saveRow = async (item, trackingValue = null) => {
+  const saveRow = async (item, trackingValue = null, forceFields = null) => {
     const token = localStorage.getItem('token')
     if (!token) return
     const row = editRows[item.id] || {}
@@ -163,12 +189,13 @@ function FoundationSchool() {
       cellId: row.areInCell === 'No' ? null : (row.cellId ?? item.cellId ?? null),
       foundationClass: row.foundationClass ?? item.foundationClass ?? 'Class 1',
       examStatus: row.examStatus ?? item.examStatus ?? 'Not Started',
-      graduationDate: row.graduationDate ?? item.graduationDate ?? null,
+      graduationDate: forceFields?.graduationDate ?? row.graduationDate ?? item.graduationDate ?? null,
       graduatedYear:
-        row.graduationDate
+        forceFields?.graduatedYear ??
+        (row.graduationDate
           ? Number(new Date(row.graduationDate).getFullYear()) || null
-          : (row.graduatedYear ?? item.graduatedYear ?? null),
-      isGraduate: row.isGraduate ?? item.isGraduate ?? false,
+          : (row.graduatedYear ?? item.graduatedYear ?? null)),
+      isGraduate: forceFields?.isGraduate ?? row.isGraduate ?? item.isGraduate ?? false,
       foundationSchool: 'Yes',
       foundationTracking: mergedTracking
     }
@@ -218,15 +245,87 @@ function FoundationSchool() {
       currentStage: (editRows[selectedItem.id]?.foundationClass ?? selectedItem.foundationClass) || tracker.currentStage || 'Class 1',
       updatedAt: new Date().toISOString()
     }
-    await saveRow(selectedItem, nextTracking)
+    const graduationDate = (editRows[selectedItem.id]?.graduationDate ?? selectedItem.graduationDate) || null
+    const graduationDatePassed = graduationDate ? new Date(graduationDate) <= new Date() : false
+    const markedGraduate = !!nextTracking.presence['Graduate']
+    const isGraduate = markedGraduate && graduationDatePassed
+    const graduatedYear = isGraduate && graduationDate ? Number(new Date(graduationDate).getFullYear()) || null : null
+    await saveRow(selectedItem, nextTracking, { graduationDate, isGraduate, graduatedYear })
   }
 
   const setClassTracking = (className, value) => {
+    if (className === 'Graduate') {
+      setTracker((prev) => ({
+        ...prev,
+        presence: { ...prev.presence, Graduate: value }
+      }))
+      return
+    }
     setTracker((prev) => ({
       ...prev,
       currentStage: className,
-      presence: CLASS_OPTIONS.reduce((acc, stage) => ({ ...acc, [stage]: stage === className ? value : false }), {})
+      presence: TRACKING_ROWS.reduce(
+        (acc, stage) => ({ ...acc, [stage]: stage === className ? value : (stage === 'Graduate' ? prev.presence.Graduate : false) }),
+        {}
+      )
     }))
+  }
+
+  const openAddTeacher = () => {
+    setTeacherForm({ id: '', title: 'Brother', name: '', mobile: '', email: '', assignedClasses: [] })
+    setShowTeacherModal(true)
+  }
+
+  const openEditTeacher = (teacher) => {
+    setTeacherForm({
+      id: String(teacher.id),
+      title: teacher.title || 'Brother',
+      name: teacher.name || '',
+      mobile: teacher.mobile || '',
+      email: teacher.email || '',
+      assignedClasses: Array.isArray(teacher.assignedClasses) ? teacher.assignedClasses : []
+    })
+    setShowTeacherModal(true)
+  }
+
+  const saveTeacher = async () => {
+    const token = localStorage.getItem('token')
+    if (!token || !teacherForm.name.trim()) return
+    const method = teacherForm.id ? 'PUT' : 'POST'
+    const url = teacherForm.id ? `/api/foundation-teachers/${teacherForm.id}` : '/api/foundation-teachers'
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        title: teacherForm.title,
+        name: teacherForm.name.trim(),
+        mobile: teacherForm.mobile.trim(),
+        email: teacherForm.email.trim(),
+        assignedClasses: teacherForm.assignedClasses
+      })
+    })
+    if (!res.ok) return
+    const saved = await res.json()
+    setTeachers((prev) =>
+      teacherForm.id ? prev.map((item) => (String(item.id) === String(saved.id) ? saved : item)) : [saved, ...prev]
+    )
+    setShowTeacherModal(false)
+  }
+
+  const deleteTeacher = async () => {
+    if (!deletingTeacherId) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const res = await fetch(`/api/foundation-teachers/${deletingTeacherId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return
+    setTeachers((prev) => prev.filter((item) => String(item.id) !== String(deletingTeacherId)))
+    setDeletingTeacherId('')
   }
 
   const saveNewStudent = async () => {
@@ -300,18 +399,17 @@ function FoundationSchool() {
         <button className={`cell-tab-btn${tab === 'graduates' ? ' active' : ''}`} type="button" onClick={() => setTab('graduates')}>
           Graduates
         </button>
-        <button type="button" className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setShowAddModal(true)}>
-          Add New Student
+        <button className={`cell-tab-btn${tab === 'teachers' ? ' active' : ''}`} type="button" onClick={() => setTab('teachers')}>
+          Teachers
         </button>
-      </div>
-
-      <div className="foundation-class-grid">
-        {CLASS_OPTIONS.map((cls) => (
-          <div key={cls} className="foundation-class-card">
-            <div className="foundation-class-name">{cls}</div>
-            <div className="foundation-class-count">{classCounts.get(cls) || 0} Students</div>
-          </div>
-        ))}
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => (tab === 'teachers' ? openAddTeacher() : setShowAddModal(true))}
+        >
+          {tab === 'teachers' ? 'Add Teacher' : 'Add New Student'}
+        </button>
       </div>
 
       <div className="search-box" style={{ marginBottom: 12 }}>
@@ -323,6 +421,50 @@ function FoundationSchool() {
         />
       </div>
 
+      {tab === 'teachers' ? (
+        <div className="table-container">
+          <table className="mobile-grid-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Mobile</th>
+                <th>Email</th>
+                <th>Assigned Classes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTeachers.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '28px' }}>No teachers added yet.</td>
+                </tr>
+              )}
+              {filteredTeachers.map((teacher) => (
+                <tr key={teacher.id}>
+                  <td data-label="Name">{`${teacher.title ? `${teacher.title} ` : ''}${teacher.name || ''}`.trim()}</td>
+                  <td data-label="Mobile">{teacher.mobile || '-'}</td>
+                  <td data-label="Email">{teacher.email || '-'}</td>
+                  <td data-label="Assigned Classes">
+                    {Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.length
+                      ? teacher.assignedClasses.join(', ')
+                      : '-'}
+                  </td>
+                  <td data-label="Actions">
+                    <div className="action-buttons">
+                      <button type="button" className="action-btn edit-btn" onClick={() => openEditTeacher(teacher)}>
+                        Edit
+                      </button>
+                      <button type="button" className="action-btn delete-btn" onClick={() => setDeletingTeacherId(String(teacher.id))}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
       <div className="foundation-tracker-layout">
         <div className="foundation-student-list">
           {filtered.length === 0 && (
@@ -340,7 +482,9 @@ function FoundationSchool() {
                   setTracker(normalizeTracking(item.foundationTracking))
                 }}
               >
-                <div className="foundation-student-name">{nameLabel(item)}</div>
+                <div className="foundation-student-name">
+                  {nameLabel(item)} {item.isGraduate ? <span className="role-pill">Graduate</span> : null}
+                </div>
                 <div className="foundation-student-meta">
                   <span>{item.foundationClass || 'Class 1'}</span>
                   <span>{item.examStatus || 'Not Started'}</span>
@@ -357,7 +501,7 @@ function FoundationSchool() {
             <>
               <div className="foundation-detail-header">
                 <div>
-                  <h3>{nameLabel(selectedItem)}</h3>
+                  <h3>{nameLabel(selectedItem)} {selectedItem.isGraduate ? <span className="role-pill">Graduate</span> : null}</h3>
                   <p>{selectedItem.mobile || '-'} {selectedItem.cellName ? `| ${selectedItem.cellName}` : ''}</p>
                 </div>
                 <div className="action-buttons">
@@ -559,9 +703,15 @@ function FoundationSchool() {
                       </tr>
                     </thead>
                     <tbody>
-                      {CLASS_OPTIONS.map((className) => {
+                      {TRACKING_ROWS.map((className) => {
                         const stageIndex = CLASS_OPTIONS.indexOf(className)
                         const isCompleted = currentStageIndex > -1 && stageIndex < currentStageIndex
+                        const graduationDate = (editRows[selectedItem.id]?.graduationDate ?? selectedItem.graduationDate) || ''
+                        const graduationPassed = graduationDate ? new Date(graduationDate) <= new Date() : false
+                        const graduateChecked = !!tracker.presence['Graduate']
+                        const status = className === 'Graduate'
+                          ? (graduateChecked ? (graduationPassed ? 'Completed' : 'In Progress') : '-')
+                          : (isCompleted ? 'Completed' : tracker.presence[className] ? 'In Progress' : '-')
                         return (
                         <tr key={className}>
                           <td data-label="Class">{className}</td>
@@ -573,7 +723,7 @@ function FoundationSchool() {
                             />
                           </td>
                           <td data-label="Status">
-                            {isCompleted ? 'Completed' : tracker.presence[className] ? 'In Progress' : '-'}
+                            {status}
                           </td>
                         </tr>
                       )})}
@@ -597,6 +747,86 @@ function FoundationSchool() {
           )}
         </div>
       </div>
+      )}
+
+      {showTeacherModal && (
+        <div className="modal-overlay active" onClick={() => setShowTeacherModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{teacherForm.id ? 'Edit Teacher' : 'Add Teacher'}</h3>
+              <button className="close-modal" type="button" onClick={() => setShowTeacherModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Title</label>
+                  <select className="form-control" value={teacherForm.title} onChange={(e) => setTeacherForm((prev) => ({ ...prev, title: e.target.value }))}>
+                    {TITLE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Name</label>
+                  <input className="form-control" value={teacherForm.name} onChange={(e) => setTeacherForm((prev) => ({ ...prev, name: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Mobile</label>
+                  <input className="form-control" value={teacherForm.mobile} onChange={(e) => setTeacherForm((prev) => ({ ...prev, mobile: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input className="form-control" value={teacherForm.email} onChange={(e) => setTeacherForm((prev) => ({ ...prev, email: e.target.value }))} />
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>Assigned Classes</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 8 }}>
+                    {CLASS_OPTIONS.map((className) => {
+                      const checked = teacherForm.assignedClasses.includes(className)
+                      return (
+                        <label key={className} className="check">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) =>
+                              setTeacherForm((prev) => ({
+                                ...prev,
+                                assignedClasses: e.target.checked
+                                  ? [...prev.assignedClasses, className]
+                                  : prev.assignedClasses.filter((value) => value !== className)
+                              }))
+                            }
+                          />
+                          {className}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setShowTeacherModal(false)}>Cancel</button>
+              <button className="btn btn-success" type="button" onClick={saveTeacher}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingTeacherId && (
+        <div className="modal-overlay confirmation-modal active" onClick={() => setDeletingTeacherId('')}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-body">
+              <div className="confirmation-icon">
+                <i className="fas fa-trash"></i>
+              </div>
+              <p className="confirmation-text">Delete this teacher?</p>
+              <div className="form-actions">
+                <button className="btn" type="button" onClick={() => setDeletingTeacherId('')}>Cancel</button>
+                <button className="btn btn-danger" type="button" onClick={deleteTeacher}>Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddModal && (
         <div className="modal-overlay active" onClick={() => setShowAddModal(false)}>

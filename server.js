@@ -863,6 +863,19 @@ async function createNotification({ title, message, type = "info", userId = null
        UNIQUE(service_id, first_timer_id)
      )`
   );
+
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS foundation_teachers (
+       id SERIAL PRIMARY KEY,
+       title TEXT,
+       name TEXT NOT NULL,
+       mobile TEXT,
+       email TEXT,
+       assigned_classes JSONB NOT NULL DEFAULT '[]'::jsonb,
+       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+     )`
+  );
 }
 
 async function ensureUserProfilesSchema() {
@@ -3945,6 +3958,110 @@ app.get("/api/ft-attendance/:id", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load individual attendance" });
+  }
+});
+
+// FOUNDATION SCHOOL TEACHERS (PROTECTED)
+app.get("/api/foundation-teachers", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id::text as id,
+              title,
+              name,
+              mobile,
+              email,
+              COALESCE(assigned_classes, '[]'::jsonb) as "assignedClasses",
+              created_at as "createdAt",
+              updated_at as "updatedAt"
+       FROM foundation_teachers
+       ORDER BY name ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load foundation teachers" });
+  }
+});
+
+app.post("/api/foundation-teachers", requireAuth, requireStaff, async (req, res) => {
+  try {
+    if (!validateWritePayload(req, res, ["title", "name", "mobile", "email", "assignedClasses"])) return;
+    const title = safeString(req.body?.title, 40) || null;
+    const name = safeString(req.body?.name, 160);
+    const mobile = safeString(req.body?.mobile, 80) || null;
+    const email = safeString(req.body?.email, 160) || null;
+    const assignedClasses = Array.isArray(req.body?.assignedClasses)
+      ? req.body.assignedClasses.map((value) => safeString(value, 40)).filter(Boolean)
+      : [];
+    if (!name) return res.status(400).json({ error: "name is required" });
+    const result = await pool.query(
+      `INSERT INTO foundation_teachers (title, name, mobile, email, assigned_classes, updated_at)
+       VALUES ($1,$2,$3,$4,$5::jsonb,NOW())
+       RETURNING id::text as id,
+                 title,
+                 name,
+                 mobile,
+                 email,
+                 COALESCE(assigned_classes, '[]'::jsonb) as "assignedClasses",
+                 created_at as "createdAt",
+                 updated_at as "updatedAt"`,
+      [title, name, mobile, email, JSON.stringify(assignedClasses)]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to add foundation teacher" });
+  }
+});
+
+app.put("/api/foundation-teachers/:id", requireAuth, requireStaff, async (req, res) => {
+  try {
+    if (!validateWritePayload(req, res, ["title", "name", "mobile", "email", "assignedClasses"])) return;
+    const title = safeString(req.body?.title, 40) ?? null;
+    const name = safeString(req.body?.name, 160) ?? null;
+    const mobile = safeString(req.body?.mobile, 80) ?? null;
+    const email = safeString(req.body?.email, 160) ?? null;
+    const assignedClasses = Array.isArray(req.body?.assignedClasses)
+      ? req.body.assignedClasses.map((value) => safeString(value, 40)).filter(Boolean)
+      : null;
+    const result = await pool.query(
+      `UPDATE foundation_teachers
+       SET title = COALESCE($1, title),
+           name = COALESCE($2, name),
+           mobile = COALESCE($3, mobile),
+           email = COALESCE($4, email),
+           assigned_classes = COALESCE($5::jsonb, assigned_classes),
+           updated_at = NOW()
+       WHERE id = $6
+       RETURNING id::text as id,
+                 title,
+                 name,
+                 mobile,
+                 email,
+                 COALESCE(assigned_classes, '[]'::jsonb) as "assignedClasses",
+                 created_at as "createdAt",
+                 updated_at as "updatedAt"`,
+      [title, name, mobile, email, assignedClasses ? JSON.stringify(assignedClasses) : null, req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: "Teacher not found" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update foundation teacher" });
+  }
+});
+
+app.delete("/api/foundation-teachers/:id", requireAuth, requireStaff, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM foundation_teachers WHERE id = $1 RETURNING id::text as id",
+      [req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: "Teacher not found" });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete foundation teacher" });
   }
 });
 
