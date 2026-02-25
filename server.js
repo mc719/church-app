@@ -144,14 +144,26 @@ app.use("/", express.static(clientDistPath));
 // ===============================
 // 4) DATABASE CONNECTION
 // ===============================
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+const dbConnectionString = (process.env.DATABASE_URL || "").trim();
+const sslMode = (process.env.PGSSLMODE || "").toLowerCase();
+const useDbSsl =
+  process.env.DB_FORCE_SSL === "true" ||
+  /sslmode=require/i.test(dbConnectionString) ||
+  sslMode === "require";
+
+const poolConfig = {
+  connectionString: dbConnectionString,
   max: Number(process.env.PGPOOL_MAX || 5),
   idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000),
   connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS || 10000),
   keepAlive: true
-});
+};
+
+if (useDbSsl) {
+  poolConfig.ssl = { rejectUnauthorized: false };
+}
+
+const pool = new Pool(poolConfig);
 
 const ACCESS_TOKEN_TTL_SEC = 60 * 60; // 1 hour
 const REFRESH_TOKEN_TTL_DAYS = 14;
@@ -4640,6 +4652,17 @@ app.get(/.*/, (req, res) => {
 // 7) START SERVER (ALWAYS LAST)
 // ===============================
 async function runStartupChecksWithRetry() {
+  if (dbConnectionString) {
+    try {
+      const dbUrl = new URL(dbConnectionString);
+      console.log(
+        `[DB] Startup target host=${dbUrl.hostname} port=${dbUrl.port || "5432"} ssl=${useDbSsl}`
+      );
+    } catch {
+      console.log(`[DB] Startup using configured DATABASE_URL (ssl=${useDbSsl})`);
+    }
+  }
+
   const maxAttempts = Number(process.env.STARTUP_DB_MAX_ATTEMPTS || 8);
   const delayMs = Number(process.env.STARTUP_DB_RETRY_MS || 5000);
 
