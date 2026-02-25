@@ -347,7 +347,7 @@ function Dashboard({ onAddCell }) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } }
+          plugins: { legend: { display: true, position: 'bottom' } }
         }
       })
     }
@@ -367,7 +367,7 @@ function Dashboard({ onAddCell }) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } }
+          plugins: { legend: { display: true, position: 'bottom' } }
         }
       })
     }
@@ -396,7 +396,7 @@ function Dashboard({ onAddCell }) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: true } },
+          plugins: { legend: { display: true, position: 'bottom' } },
           scales: {
             y: { beginAtZero: true, ticks: { precision: 0 } }
           }
