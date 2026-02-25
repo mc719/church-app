@@ -146,7 +146,11 @@ app.use("/", express.static(clientDistPath));
 // ===============================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  max: Number(process.env.PGPOOL_MAX || 5),
+  idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000),
+  connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS || 10000),
+  keepAlive: true
 });
 
 const ACCESS_TOKEN_TTL_SEC = 60 * 60; // 1 hour
@@ -4635,10 +4639,32 @@ app.get(/.*/, (req, res) => {
 // ===============================
 // 7) START SERVER (ALWAYS LAST)
 // ===============================
-ensureUserProfilesSchema()
-  .then(() => ensureFirstTimerSchema())
-  .then(() => ensureSecuritySchema())
-  .then(() => seedProfilesForExistingUsers())
+async function runStartupChecksWithRetry() {
+  const maxAttempts = Number(process.env.STARTUP_DB_MAX_ATTEMPTS || 8);
+  const delayMs = Number(process.env.STARTUP_DB_RETRY_MS || 5000);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await pool.query("SELECT 1");
+      await ensureUserProfilesSchema();
+      await ensureFirstTimerSchema();
+      await ensureSecuritySchema();
+      await seedProfilesForExistingUsers();
+      return;
+    } catch (err) {
+      const message = err?.message || String(err);
+      console.error(
+        `Startup DB check failed (attempt ${attempt}/${maxAttempts}): ${message}`
+      );
+      if (attempt >= maxAttempts) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
+runStartupChecksWithRetry()
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
