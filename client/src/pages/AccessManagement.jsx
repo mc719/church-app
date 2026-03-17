@@ -66,7 +66,6 @@ function AccessManagement() {
   const [allowAll, setAllowAll] = useState(false)
   const [newAllowedMenus, setNewAllowedMenus] = useState([])
   const [newAllowAll, setNewAllowAll] = useState(true)
-  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -77,12 +76,10 @@ function AccessManagement() {
         fetch(`${API_BASE}/roles`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : []))
       ])
         .then(([usersData, rolesData]) => {
-          setLoadError('')
           setUsers(Array.isArray(usersData) ? usersData : [])
           setRoles(Array.isArray(rolesData) ? rolesData : [])
         })
         .catch(() => {
-          setLoadError('Unable to load users right now.')
           setUsers([])
           setRoles([])
         })
@@ -267,9 +264,6 @@ function AccessManagement() {
       </div>
 
       <div className="table-container">
-        {loadError && (
-          <div className="access-error-banner">{loadError}</div>
-        )}
         <table className="mobile-grid-table">
           <thead>
             <tr>
