@@ -160,7 +160,7 @@ const poolConfig = {
 };
 
 if (useDbSsl) {
-  poolConfig.ssl = { rejectUnauthorized: true };
+  poolConfig.ssl = { rejectUnauthorized: false };
 }
 
 const pool = new Pool(poolConfig);
@@ -1721,7 +1721,7 @@ app.get("/api/departments", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/departments", rateLimit({ keyPrefix: "departments-create", windowMs: 60_000, max: 20 }), requireAuth, requireAdmin, async (req, res) => {
+app.post("/api/departments", rateLimit({ keyPrefix: "departments-create", windowMs: 60_000, max: 20 }), requireAuthOrAccessCode, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["name", "hodTitle", "hodName", "hodMobile"])) return;
     const name = safeString(req.body?.name, 180);
@@ -1816,26 +1816,40 @@ app.delete("/api/departments/:id", requireAuth, requireAdmin, async (req, res) =
 // OTP SEND (PUBLIC) - by email
 app.post("/api/otp/send", rateLimit({ keyPrefix: "otp-send", windowMs: 60_000, max: 5 }), async (req, res) => {
   try {
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    const genericResponse = { message: "If that email is registered, a one-time code has been sent." };
+    const { email } = req.body || {};
 
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    const result = await pool.query(
-      "SELECT id, username, role, status, email, restricted_menus, token_version FROM users WHERE LOWER(email) = $1 LIMIT 1",
-      [email]
-    );
+  const result = await pool.query(
+    "SELECT id, username, role, status, email, restricted_menus, token_version FROM users WHERE email = $1",
+    [email]
+  );
 
-    const user = result.rows[0];
-    if (user?.status) {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + OTP_TTL_MS;
-      otpStore.set(email, { code, expiresAt, user });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Unrecognized email" });
     }
 
-    res.json(genericResponse);
+    const user = result.rows[0];
+
+    if (!user.status) {
+      return res.status(403).json({ error: "Account disabled" });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + OTP_TTL_MS;
+    otpStore.set(email, { code, expiresAt, user });
+
+    // In a real app, send via email/SMS here.
+    console.log(`OTP for ${email}: ${code}`);
+
+    const response = { message: "One-time code sent" };
+    if (process.env.NODE_ENV !== "production") {
+      response.devCode = code;
+    }
+
+    res.json(response);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to send code" });
@@ -1966,7 +1980,7 @@ app.post("/api/login", rateLimit({ keyPrefix: "login", windowMs: 60_000, max: 10
 });
 
 // ADD CELL (AUTH OR ACCESS CODE)
-app.post("/api/cells", rateLimit({ keyPrefix: "cells-create", windowMs: 60_000, max: 20 }), requireAuth, requireStaff, async (req, res) => {
+app.post("/api/cells", rateLimit({ keyPrefix: "cells-create", windowMs: 60_000, max: 20 }), requireAuthOrAccessCode, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["name", "venue", "day", "time", "description"])) return;
     const name = safeString(req.body?.name, 160);
@@ -2394,7 +2408,7 @@ app.put("/api/profiles/:userId", requireAuth, requireAdmin, async (req, res) => 
   }
 });
 
-app.get("/api/profile/by-email", requireAuth, requireAdmin, async (req, res) => {
+app.get("/api/profile/by-email", requireAuth, async (req, res) => {
   try {
     const email = String(req.query.email || "").trim().toLowerCase();
     if (!email) {
@@ -2646,7 +2660,7 @@ app.get("/api/members", requireAuth, async (req, res) => {
 });
 
 // ADD MEMBER (AUTH OR ACCESS CODE)
-app.post("/api/members", rateLimit({ keyPrefix: "members-create", windowMs: 60_000, max: 40 }), requireAuth, requireStaff, async (req, res) => {
+app.post("/api/members", rateLimit({ keyPrefix: "members-create", windowMs: 60_000, max: 40 }), requireAuthOrAccessCode, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["cellId", "departmentId", "title", "name", "gender", "mobile", "email", "role", "isFirstTimer", "foundationSchool", "dateOfBirth", "dobMonth", "dobDay"])) return;
     const cellId = req.body?.cellId ?? null;
@@ -3128,7 +3142,7 @@ app.get("/api/first-timers/category-trends", requireAuth, async (req, res) => {
 });
 
 // ADD FIRST-TIMER (PROTECTED OR ACCESS CODE)
-app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", windowMs: 60_000, max: 30 }), requireAuth, requireStaff, async (req, res) => {
+app.post("/api/first-timers", rateLimit({ keyPrefix: "first-timers-create", windowMs: 60_000, max: 30 }), requireAuthOrAccessCode, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, [
       "title", "name", "surname", "gender", "mobile", "email", "photoData", "address", "postcode", "birthday",

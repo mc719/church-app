@@ -15,11 +15,7 @@ Before every production deploy:
    - `DATABASE_URL`
    - `JWT_SECRET`
    - `CORS_ORIGINS`
-   - `DB_FORCE_SSL=true`
    - `ACCESS_CODE` (if used)
-6. Confirm no live secrets are committed to the repo:
-   - `.env` must stay local-only
-   - committed examples must use placeholders only
 4. Deploy.
 5. Run smoke tests:
    - `GET /api/health` returns 200
@@ -85,21 +81,18 @@ Rotate in this order:
 Rotation steps:
 
 1. Generate new secret value.
-2. Update the Render environment variable and any other secret store in use.
-3. Replace local `.env` values with the new secrets only on trusted machines.
-4. Ensure committed files keep placeholders only (`.env.example`, docs, scripts).
-5. Redeploy service.
-6. Verify:
+2. Update Render environment variable.
+3. Redeploy service.
+4. Verify:
    - login
    - refresh token flow
    - core API read/write calls
-7. Record date, operator, and outcome in change log.
+5. Record date, operator, and outcome in change log.
 
 Notes:
 
 - Rotating `JWT_SECRET` forces re-login (expected).
 - After high-risk event, rotate immediately (not waiting for quarter).
-- `DATABASE_URL` should require TLS, and `DB_FORCE_SSL=true` should remain enabled unless the platform provides an equivalent enforced setting.
 
 ## 6) Backup and Restore Drill
 

@@ -47,25 +47,14 @@ const BASE_MENU_OPTIONS = [
 const getMenuLabel = (id, options) => options.find((m) => m.id === id)?.label || id
 
 function AccessManagement() {
-  const defaultNewUser = () => ({
-    username: '',
-    email: '',
-    password: '',
-    role: '',
-    status: true
-  })
-
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [menuOptions, setMenuOptions] = useState(BASE_MENU_OPTIONS)
   const [page, setPage] = useState(1)
-  const [creatingUser, setCreatingUser] = useState(null)
   const [editingUser, setEditingUser] = useState(null)
   const [deletingUser, setDeletingUser] = useState(null)
   const [allowedMenus, setAllowedMenus] = useState([])
   const [allowAll, setAllowAll] = useState(false)
-  const [newAllowedMenus, setNewAllowedMenus] = useState([])
-  const [newAllowAll, setNewAllowAll] = useState(true)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -164,15 +153,6 @@ function AccessManagement() {
     setEditingUser({ ...user, password: '' })
   }
 
-  const openCreate = () => {
-    setCreatingUser({
-      ...defaultNewUser(),
-      role: roles[0]?.name || ''
-    })
-    setNewAllowAll(true)
-    setNewAllowedMenus(menuOptions.map((menu) => menu.id))
-  }
-
   const handleDelete = async () => {
     if (!deletingUser) return
     const token = localStorage.getItem('token')
@@ -215,34 +195,6 @@ function AccessManagement() {
     }
     setEditingUser(null)
   }
-
-  const handleCreate = async (event) => {
-    event.preventDefault()
-    if (!creatingUser) return
-    const token = localStorage.getItem('token')
-    if (!token) return
-    const res = await fetch(`${API_BASE}/users`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        username: creatingUser.username,
-        email: creatingUser.email,
-        password: creatingUser.password,
-        role: creatingUser.role,
-        status: creatingUser.status,
-        restrictedMenus: newAllowAll ? [] : toRestrictedMenus(newAllowedMenus)
-      })
-    })
-    if (!res.ok) return
-    const created = await res.json()
-    setUsers((prev) => [...prev, created])
-    setPage(Math.max(1, Math.ceil((users.length + 1) / PAGE_SIZE)))
-    setCreatingUser(null)
-  }
-
   const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE))
   const showPagination = users.length > 10
   const currentPage = Math.min(page, totalPages)
@@ -251,18 +203,6 @@ function AccessManagement() {
 
   return (
     <div className="access-page">
-      <div className="section-header access-header">
-        <div>
-          <h2>User Access</h2>
-          <p className="access-subtitle">Manage accounts, roles, and page permissions.</p>
-        </div>
-        <div className="page-actions access-actions" style={{ justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <button className="btn btn-primary" type="button" onClick={openCreate}>
-            <i className="fas fa-user-plus"></i> Add User
-          </button>
-        </div>
-      </div>
-
       <div className="table-container">
         <table className="mobile-grid-table">
           <thead>
@@ -445,122 +385,6 @@ function AccessManagement() {
                   </button>
                   <button className="btn btn-success" type="submit">
                     Save
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {creatingUser && (
-        <div className="modal-overlay active" onClick={() => setCreatingUser(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Add User</h3>
-              <button className="close-modal" type="button" onClick={() => setCreatingUser(null)}>
-                &times;
-              </button>
-            </div>
-            <div className="modal-body">
-              <form onSubmit={handleCreate}>
-                <div className="form-group">
-                  <label>Username</label>
-                  <input
-                    className="form-control"
-                    value={creatingUser.username}
-                    onChange={(e) => setCreatingUser({ ...creatingUser, username: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input
-                    className="form-control"
-                    type="email"
-                    value={creatingUser.email}
-                    onChange={(e) => setCreatingUser({ ...creatingUser, email: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Password</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    value={creatingUser.password}
-                    onChange={(e) => setCreatingUser({ ...creatingUser, password: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Role</label>
-                  <select
-                    className="form-control"
-                    value={creatingUser.role}
-                    onChange={(e) => setCreatingUser({ ...creatingUser, role: e.target.value })}
-                    required
-                  >
-                    {roles.length === 0 && <option value="">No roles</option>}
-                    {roles.map((role) => (
-                      <option key={role.id} value={role.name}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <select
-                    className="form-control"
-                    value={creatingUser.status ? 'active' : 'inactive'}
-                    onChange={(e) => setCreatingUser({ ...creatingUser, status: e.target.value === 'active' })}
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Allowed Menus</label>
-                  <div className="allowed-menus">
-                    <label className="allowed-menu-item">
-                      <input
-                        type="checkbox"
-                        checked={newAllowAll}
-                        onChange={(e) => {
-                          setNewAllowAll(e.target.checked)
-                          if (e.target.checked) {
-                            setNewAllowedMenus(menuOptions.map((menu) => menu.id))
-                          }
-                        }}
-                      />
-                      <span>All</span>
-                    </label>
-                    {!newAllowAll &&
-                      menuOptions.map((menu) => (
-                        <label className="allowed-menu-item" key={`new-${menu.id}`}>
-                          <input
-                            type="checkbox"
-                            checked={newAllowedMenus.includes(menu.id)}
-                            onChange={(e) => {
-                              setNewAllowedMenus((prev) =>
-                                e.target.checked
-                                  ? [...prev, menu.id]
-                                  : prev.filter((id) => id !== menu.id)
-                              )
-                            }}
-                          />
-                          <span>{menu.label}</span>
-                        </label>
-                      ))}
-                  </div>
-                </div>
-                <div className="form-actions">
-                  <button className="btn" type="button" onClick={() => setCreatingUser(null)}>
-                    Cancel
-                  </button>
-                  <button className="btn btn-success" type="submit">
-                    Add User
                   </button>
                 </div>
               </form>

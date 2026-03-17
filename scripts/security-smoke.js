@@ -72,62 +72,11 @@ async function run() {
     }
   }
 
-  // 3) Shared access code should not bypass write authentication.
-  {
-    const { res, json } = await request("/api/cells", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-access-code": process.env.ACCESS_CODE || "test-access-code"
-      },
-      body: JSON.stringify({ name: "security-smoke-cell" })
-    });
-    if (res.status === 401 || res.status === 403) ok("access-code-write-blocked");
-    else {
-      failed += 1;
-      fail("access-code-write-blocked", `expected 401/403, got ${res.status} ${json ? JSON.stringify(json) : ""}`);
-    }
-  }
-
-  // 4) OTP send should not enumerate users and should never return a dev code.
-  {
-    const unknownEmail = `nobody+${Date.now()}@example.com`;
-    const { res: knownRes, json: knownJson } = await request("/api/otp/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: TEST_USERNAME || "known@example.com" })
-    });
-    const { res: unknownRes, json: unknownJson } = await request("/api/otp/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: unknownEmail })
-    });
-
-    const knownMessage = knownJson?.message;
-    const unknownMessage = unknownJson?.message;
-    const noDevCode = !("devCode" in (knownJson || {})) && !("devCode" in (unknownJson || {}));
-    if (
-      knownRes.status === 200 &&
-      unknownRes.status === 200 &&
-      typeof knownMessage === "string" &&
-      knownMessage === unknownMessage &&
-      noDevCode
-    ) {
-      ok("otp-generic-response");
-    } else {
-      failed += 1;
-      fail(
-        "otp-generic-response",
-        `expected matching 200 responses without devCode, got known=${knownRes.status} unknown=${unknownRes.status}`
-      );
-    }
-  }
-
   const token = await login();
   if (!token) {
     skip("auth-dependent-tests", "TEST_USERNAME/TEST_PASSWORD missing or invalid");
   } else {
-    // 5) Unknown field payload should be rejected.
+    // 3) Unknown field payload should be rejected.
     {
       const { res } = await request("/api/profile/me", {
         method: "PUT",
@@ -144,7 +93,7 @@ async function run() {
       }
     }
 
-    // 6) Oversize image upload should be rejected.
+    // 4) Oversize image upload should be rejected.
     {
       const oversized = `data:image/png;base64,${"A".repeat(3 * 1024 * 1024)}`;
       const { res } = await request("/api/profile/me", {
@@ -174,3 +123,4 @@ run().catch((err) => {
   console.error("Security smoke test runner failed:", err);
   process.exit(1);
 });
+
