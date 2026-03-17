@@ -2126,12 +2126,19 @@ app.get("/api/users", requireAuth, requireAdmin, async (req, res) => {
                 u.role,
                 u.status,
                 u.restricted_menus as "restrictedMenus",
-                COALESCE(up.full_name, m.full_name, m.name) as name
+                COALESCE(
+                  up.full_name,
+                  (
+                    SELECT m.name
+                    FROM members m
+                    WHERE LOWER(m.email) = LOWER(u.email)
+                    ORDER BY m.id DESC
+                    LIMIT 1
+                  )
+                ) as name
          FROM users u
          LEFT JOIN user_profiles up
            ON up.user_id = u.id
-         LEFT JOIN members m
-           ON lower(m.email) = lower(u.email)
          ORDER BY u.id`
       );
     res.json(result.rows);
