@@ -392,54 +392,6 @@ function requireAuth(req, res, next) {
     });
 }
 
-function requireAuthOrAccessCode(req, res, next) {
-  const token = getBearerOrCookieToken(req);
-  const accessCode = normalizeAccessCode(req.headers["x-access-code"]);
-  const expectedAccessCode = normalizeAccessCode(ACCESS_CODE);
-
-  if (expectedAccessCode && accessCode && accessCode === expectedAccessCode) {
-    return next();
-  }
-
-  if (!token) {
-    return res.status(401).json({ error: expectedAccessCode ? "Missing token or access code" : "Missing token" });
-  }
-
-  let payload;
-  try {
-    payload = jwt.verify(token, JWT_SECRET);
-  } catch {
-    return res.status(401).json({ error: "Invalid or expired token" });
-  }
-
-  pool
-    .query(
-      "SELECT id, username, role, status, token_version FROM users WHERE id = $1 LIMIT 1",
-      [payload.userId]
-    )
-    .then((result) => {
-      const user = result.rows[0];
-      if (!user) return res.status(401).json({ error: "Invalid token user" });
-      if (!user.status) return res.status(403).json({ error: "Account disabled" });
-      const tokenVersion = Number(payload.tokenVersion);
-      const currentVersion = Number(user.token_version || 1);
-      if (!Number.isFinite(tokenVersion) || tokenVersion !== currentVersion) {
-        return res.status(401).json({ error: "Session expired. Please sign in again." });
-      }
-      req.user = {
-        userId: String(user.id),
-        username: user.username,
-        role: user.role,
-        tokenVersion: currentVersion
-      };
-      next();
-    })
-    .catch((err) => {
-      console.error("Auth check failed:", err);
-      return res.status(500).json({ error: "Auth validation failed" });
-    });
-}
-
 app.post("/api/access/verify", rateLimit({ keyPrefix: "access-verify", windowMs: 60_000, max: 10 }), (req, res) => {
   const accessCode = normalizeAccessCode(req.body?.accessCode);
   const expectedAccessCode = normalizeAccessCode(ACCESS_CODE);
@@ -1721,7 +1673,7 @@ app.get("/api/departments", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/departments", rateLimit({ keyPrefix: "departments-create", windowMs: 60_000, max: 20 }), requireAuthOrAccessCode, async (req, res) => {
+app.post("/api/departments", rateLimit({ keyPrefix: "departments-create", windowMs: 60_000, max: 20 }), requireAuth, requireStaff, async (req, res) => {
   try {
     if (!validateWritePayload(req, res, ["name", "hodTitle", "hodName", "hodMobile"])) return;
     const name = safeString(req.body?.name, 180);
@@ -2518,7 +2470,7 @@ app.get("/api/audit-logs", requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET CELLS (PROTECTED OR ACCESS CODE)
-app.get("/api/cells", requireAuthOrAccessCode, async (req, res) => {
+app.get("/api/cells", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT id::text as id, name, venue, day, time, description FROM cells ORDER BY id"
