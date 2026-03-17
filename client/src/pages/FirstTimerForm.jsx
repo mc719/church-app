@@ -55,7 +55,7 @@ function FirstTimerForm() {
   const verifyAccessCode = async () => {
     const trimmed = accessInput.trim()
     if (!trimmed) {
-      setAccessError('Access code is required.')
+      setAccessError('Church team passcode is required.')
       return false
     }
     try {
@@ -66,14 +66,14 @@ function FirstTimerForm() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Invalid access code')
+        throw new Error(data.error || 'Invalid church team passcode')
       }
       setAccessCode(trimmed)
       setAccessError('')
       setShowAccess(false)
       return true
     } catch (err) {
-      setAccessError(err.message || 'Invalid access code')
+      setAccessError(err.message || 'Invalid church team passcode')
       return false
     }
   }
@@ -175,7 +175,7 @@ function FirstTimerForm() {
 
             <div className="headtext">
               <div className="h1">CHRIST EMBASSY</div>
-              <div className="h2">Welcome FORM!</div>
+              <div className="h2">Guest Welcome Form</div>
               <div className="p" style={{ fontStyle: 'italic' }}>
                 <strong>We</strong> are most delighted to have <strong>YOU</strong> in our midst today.
               </div>
@@ -399,14 +399,19 @@ function FirstTimerForm() {
       {showAccess && (
         <div className="ft-form-access-overlay">
           <div className="ft-form-access-modal">
-            <h2>Access Code</h2>
-            <label htmlFor="ftAccessCode">Enter access code to continue</label>
+            <h2>Church Team Passcode</h2>
+            <p className="ft-form-access-copy">
+              This page is for church guest registration only. Enter the passcode given by the hosting team.
+              Do not enter your email, banking, or personal account password here.
+            </p>
+            <label htmlFor="ftAccessCode">Enter event passcode to open the guest form</label>
             <input
               id="ftAccessCode"
-              type="password"
+              type="text"
               value={accessInput}
               onChange={(event) => setAccessInput(event.target.value)}
-              autoComplete="one-time-code"
+              autoComplete="off"
+              inputMode="text"
               style={{ width: '100%', marginTop: '8px', padding: '10px', borderRadius: '8px', border: '1px solid #d0d7e5' }}
             />
             {accessError && <p style={{ color: '#b23a2c', marginTop: '8px' }}>{accessError}</p>}
@@ -415,7 +420,7 @@ function FirstTimerForm() {
                 Cancel
               </button>
               <button type="button" className="primary" onClick={verifyAccessCode}>
-                Continue
+                Open form
               </button>
             </div>
           </div>

@@ -65,6 +65,12 @@
   margin-top: 8px;
 }
 
+.new-department-passcode-copy {
+  margin: 0 0 14px;
+  color: #475569;
+  line-height: 1.5;
+}
+
 @media (max-width: 640px) {
   .new-department-form {
     padding: 24px;

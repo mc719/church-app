@@ -120,7 +120,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
+        scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
         imgSrc: ["'self'", "data:", "blob:"],
         fontSrc: ["'self'", "data:", "https://cdnjs.cloudflare.com"],

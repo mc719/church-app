@@ -44,7 +44,7 @@ function NewDepartmentForm() {
   const verifyAccessCode = async () => {
     const trimmed = accessInput.trim()
     if (!trimmed) {
-      setAccessError('Access code is required.')
+      setAccessError('Church team passcode is required.')
       return false
     }
     try {
@@ -55,14 +55,14 @@ function NewDepartmentForm() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Invalid access code')
+        throw new Error(data.error || 'Invalid church team passcode')
       }
       setAccessCode(trimmed)
       setAccessError('')
       setShowAccess(false)
       return true
     } catch (err) {
-      setAccessError(err.message || 'Invalid access code')
+      setAccessError(err.message || 'Invalid church team passcode')
       return false
     }
   }
@@ -170,12 +170,18 @@ function NewDepartmentForm() {
               </button>
             </div>
             <div className="modal-body">
+              <p className="new-department-passcode-copy">
+                This page is for internal church administration. Enter only the passcode issued by the church
+                team. Do not use any personal account password here.
+              </p>
               <div className="form-group">
-                <label>Access Code</label>
+                <label>Church Team Passcode</label>
                 <input
                   className="form-control"
+                  type="text"
                   value={accessInput}
                   onChange={(event) => setAccessInput(event.target.value)}
+                  autoComplete="off"
                 />
                 {accessError && <div className="error-message">{accessError}</div>}
               </div>
@@ -184,7 +190,7 @@ function NewDepartmentForm() {
                   Cancel
                 </button>
                 <button className="btn btn-success" type="button" onClick={verifyAccessCode}>
-                  Continue
+                  Open form
                 </button>
               </div>
             </div>

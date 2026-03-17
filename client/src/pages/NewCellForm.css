@@ -129,6 +129,12 @@
   color: #1e3a5f;
 }
 
+.new-cell-passcode-copy {
+  margin: 0 0 12px;
+  color: #4a5d75;
+  line-height: 1.45;
+}
+
 .new-cell-modal-actions {
   display: flex;
   gap: 10px;

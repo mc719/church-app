@@ -62,7 +62,7 @@ function NewCellForm() {
   const verifyAccessCode = async () => {
     const trimmed = accessInput.trim()
     if (!trimmed) {
-      setAccessError('Access code is required.')
+      setAccessError('Church team passcode is required.')
       return false
     }
     try {
@@ -73,14 +73,14 @@ function NewCellForm() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Invalid access code')
+        throw new Error(data.error || 'Invalid church team passcode')
       }
       setAccessCode(trimmed)
       setAccessError('')
       setShowAccess(false)
       return true
     } catch (err) {
-      setAccessError(err.message || 'Invalid access code')
+      setAccessError(err.message || 'Invalid church team passcode')
       return false
     }
   }
@@ -338,14 +338,19 @@ function NewCellForm() {
       {showAccess && (
         <div className="new-cell-modal-overlay">
           <div className="new-cell-modal">
-            <h2>Access Code</h2>
-            <label htmlFor="accessCodeInput">Enter access code to continue</label>
+            <h2>Church Team Passcode</h2>
+            <p className="new-cell-passcode-copy">
+              This page is for internal church data entry. Use only the passcode issued by your local team.
+              Do not enter your email or banking password on this page.
+            </p>
+            <label htmlFor="accessCodeInput">Enter event passcode to continue</label>
             <input
               id="accessCodeInput"
-              type="password"
+              type="text"
               value={accessInput}
               onChange={(event) => setAccessInput(event.target.value)}
-              autoComplete="one-time-code"
+              autoComplete="off"
+              inputMode="text"
             />
             {accessError && <p style={{ color: '#b23a2c', marginTop: '8px' }}>{accessError}</p>}
             <div className="new-cell-modal-actions">
@@ -353,7 +358,7 @@ function NewCellForm() {
                 Cancel
               </button>
               <button type="button" className="new-cell-btn new-cell-btn-primary" onClick={verifyAccessCode}>
-                Continue
+                Open form
               </button>
             </div>
           </div>

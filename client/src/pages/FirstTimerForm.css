@@ -150,6 +150,13 @@
   margin-top: 2px;
 }
 
+.ft-form-access-copy {
+  margin: 0 0 12px;
+  color: #55677f;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
 .ft-form-page .hr {
   height: 1px;
   background: #c7d7ee;
