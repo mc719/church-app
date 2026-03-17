@@ -5,6 +5,38 @@ import './index.css'
 import './styles/main.css'
 import App from './App.jsx'
 
+const localStorageProto = Object.getPrototypeOf(window.localStorage)
+const nativeLocalGetItem = localStorageProto.getItem
+const nativeLocalSetItem = localStorageProto.setItem
+const nativeLocalRemoveItem = localStorageProto.removeItem
+
+const legacyToken = nativeLocalGetItem.call(window.localStorage, 'token')
+if (legacyToken) {
+  window.sessionStorage.setItem('token', legacyToken)
+  nativeLocalRemoveItem.call(window.localStorage, 'token')
+}
+
+localStorageProto.getItem = function patchedGetItem(key) {
+  if (this === window.localStorage && key === 'token') {
+    return window.sessionStorage.getItem('token')
+  }
+  return nativeLocalGetItem.call(this, key)
+}
+
+localStorageProto.setItem = function patchedSetItem(key, value) {
+  if (this === window.localStorage && key === 'token') {
+    return window.sessionStorage.setItem('token', value)
+  }
+  return nativeLocalSetItem.call(this, key, value)
+}
+
+localStorageProto.removeItem = function patchedRemoveItem(key) {
+  if (this === window.localStorage && key === 'token') {
+    return window.sessionStorage.removeItem('token')
+  }
+  return nativeLocalRemoveItem.call(this, key)
+}
+
 const showToast = (message) => {
   let toast = document.getElementById('appToast')
   if (!toast) {
