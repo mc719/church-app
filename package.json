@@ -6,7 +6,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "build": "npm install && npm --prefix client install --include=dev && npm --prefix client run build",
+    "security:secrets": "node scripts/secret-scan.js",
     "security:test": "node scripts/security-smoke.js",
+    "security:audit": "npm audit --omit=dev --audit-level=high && npm --prefix client audit --omit=dev --audit-level=high",
     "migrate": "node scripts/migrate.js",
     "backup:verify": "node scripts/verify-backup-restore.js"
   },

@@ -5,6 +5,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 jobs:
@@ -16,6 +18,8 @@ jobs:
       BASE_URL: ${{ secrets.SECURITY_TEST_BASE_URL }}
       TEST_USERNAME: ${{ secrets.SECURITY_TEST_USERNAME }}
       TEST_PASSWORD: ${{ secrets.SECURITY_TEST_PASSWORD }}
+      SECURITY_TEST_EMAIL: ${{ secrets.SECURITY_TEST_EMAIL }}
+      SECURITY_TEST_FAKE_EMAIL: ${{ secrets.SECURITY_TEST_FAKE_EMAIL }}
       CORS_ORIGINS: ${{ secrets.SECURITY_TEST_CORS_ORIGINS }}
 
     steps:
@@ -31,11 +35,17 @@ jobs:
       - name: Install root dependencies
         run: npm install
 
+      - name: Scan tracked files for secrets
+        run: npm run security:secrets
+
       - name: Syntax check server
         run: node --check server.js
 
       - name: Build client
         run: npm --prefix client install && npm --prefix client run build
+
+      - name: Run dependency audits
+        run: npm run security:audit
 
       - name: Run security smoke tests
         if: ${{ env.BASE_URL != '' && env.TEST_USERNAME != '' && env.TEST_PASSWORD != '' }}
@@ -46,4 +56,4 @@ jobs:
         run: |
           echo "Security smoke tests skipped."
           echo "Set repo secrets: SECURITY_TEST_BASE_URL, SECURITY_TEST_USERNAME, SECURITY_TEST_PASSWORD, SECURITY_TEST_CORS_ORIGINS"
-
+          echo "Optional stronger OTP coverage: SECURITY_TEST_EMAIL, SECURITY_TEST_FAKE_EMAIL"
