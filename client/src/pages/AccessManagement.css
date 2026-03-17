@@ -38,6 +38,16 @@
   flex-wrap: wrap;
 }
 
+.access-page .access-header {
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+
+.access-page .access-subtitle {
+  margin: 6px 0 0;
+  color: var(--gray-color);
+}
+
 .access-page .access-filter {
   min-width: 150px;
 }

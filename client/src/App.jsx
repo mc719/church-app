@@ -26,6 +26,7 @@ import NewDepartmentForm from './pages/NewDepartmentForm.jsx'
 function App() {
   const [showAddCell, setShowAddCell] = useState(false)
   const [hasToken, setHasToken] = useState(Boolean(localStorage.getItem('token')))
+  const [authReady, setAuthReady] = useState(Boolean(localStorage.getItem('token')))
 
   const modalContext = useMemo(() => ({
     openAddCell: () => setShowAddCell(true),
@@ -33,14 +34,44 @@ function App() {
   }), [])
 
   useEffect(() => {
-    const syncToken = () => {
-      setHasToken(Boolean(localStorage.getItem('token')))
+    let mounted = true
+
+    const syncToken = async () => {
+      const current = Boolean(localStorage.getItem('token'))
+      if (mounted) {
+        setHasToken(current)
+      }
+      if (current) {
+        if (mounted) {
+          setAuthReady(true)
+        }
+        return
+      }
+
+      try {
+        const res = await fetch('/api/auth/refresh', { method: 'POST' })
+        if (!mounted) return
+        setHasToken(res.ok)
+      } catch {
+        if (!mounted) return
+        setHasToken(false)
+      } finally {
+        if (mounted) {
+          setAuthReady(true)
+        }
+      }
     }
-    syncToken()
-    window.addEventListener('storage', syncToken)
+
+    const handleStorage = () => {
+      void syncToken()
+    }
+
+    void syncToken()
+    window.addEventListener('storage', handleStorage)
     window.addEventListener('auth-changed', syncToken)
     return () => {
-      window.removeEventListener('storage', syncToken)
+      mounted = false
+      window.removeEventListener('storage', handleStorage)
       window.removeEventListener('auth-changed', syncToken)
     }
   }, [])
@@ -50,6 +81,10 @@ function App() {
     window.addEventListener('open-add-cell', handleOpenAddCell)
     return () => window.removeEventListener('open-add-cell', handleOpenAddCell)
   }, [])
+
+  if (!authReady) {
+    return null
+  }
 
   return (
     <>
