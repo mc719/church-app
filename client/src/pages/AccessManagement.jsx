@@ -71,23 +71,37 @@ function AccessManagement() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) return
-    const load = () =>
-      Promise.all([
-        fetch(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : [])),
-        fetch(`${API_BASE}/roles`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => (r.ok ? r.json() : []))
-      ])
-        .then(([usersData, rolesData]) => {
+    const load = async () => {
+      try {
+        const [usersRes, rolesRes] = await Promise.all([
+          fetch(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/roles`, { headers: { Authorization: `Bearer ${token}` } })
+        ])
+
+        const usersData = await usersRes.json().catch(() => [])
+        const rolesData = await rolesRes.json().catch(() => [])
+
+        if (!usersRes.ok) {
+          setLoadError(usersData?.error || 'Unable to load users right now.')
+          setUsers([])
+        } else {
           setLoadError('')
           setUsers(Array.isArray(usersData) ? usersData : [])
-          setRoles(Array.isArray(rolesData) ? rolesData : [])
-        })
-        .catch(() => {
-          setLoadError('Unable to load users right now.')
-          setUsers([])
-          setRoles([])
-        })
+        }
 
-    load()
+        if (rolesRes.ok) {
+          setRoles(Array.isArray(rolesData) ? rolesData : [])
+        } else {
+          setRoles([])
+        }
+      } catch {
+        setLoadError('Unable to load users right now.')
+        setUsers([])
+        setRoles([])
+      }
+    }
+
+    void load()
     const timer = setInterval(load, 30000)
     const onFocus = () => load()
     window.addEventListener('focus', onFocus)
